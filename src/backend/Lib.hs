@@ -16,9 +16,8 @@ import System.IO
 
 
 type Api =
-  "image"
-  :> QueryParam' '[Required, Strict] "gamma" Double
-  :> Get '[OctetStream] BS.ByteString :<|>
+  "image" :> QueryParam' '[Required, Strict] "gamma" Double :> Get '[OctetStream] BS.ByteString :<|>
+  "image" :> "coordinate" :> QueryParam' '[Required, Strict] "gamma" Double :> ReqBody '[JSON] (Int, Int) :> Post '[JSON] Double :<|>
   Raw
 
 
@@ -39,17 +38,28 @@ server =
 handlers :: Server Api
 handlers =
   handleImage :<|>
+  handleCoordinate :<|>
   serveDirectoryFileServer "./"
 
 
 handleImage :: Double -> Servant.Handler BS.ByteString
 handleImage g = do
-  image <- liftIO $ readImage "test2.png"
+  image <- liftIO $ readImage "assets/test2.png"
   pure $ Massiv.encodeImage Massiv.imageWriteFormats "image.png" $
     Array.map (gamma g . invert) image
 
 
+handleCoordinate :: Double -> (Int, Int) -> Servant.Handler Double
+handleCoordinate g (x, y) = do
+  image <- liftIO $ readImage "assets/test2.png"
+  let image2 = Array.compute (Array.map (gamma g . invert) image) :: MonochromeImage Array.S
+  case Array.index image2 (Array.Ix2 y x) of
+    Just (ColorSpace.PixelY v) -> pure v
+    Nothing -> pure 0
+
+
 -- IMAGE
+
 
 
 type MonochromeImage r =
