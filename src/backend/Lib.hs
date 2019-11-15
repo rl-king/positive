@@ -9,6 +9,8 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Massiv.Array as Array
 import qualified Data.Massiv.Array.IO as Massiv
+import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Graphics.ColorSpace as ColorSpace
 import Network.Wai.Handler.Warp
 import Servant
@@ -16,8 +18,17 @@ import System.IO
 
 
 type Api =
-  "image" :> QueryParam' '[Required, Strict] "gamma" Double :> Get '[OctetStream] BS.ByteString :<|>
-  "image" :> "coordinate" :> QueryParam' '[Required, Strict] "gamma" Double :> ReqBody '[JSON] (Int, Int) :> Post '[JSON] Double :<|>
+  -- IMAGE
+  "image"
+  :> QueryParam' '[Required, Strict] "path" Text
+  :> QueryParam' '[Required, Strict] "gamma" Double
+  :> Get '[OctetStream] BS.ByteString :<|>
+  -- COORDINATE
+  "image" :> "coordinate"
+  :> QueryParam' '[Required, Strict] "path" Text
+  :> QueryParam' '[Required, Strict] "gamma" Double
+  :> ReqBody '[JSON] (Int, Int) :> Post '[JSON] Double :<|>
+  -- RAW
   Raw
 
 
@@ -42,16 +53,16 @@ handlers =
   serveDirectoryFileServer "./"
 
 
-handleImage :: Double -> Servant.Handler BS.ByteString
-handleImage g = do
-  image <- liftIO $ readImage "assets/test2.png"
-  pure $ Massiv.encodeImage Massiv.imageWriteFormats "image.png" $
+handleImage :: Text ->Double -> Servant.Handler BS.ByteString
+handleImage path g = do
+  image <- liftIO $ readImage (Text.unpack path)
+  pure $ Massiv.encodeImage Massiv.imageWriteFormats (Text.unpack path) $
     Array.map (gamma g . invert) image
 
 
-handleCoordinate :: Double -> (Int, Int) -> Servant.Handler Double
-handleCoordinate g (x, y) = do
-  image <- liftIO $ readImage "assets/test2.png"
+handleCoordinate :: Text -> Double -> (Int, Int) -> Servant.Handler Double
+handleCoordinate path g (x, y) = do
+  image <- liftIO $ readImage (Text.unpack path)
   let image2 = Array.compute (Array.map (gamma g . invert) image) :: MonochromeImage Array.S
   case Array.index image2 (Array.Ix2 y x) of
     Just (ColorSpace.PixelY v) -> pure v
@@ -59,7 +70,6 @@ handleCoordinate g (x, y) = do
 
 
 -- IMAGE
-
 
 
 type MonochromeImage r =
