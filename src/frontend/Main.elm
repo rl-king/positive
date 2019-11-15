@@ -36,6 +36,7 @@ main =
 
 type alias Model =
     { gamma : Float
+    , zone : Float
     , coordinateValue : Maybe Float
     , drag : Maybe Drag
     , key : Navigation.Key
@@ -58,6 +59,7 @@ type alias Drag =
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     ( { gamma = 2.2
+      , zone = 0
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
@@ -86,6 +88,7 @@ type Msg
     | DragEnd
     | OnImageClick ( Int, Int )
     | OnGammaChange Int
+    | OnZoneChange Int
     | GotValueAtCoordinate (Result Http.Error Float)
 
 
@@ -133,6 +136,11 @@ update msg model =
             , Cmd.none
             )
 
+        OnZoneChange zone ->
+            ( { model | zone = toFloat zone / 1000 }
+            , Cmd.none
+            )
+
         GotValueAtCoordinate value ->
             ( { model | coordinateValue = Result.toMaybe value }
             , Cmd.none
@@ -169,6 +177,21 @@ view model =
                     ]
                     []
                 ]
+            , div []
+                [ label [] [ text "zone III" ]
+                , p [] [ text (String.fromFloat model.zone) ]
+                , input
+                    [ type_ "range"
+                    , value (String.fromInt (floor (model.zone * 1000)))
+                    , Attributes.min "-100"
+                    , Attributes.max "100"
+                    , on "change" <|
+                        Decode.map OnZoneChange
+                            (Decode.at [ "target", "valueAsNumber" ] Decode.int)
+                    , style "width" "16rem"
+                    ]
+                    []
+                ]
             ]
         ]
     }
@@ -182,6 +205,7 @@ viewImage model =
                 Url.absolute
                     [ "image" ]
                     [ Url.string "gamma" (String.fromFloat model.gamma)
+                    , Url.string "zone" (String.fromFloat model.zone)
                     , Url.string "path" model.path
                     ]
             , on "click" <|

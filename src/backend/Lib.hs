@@ -22,11 +22,13 @@ type Api =
   "image"
   :> QueryParam' '[Required, Strict] "path" Text
   :> QueryParam' '[Required, Strict] "gamma" Double
+  :> QueryParam' '[Required, Strict] "zone" Double
   :> Get '[OctetStream] BS.ByteString :<|>
   -- COORDINATE
   "image" :> "coordinate"
   :> QueryParam' '[Required, Strict] "path" Text
   :> QueryParam' '[Required, Strict] "gamma" Double
+  :> QueryParam' '[Required, Strict] "zone" Double
   :> ReqBody '[JSON] (Int, Int) :> Post '[JSON] Double :<|>
   -- RAW
   Raw
@@ -53,17 +55,17 @@ handlers =
   serveDirectoryFileServer "./"
 
 
-handleImage :: Text ->Double -> Servant.Handler BS.ByteString
-handleImage path g = do
+handleImage :: Text -> Double -> Double -> Servant.Handler BS.ByteString
+handleImage path g z = do
   image <- liftIO $ readImage (Text.unpack path)
   pure $ Massiv.encodeImage Massiv.imageWriteFormats (Text.unpack path) $
-    Array.map (gamma g . invert) image
+    Array.map (zone z . gamma g . invert) image
 
 
-handleCoordinate :: Text -> Double -> (Int, Int) -> Servant.Handler Double
-handleCoordinate path g (x, y) = do
+handleCoordinate :: Text -> Double -> Double -> (Int, Int) -> Servant.Handler Double
+handleCoordinate path g z (x, y) = do
   image <- liftIO $ readImage (Text.unpack path)
-  let image2 = Array.compute (Array.map (gamma g . invert) image) :: MonochromeImage Array.S
+  let image2 = Array.compute (Array.map (zone z . gamma g . invert) image) :: MonochromeImage Array.S
   case Array.index image2 (Array.Ix2 y x) of
     Just (ColorSpace.PixelY v) -> pure v
     Nothing -> pure 0
@@ -93,3 +95,11 @@ invert =
 gamma :: Double -> MonochromePixel -> MonochromePixel
 gamma x =
   fmap (** x)
+
+
+zone :: Double -> MonochromePixel -> MonochromePixel
+zone i =
+  let
+    m v = 1 - abs (v - 0.35)
+  in
+  fmap (\v -> v + (i * m v))
