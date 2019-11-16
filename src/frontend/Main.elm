@@ -129,9 +129,7 @@ update msg model =
             , Http.post
                 { url =
                     Url.absolute [ "image", "coordinate" ]
-                        [ Url.string "gamma" (String.fromFloat model.gamma)
-                        , Url.string "path" model.path
-                        ]
+                        (toImageUrlParams model)
                 , expect = Http.expectJson GotValueAtCoordinate Decode.float
                 , body = Http.jsonBody (Encode.list identity [ Encode.int x, Encode.int y ])
                 }
@@ -225,15 +223,7 @@ viewImage : Model -> Html Msg
 viewImage model =
     section [ id "image-section" ]
         [ img
-            [ src <|
-                Url.absolute
-                    [ "image" ]
-                    [ Url.string "gamma" (String.fromFloat model.gamma)
-                    , Url.string "zone-1" (String.fromFloat model.zone1)
-                    , Url.string "zone-5" (String.fromFloat model.zone5)
-                    , Url.string "zone-9" (String.fromFloat model.zone9)
-                    , Url.string "path" model.path
-                    ]
+            [ src (Url.absolute [ "image" ] (toImageUrlParams model))
             , on "click" <|
                 Decode.map4 (\x y tx ty -> OnImageClick ( x - tx, y - ty ))
                     (Decode.field "x" Decode.int)
@@ -244,6 +234,16 @@ viewImage model =
             ]
             []
         ]
+
+
+toImageUrlParams : Model -> List Url.QueryParameter
+toImageUrlParams model =
+    [ Url.string "gamma" (String.fromFloat model.gamma)
+    , Url.string "zone-1" (String.fromFloat model.zone1)
+    , Url.string "zone-5" (String.fromFloat model.zone5)
+    , Url.string "zone-9" (String.fromFloat model.zone9)
+    , Url.string "path" model.path
+    ]
 
 
 viewZoneDot : Maybe Drag -> Html Msg
