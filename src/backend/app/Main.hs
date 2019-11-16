@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import Positive
 
 main :: IO ()
 main = server

@@ -3,8 +3,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-module Lib (server) where
+module Positive (server) where
 
+import Control.Concurrent.STM
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Massiv.Array as Array
@@ -15,6 +16,10 @@ import qualified Graphics.ColorSpace as ColorSpace
 import Network.Wai.Handler.Warp
 import Servant
 import System.IO
+
+
+newtype State =
+  State (TVar (Maybe (Text, MonochromeImage Array.S)))
 
 
 type Api =
@@ -39,8 +44,9 @@ api = Proxy
 
 
 server :: IO ()
-server =
-  runSettings settings (serve api handlers )
+server = do
+  state <- State <$> newTVarIO Nothing
+  runSettings settings (serve api (handlers state))
   where
     settings =
       setPort 8080 $
@@ -48,27 +54,46 @@ server =
       defaultSettings
 
 
-handlers :: Server Api
-handlers =
-  handleImage :<|>
-  handleCoordinate :<|>
+handlers :: State -> Server Api
+handlers state =
+  handleImage state :<|>
+  handleCoordinate state :<|>
   serveDirectoryFileServer "./"
 
 
-handleImage :: Text -> Double -> Double -> Servant.Handler BS.ByteString
-handleImage path g z = do
-  image <- liftIO $ readImage (Text.unpack path)
+handleImage :: State -> Text -> Double -> Double -> Servant.Handler BS.ByteString
+handleImage state path g z = do
+  image <- liftIO $ getImage state path
   pure $ Massiv.encodeImage Massiv.imageWriteFormats (Text.unpack path) $
     Array.map (zone z . gamma g . invert) image
 
 
-handleCoordinate :: Text -> Double -> Double -> (Int, Int) -> Servant.Handler Double
-handleCoordinate path g z (x, y) = do
-  image <- liftIO $ readImage (Text.unpack path)
+handleCoordinate :: State -> Text -> Double -> Double -> (Int, Int) -> Servant.Handler Double
+handleCoordinate state path g z (x, y) = do
+  image <- liftIO $ getImage state path
   let image2 = Array.compute (Array.map (zone z . gamma g . invert) image) :: MonochromeImage Array.S
   case Array.index image2 (Array.Ix2 y x) of
     Just (ColorSpace.PixelY v) -> pure v
     Nothing -> pure 0
+
+
+getImage :: State -> Text -> IO (MonochromeImage Array.S)
+getImage (State state) path = do
+  maybeImage <- readTVarIO state
+  case maybeImage of
+    Nothing -> do
+      putStrLn "Read image"
+      image <- readImage (Text.unpack path)
+      atomically $ writeTVar state (Just (path, image))
+      pure image
+    Just (cachedPath, cachedImage)
+      | path == cachedPath ->
+          putStrLn "From cache image" >> pure cachedImage
+      | otherwise -> do
+          putStrLn "Read image"
+          imageNew <- readImage (Text.unpack path)
+          atomically $ writeTVar state (Just (path, imageNew))
+          pure imageNew
 
 
 -- IMAGE

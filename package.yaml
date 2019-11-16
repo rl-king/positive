@@ -24,9 +24,11 @@ dependencies:
   - http-types
   - massiv
   - massiv-io
+  - psqueues
   - safe-exceptions
   - servant
   - servant-server
+  - stm
   - text
   - wai
   - warp
@@ -38,12 +40,18 @@ executables:
   positive-exe:
     main:                Main.hs
     source-dirs:         src/backend/app
+    dependencies:
+    - positive
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    dependencies:
-    - positive
+    - -O2
+    - -Wall
+    - -Wcompat
+    - -Wincomplete-record-updates
+    - -Wincomplete-uni-patterns
+    - -Wredundant-constraints
 
 tests:
   positive-test:
