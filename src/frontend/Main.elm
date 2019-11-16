@@ -36,7 +36,9 @@ main =
 
 type alias Model =
     { gamma : Float
-    , zone : Float
+    , zone1 : Float
+    , zone5 : Float
+    , zone9 : Float
     , coordinateValue : Maybe Float
     , drag : Maybe Drag
     , key : Navigation.Key
@@ -59,7 +61,9 @@ type alias Drag =
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     ( { gamma = 2.2
-      , zone = 0
+      , zone1 = 0
+      , zone5 = 0
+      , zone9 = 0
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
@@ -88,7 +92,9 @@ type Msg
     | DragEnd
     | OnImageClick ( Int, Int )
     | OnGammaChange Int
-    | OnZoneChange Int
+    | OnZone1Change Int
+    | OnZone5Change Int
+    | OnZone9Change Int
     | GotValueAtCoordinate (Result Http.Error Float)
 
 
@@ -136,10 +142,14 @@ update msg model =
             , Cmd.none
             )
 
-        OnZoneChange zone ->
-            ( { model | zone = toFloat zone / 1000 }
-            , Cmd.none
-            )
+        OnZone1Change zone ->
+            ( { model | zone1 = toFloat zone / 1000 }, Cmd.none )
+
+        OnZone5Change zone ->
+            ( { model | zone5 = toFloat zone / 1000 }, Cmd.none )
+
+        OnZone9Change zone ->
+            ( { model | zone9 = toFloat zone / 1000 }, Cmd.none )
 
         GotValueAtCoordinate value ->
             ( { model | coordinateValue = Result.toMaybe value }
@@ -158,43 +168,57 @@ view model =
         [ main_ []
             [ viewImage model
             , viewZoneDot model.drag
-            , div []
-                [ label [] [ text "pos" ]
-                , p [] [ text (Debug.toString model.coordinateValue) ]
-                ]
-            , div []
-                [ label [] [ text "gamma" ]
-                , p [] [ text (String.fromFloat model.gamma) ]
-                , input
-                    [ type_ "range"
-                    , value (String.fromInt (floor (model.gamma * 100)))
-                    , Attributes.min "0"
-                    , Attributes.max "2000"
-                    , on "change" <|
-                        Decode.map OnGammaChange
-                            (Decode.at [ "target", "valueAsNumber" ] Decode.int)
-                    , style "width" "16rem"
-                    ]
-                    []
-                ]
-            , div []
-                [ label [] [ text "zone III" ]
-                , p [] [ text (String.fromFloat model.zone) ]
-                , input
-                    [ type_ "range"
-                    , value (String.fromInt (floor (model.zone * 1000)))
-                    , Attributes.min "-100"
-                    , Attributes.max "100"
-                    , on "change" <|
-                        Decode.map OnZoneChange
-                            (Decode.at [ "target", "valueAsNumber" ] Decode.int)
-                    , style "width" "16rem"
-                    ]
-                    []
-                ]
+            , viewSettings model
             ]
         ]
     }
+
+
+viewSettings : Model -> Html Msg
+viewSettings model =
+    section [ id "settings" ]
+        [ div []
+            [ label [] [ text "pos" ]
+            , p [] [ text (Debug.toString model.coordinateValue) ]
+            ]
+        , div []
+            [ label [] [ text "gamma" ]
+            , p [] [ text (String.fromFloat model.gamma) ]
+            , input
+                [ type_ "range"
+                , value (String.fromInt (floor (model.gamma * 100)))
+                , Attributes.min "0"
+                , Attributes.max "2000"
+                , on "change" <|
+                    Decode.map OnGammaChange
+                        (Decode.at [ "target", "valueAsNumber" ] Decode.int)
+                , style "width" "16rem"
+                ]
+                []
+            ]
+        , viewZoneSlider OnZone1Change "Zone I" model.zone1
+        , viewZoneSlider OnZone5Change "Zone V" model.zone5
+        , viewZoneSlider OnZone9Change "Zone IX" model.zone9
+        ]
+
+
+viewZoneSlider : (Int -> Msg) -> String -> Float -> Html Msg
+viewZoneSlider toMsg title val =
+    div []
+        [ label [] [ text title ]
+        , p [] [ text (String.fromFloat val) ]
+        , input
+            [ type_ "range"
+            , value (String.fromInt (floor (val * 1000)))
+            , Attributes.min "-100"
+            , Attributes.max "100"
+            , on "change" <|
+                Decode.map toMsg
+                    (Decode.at [ "target", "valueAsNumber" ] Decode.int)
+            , style "width" "16rem"
+            ]
+            []
+        ]
 
 
 viewImage : Model -> Html Msg
@@ -205,7 +229,9 @@ viewImage model =
                 Url.absolute
                     [ "image" ]
                     [ Url.string "gamma" (String.fromFloat model.gamma)
-                    , Url.string "zone" (String.fromFloat model.zone)
+                    , Url.string "zone-1" (String.fromFloat model.zone1)
+                    , Url.string "zone-5" (String.fromFloat model.zone5)
+                    , Url.string "zone-9" (String.fromFloat model.zone9)
                     , Url.string "path" model.path
                     ]
             , on "click" <|

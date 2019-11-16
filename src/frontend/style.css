@@ -11,6 +11,10 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 }
 
+main {
+    display: flex;
+}
+
 #image-section {
     padding: 2rem;
     width: 100%;
@@ -20,4 +24,5 @@ body {
 
 img {
     display: block;
+    max-height: 80vh;
 }
