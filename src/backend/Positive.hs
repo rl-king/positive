@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
@@ -13,13 +14,28 @@ import qualified Data.Massiv.Array.IO as Massiv
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Graphics.ColorSpace as ColorSpace
+import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
 import Servant
 import System.IO
 
 
 newtype State =
-  State (TVar (Maybe (Text, MonochromeImage Array.S)))
+  State
+  { _cachedImage :: TVar (Maybe (Text, MonochromeImage Array.S))
+  }
+
+
+data Image
+
+
+instance Accept Image where
+    contentType _ =
+      "image" Media.// "png"
+
+
+instance MimeRender Image BS.ByteString where
+    mimeRender _ = id
 
 
 type Api =
@@ -30,7 +46,7 @@ type Api =
   :> QueryParam' '[Required, Strict] "zone-1" Double
   :> QueryParam' '[Required, Strict] "zone-5" Double
   :> QueryParam' '[Required, Strict] "zone-9" Double
-  :> Get '[OctetStream] BS.ByteString :<|>
+  :> Get '[Image] BS.ByteString :<|>
   -- COORDINATE
   "image" :> "coordinate"
   :> QueryParam' '[Required, Strict] "path" Text
@@ -49,8 +65,8 @@ api = Proxy
 
 server :: IO ()
 server = do
-  state <- State <$> newTVarIO Nothing
-  runSettings settings (serve api (handlers state))
+  cachedImage <- newTVarIO Nothing
+  runSettings settings (serve api (handlers (State cachedImage)))
   where
     settings =
       setPort 8080 $
@@ -69,35 +85,40 @@ handleImage :: State -> Text -> Double -> Double -> Double -> Double -> Servant.
 handleImage state path g z1 z5 z9 = do
   image <- liftIO $ getImage state path
   pure $ Massiv.encodeImage Massiv.imageWriteFormats (Text.unpack path) $
-    Array.map (zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert) image
+    processImage g z1 z5 z9 image
+
 
 handleCoordinate :: State -> Text -> Double -> Double -> Double -> Double -> (Int, Int) -> Servant.Handler Double
 handleCoordinate state path g z1 z5 z9 (x, y) = do
   image <- liftIO $ getImage state path
   let image2 =
-        Array.compute (Array.map (zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert) image) :: MonochromeImage Array.S
+        Array.compute $ processImage g z1 z5 z9 image :: MonochromeImage Array.S
   case Array.index image2 (Array.Ix2 y x) of
     Just (ColorSpace.PixelY v) -> pure v
     Nothing -> pure 0
 
 
+processImage :: Double -> Double -> Double -> Double -> MonochromeImage Array.S -> MonochromeImage Array.D
+processImage g z1 z5 z9 =
+  Array.map (zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert)
+
 
 getImage :: State -> Text -> IO (MonochromeImage Array.S)
-getImage (State state) path = do
-  maybeImage <- readTVarIO state
+getImage (State cachedImage) path = do
+  maybeImage <- readTVarIO cachedImage
   case maybeImage of
     Nothing -> do
       putStrLn "Read image"
       image <- readImage (Text.unpack path)
-      atomically $ writeTVar state (Just (path, image))
+      atomically $ writeTVar cachedImage (Just (path, image))
       pure image
-    Just (cachedPath, cachedImage)
+    Just (cachedPath, cachedImage')
       | path == cachedPath ->
-          putStrLn "From cache image" >> pure cachedImage
+          putStrLn "From cache image" >> pure cachedImage'
       | otherwise -> do
           putStrLn "Read image"
           imageNew <- readImage (Text.unpack path)
-          atomically $ writeTVar state (Just (path, imageNew))
+          atomically $ writeTVar cachedImage (Just (path, imageNew))
           pure imageNew
 
 
@@ -130,6 +151,6 @@ gamma x =
 zone :: Double -> Double -> MonochromePixel -> MonochromePixel
 zone t i =
   let
-    m v = 1 - abs (v - t)
+    m v = (1 - abs (v - t)) * (1 - abs (v - t))
   in
   fmap (\v -> v + (i * m v))
