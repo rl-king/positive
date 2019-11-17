@@ -43,6 +43,7 @@ type alias Model =
     , drag : Maybe Drag
     , key : Navigation.Key
     , path : String
+    , fileNames : List String
     }
 
 
@@ -67,17 +68,26 @@ init _ url key =
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
-      , path =
-            Maybe.withDefault "" <|
-                Url.Parser.parse
-                    (Url.Parser.map
-                        (Maybe.withDefault "")
-                        (Url.Parser.query (Url.Parser.Query.string "path"))
-                    )
-                    url
+      , fileNames = []
+      , path = fromUrl url
       }
-    , Cmd.none
+    , Http.get
+        { url = Url.absolute [ "directory" ] [ Url.string "dir" "assets" ]
+        , expect =
+            Http.expectJson GotDirectory (Decode.list Decode.string)
+        }
     )
+
+
+fromUrl : Url -> String
+fromUrl url =
+    Maybe.withDefault "" <|
+        Url.Parser.parse
+            (Url.Parser.map
+                (Maybe.withDefault "")
+                (Url.Parser.query (Url.Parser.Query.string "path"))
+            )
+            url
 
 
 
@@ -87,6 +97,7 @@ init _ url key =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
+    | GotDirectory (Result Http.Error (List String))
     | DragStart Coordinate
     | DragAt Coordinate
     | DragEnd
@@ -107,7 +118,13 @@ update msg model =
         LinkClicked (Browser.External href) ->
             ( model, Navigation.load href )
 
-        UrlChanged _ ->
+        UrlChanged url ->
+            ( { model | path = fromUrl url }, Cmd.none )
+
+        GotDirectory (Ok fileNames) ->
+            ( { model | fileNames = fileNames }, Cmd.none )
+
+        GotDirectory (Err err) ->
             ( model, Cmd.none )
 
         DragStart coordinates ->
@@ -167,9 +184,24 @@ view model =
             [ viewImage model
             , viewZoneDot model.drag
             , viewSettings model
+            , viewFiles model.fileNames
             ]
         ]
     }
+
+
+viewFiles : List String -> Html Msg
+viewFiles fileNames =
+    ul [] <|
+        List.map viewFile fileNames
+
+
+viewFile : String -> Html Msg
+viewFile fileName =
+    li []
+        [ a [ href (Url.absolute [] [ Url.string "path" ("assets/" ++ fileName) ]) ]
+            [ text fileName ]
+        ]
 
 
 viewSettings : Model -> Html Msg

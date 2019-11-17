@@ -17,6 +17,8 @@ import qualified Graphics.ColorSpace as ColorSpace
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
 import Servant
+import System.Directory
+import qualified System.FilePath.Posix as Path
 import System.IO
 
 
@@ -56,6 +58,10 @@ type Api =
   :> QueryParam' '[Required, Strict] "zone-9" Double
   :> ReqBody '[JSON] (Int, Int) :> Post '[JSON] Double :<|>
   -- RAW
+  "directory"
+  :> QueryParam' '[Required, Strict] "dir" Text
+  :> Get '[JSON] [Text] :<|>
+  -- RAW
   Raw
 
 
@@ -78,6 +84,7 @@ handlers :: State -> Server Api
 handlers state =
   handleImage state :<|>
   handleCoordinate state :<|>
+  handleDirectory :<|>
   serveDirectoryFileServer "./"
 
 
@@ -96,6 +103,12 @@ handleCoordinate state path g z1 z5 z9 (x, y) = do
   case Array.index image2 (Array.Ix2 y x) of
     Just (ColorSpace.PixelY v) -> pure v
     Nothing -> pure 0
+
+
+handleDirectory :: Text -> Servant.Handler [Text]
+handleDirectory dir = do
+  files <- liftIO $ listDirectory (Text.unpack dir)
+  pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
 
 processImage :: Double -> Double -> Double -> Double -> MonochromeImage Array.S -> MonochromeImage Array.D
