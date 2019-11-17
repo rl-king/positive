@@ -233,7 +233,26 @@ viewImage model =
             , style "user-select" "none"
             ]
             []
+        , viewZones model
         ]
+
+
+viewZones : Model -> Html Msg
+viewZones model =
+    let
+        zone t i v =
+            v + (i * m t v)
+
+        m t v =
+            (1 - abs (v - t)) * (1 - abs (v - t))
+
+        vs =
+            List.map (\x -> toFloat x / 10) <| List.range 0 10
+    in
+    ul [] <|
+        List.map2 (\x i -> li [] [ text (String.left 5 (String.fromFloat (x - i))) ])
+            (List.map (zone 0.95 model.zone9 << zone 0.5 model.zone5 << zone 0.15 model.zone1) vs)
+            vs
 
 
 toImageUrlParams : Model -> List Url.QueryParameter
