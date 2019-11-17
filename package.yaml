@@ -56,6 +56,20 @@ executables:
     - -Wincomplete-uni-patterns
     - -Wredundant-constraints
 
+benchmarks:
+  positive-benchmarks:
+    source-dirs: benchmark
+    main: Main.hs
+    dependencies:
+      - base
+      - positive
+      - criterion
+    ghc-options:
+      - -rtsopts
+      - -threaded
+      - -with-rtsopts=-N
+      - -O2
+
 tests:
   positive-test:
     main:                Spec.hs

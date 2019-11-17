@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-module Positive (server) where
+module Positive where
 
 import Control.Concurrent.STM
 import Control.Monad.IO.Class (liftIO)
@@ -154,11 +154,13 @@ readImage =
 invert :: MonochromePixel -> MonochromePixel
 invert =
   fmap (1 -)
+{-# INLINE invert #-}
 
 
 gamma :: Double -> MonochromePixel -> MonochromePixel
 gamma x =
   fmap (** x)
+{-# INLINE gamma #-}
 
 
 zone :: Double -> Double -> MonochromePixel -> MonochromePixel
@@ -167,3 +169,4 @@ zone t i =
     m v = (1 - abs (v - t)) * (1 - abs (v - t))
   in
   fmap (\v -> v + (i * m v))
+{-# INLINE zone #-}
