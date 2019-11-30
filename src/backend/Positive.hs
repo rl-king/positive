@@ -48,6 +48,8 @@ type Api =
   :> QueryParam' '[Required, Strict] "zone-1" Double
   :> QueryParam' '[Required, Strict] "zone-5" Double
   :> QueryParam' '[Required, Strict] "zone-9" Double
+  :> QueryParam' '[Required, Strict] "blackpoint" Double
+  :> QueryParam' '[Required, Strict] "whitepoint" Double
   :> Get '[Image] BS.ByteString :<|>
   -- COORDINATE
   "image" :> "coordinate"
@@ -56,6 +58,8 @@ type Api =
   :> QueryParam' '[Required, Strict] "zone-1" Double
   :> QueryParam' '[Required, Strict] "zone-5" Double
   :> QueryParam' '[Required, Strict] "zone-9" Double
+  :> QueryParam' '[Required, Strict] "blackpoint" Double
+  :> QueryParam' '[Required, Strict] "whitepoint" Double
   :> ReqBody '[JSON] (Int, Int) :> Post '[JSON] Double :<|>
   -- RAW
   "directory"
@@ -88,18 +92,18 @@ handlers state =
   serveDirectoryFileServer "./"
 
 
-handleImage :: State -> Text -> Double -> Double -> Double -> Double -> Servant.Handler BS.ByteString
-handleImage state path g z1 z5 z9 = do
+handleImage :: State -> Text -> Double -> Double -> Double -> Double -> Double -> Double -> Servant.Handler BS.ByteString
+handleImage state path g z1 z5 z9 bp wp = do
   image <- liftIO $ getImage state path
   pure $ Massiv.encodeImage Massiv.imageWriteFormats (Text.unpack path) $
-    processImage g z1 z5 z9 image
+    processImage g z1 z5 z9 bp wp image
 
 
-handleCoordinate :: State -> Text -> Double -> Double -> Double -> Double -> (Int, Int) -> Servant.Handler Double
-handleCoordinate state path g z1 z5 z9 (x, y) = do
+handleCoordinate :: State -> Text -> Double -> Double -> Double -> Double -> Double -> Double -> (Int, Int) -> Servant.Handler Double
+handleCoordinate state path g z1 z5 z9 bp wp (x, y) = do
   image <- liftIO $ getImage state path
   let image2 =
-        Array.compute $ processImage g z1 z5 z9 image :: MonochromeImage Array.S
+        Array.compute $ processImage g z1 z5 z9 bp wp image :: MonochromeImage Array.S
   case Array.index image2 (Array.Ix2 y x) of
     Just (ColorSpace.PixelY v) -> pure v
     Nothing -> pure 0
@@ -111,9 +115,9 @@ handleDirectory dir = do
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
 
-processImage :: Double -> Double -> Double -> Double -> MonochromeImage Array.S -> MonochromeImage Array.D
-processImage g z1 z5 z9 =
-  Array.map (zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert)
+processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage Array.S -> MonochromeImage Array.D
+processImage g z1 z5 z9 bp wp =
+  Array.map (whitepoint wp . blackpoint bp . zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert)
 
 
 getImage :: State -> Text -> IO (MonochromeImage Array.S)
@@ -155,6 +159,18 @@ invert :: MonochromePixel -> MonochromePixel
 invert =
   fmap (1 -)
 {-# INLINE invert #-}
+
+
+blackpoint :: Double -> MonochromePixel -> MonochromePixel
+blackpoint x =
+  fmap (\p -> p + ((1 - p) * x))
+{-# INLINE blackpoint #-}
+
+
+whitepoint :: Double -> MonochromePixel -> MonochromePixel
+whitepoint x =
+  fmap (\p -> p - (x * p))
+{-# INLINE whitepoint #-}
 
 
 gamma :: Double -> MonochromePixel -> MonochromePixel

@@ -39,6 +39,8 @@ type alias Model =
     , zone1 : Float
     , zone5 : Float
     , zone9 : Float
+    , blackpoint : Float
+    , whitepoint : Float
     , coordinateValue : Maybe Float
     , drag : Maybe Drag
     , key : Navigation.Key
@@ -65,6 +67,8 @@ init _ url key =
       , zone1 = 0
       , zone5 = 0
       , zone9 = 0
+      , blackpoint = 0
+      , whitepoint = 0
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
@@ -106,6 +110,8 @@ type Msg
     | OnZone1Change Int
     | OnZone5Change Int
     | OnZone9Change Int
+    | OnBlackpointChange Int
+    | OnWhitepointChange Int
     | GotValueAtCoordinate (Result Http.Error Float)
 
 
@@ -165,6 +171,12 @@ update msg model =
 
         OnZone9Change zone ->
             ( { model | zone9 = toFloat zone / 1000 }, Cmd.none )
+
+        OnBlackpointChange bp ->
+            ( { model | blackpoint = toFloat bp / 100 }, Cmd.none )
+
+        OnWhitepointChange wp ->
+            ( { model | whitepoint = toFloat wp / 100 }, Cmd.none )
 
         GotValueAtCoordinate value ->
             ( { model | coordinateValue = Result.toMaybe value }
@@ -226,22 +238,24 @@ viewSettings model =
                 ]
                 []
             ]
-        , viewZoneSlider OnZone1Change "Zone I" model.zone1
-        , viewZoneSlider OnZone5Change "Zone V" model.zone5
-        , viewZoneSlider OnZone9Change "Zone IX" model.zone9
+        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (model.zone1 * 1000)
+        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (model.zone5 * 1000)
+        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (model.zone9 * 1000)
+        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (model.blackpoint * 100)
+        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (model.whitepoint * 100)
         ]
 
 
-viewZoneSlider : (Int -> Msg) -> String -> Float -> Html Msg
-viewZoneSlider toMsg title val =
+viewZoneSlider : (Int -> Msg) -> ( Int, Int ) -> String -> Float -> Html Msg
+viewZoneSlider toMsg ( min, max ) title val =
     div []
         [ label [] [ text title ]
         , p [] [ text (String.fromFloat val) ]
         , input
             [ type_ "range"
-            , value (String.fromInt (floor (val * 1000)))
-            , Attributes.min "-100"
-            , Attributes.max "100"
+            , value (String.fromInt (floor val))
+            , Attributes.min (String.fromInt min)
+            , Attributes.max (String.fromInt max)
             , on "change" <|
                 Decode.map toMsg
                     (Decode.at [ "target", "valueAsNumber" ] Decode.int)
@@ -293,6 +307,8 @@ toImageUrlParams model =
     , Url.string "zone-1" (String.fromFloat model.zone1)
     , Url.string "zone-5" (String.fromFloat model.zone5)
     , Url.string "zone-9" (String.fromFloat model.zone9)
+    , Url.string "blackpoint" (String.fromFloat model.blackpoint)
+    , Url.string "whitepoint" (String.fromFloat model.whitepoint)
     , Url.string "path" model.path
     ]
 
