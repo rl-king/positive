@@ -24,10 +24,19 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , onUrlRequest = LinkClicked
         , onUrlChange = UrlChanged
         }
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none
 
 
 
@@ -35,18 +44,19 @@ main =
 
 
 type alias Model =
-    { gamma : Float
-    , zone1 : Float
-    , zone5 : Float
-    , zone9 : Float
-    , blackpoint : Float
-    , whitepoint : Float
+    { image : Image
     , coordinateValue : Maybe Float
     , drag : Maybe Drag
     , key : Navigation.Key
     , path : String
     , fileNames : List String
     }
+
+
+type Image
+    = Ready Settings
+    | Loading Settings
+    | Queued Settings Settings
 
 
 type alias Coordinate =
@@ -63,12 +73,7 @@ type alias Drag =
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( { gamma = 2.2
-      , zone1 = 0
-      , zone5 = 0
-      , zone9 = 0
-      , blackpoint = 0
-      , whitepoint = 0
+    ( { image = Ready (Settings 2.2 0 0 0 0 0)
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
@@ -81,6 +86,16 @@ init _ url key =
             Http.expectJson GotDirectory (Decode.list Decode.string)
         }
     )
+
+
+type alias Settings =
+    { gamma : Float
+    , zone1 : Float
+    , zone5 : Float
+    , zone9 : Float
+    , blackpoint : Float
+    , whitepoint : Float
+    }
 
 
 fromUrl : Url -> String
@@ -113,6 +128,7 @@ type Msg
     | OnBlackpointChange Int
     | OnWhitepointChange Int
     | GotValueAtCoordinate (Result Http.Error Float)
+    | OnImageLoad
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -152,36 +168,58 @@ update msg model =
             , Http.post
                 { url =
                     Url.absolute [ "image", "coordinate" ]
-                        (toImageUrlParams model)
+                        (toImageUrlParams model.path (toSettings model.image))
                 , expect = Http.expectJson GotValueAtCoordinate Decode.float
                 , body = Http.jsonBody (Encode.list identity [ Encode.int x, Encode.int y ])
                 }
             )
 
         OnGammaChange gamma ->
-            ( { model | gamma = toFloat gamma / 100 }
-            , Cmd.none
-            )
+            ( updateSettings (\s -> { s | gamma = toFloat gamma / 100 }) model, Cmd.none )
 
         OnZone1Change zone ->
-            ( { model | zone1 = toFloat zone / 1000 }, Cmd.none )
+            ( updateSettings (\s -> { s | zone1 = toFloat zone / 1000 }) model, Cmd.none )
 
         OnZone5Change zone ->
-            ( { model | zone5 = toFloat zone / 1000 }, Cmd.none )
+            ( updateSettings (\s -> { s | zone5 = toFloat zone / 1000 }) model, Cmd.none )
 
         OnZone9Change zone ->
-            ( { model | zone9 = toFloat zone / 1000 }, Cmd.none )
+            ( updateSettings (\s -> { s | zone9 = toFloat zone / 1000 }) model, Cmd.none )
 
         OnBlackpointChange bp ->
-            ( { model | blackpoint = toFloat bp / 100 }, Cmd.none )
+            ( updateSettings (\s -> { s | blackpoint = toFloat bp / 100 }) model, Cmd.none )
 
         OnWhitepointChange wp ->
-            ( { model | whitepoint = toFloat wp / 100 }, Cmd.none )
+            ( updateSettings (\s -> { s | whitepoint = toFloat wp / 100 }) model, Cmd.none )
 
         GotValueAtCoordinate value ->
             ( { model | coordinateValue = Result.toMaybe value }
             , Cmd.none
             )
+
+        OnImageLoad ->
+            case model.image of
+                Ready _ ->
+                    ( model, Cmd.none )
+
+                Loading s ->
+                    ( { model | image = Ready s }, Cmd.none )
+
+                Queued _ n ->
+                    ( { model | image = Ready n }, Cmd.none )
+
+
+updateSettings : (Settings -> Settings) -> Model -> Model
+updateSettings f model =
+    case model.image of
+        Ready s ->
+            { model | image = Loading (f s) }
+
+        Loading s ->
+            { model | image = Queued s (f s) }
+
+        Queued s n ->
+            { model | image = Queued s (f n) }
 
 
 
@@ -205,7 +243,7 @@ view model =
 viewFiles : List String -> Html Msg
 viewFiles fileNames =
     ul [] <|
-        List.map viewFile fileNames
+        List.map viewFile (List.sort fileNames)
 
 
 viewFile : String -> Html Msg
@@ -218,6 +256,10 @@ viewFile fileName =
 
 viewSettings : Model -> Html Msg
 viewSettings model =
+    let
+        settings =
+            toSettings model.image
+    in
     section [ id "settings" ]
         [ div []
             [ label [] [ text "pos" ]
@@ -225,24 +267,24 @@ viewSettings model =
             ]
         , div []
             [ label [] [ text "gamma" ]
-            , p [] [ text (String.fromFloat model.gamma) ]
+            , p [] [ text (String.fromFloat settings.gamma) ]
             , input
                 [ type_ "range"
-                , value (String.fromInt (floor (model.gamma * 100)))
+                , value (String.fromInt (floor (settings.gamma * 100)))
                 , Attributes.min "0"
                 , Attributes.max "2000"
-                , on "change" <|
+                , on "input" <|
                     Decode.map OnGammaChange
                         (Decode.at [ "target", "valueAsNumber" ] Decode.int)
                 , style "width" "16rem"
                 ]
                 []
             ]
-        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (model.zone1 * 1000)
-        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (model.zone5 * 1000)
-        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (model.zone9 * 1000)
-        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (model.blackpoint * 100)
-        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (model.whitepoint * 100)
+        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.zone1 * 1000)
+        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.zone5 * 1000)
+        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.zone9 * 1000)
+        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.blackpoint * 100)
+        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.whitepoint * 100)
         ]
 
 
@@ -256,7 +298,7 @@ viewZoneSlider toMsg ( min, max ) title val =
             , value (String.fromInt (floor val))
             , Attributes.min (String.fromInt min)
             , Attributes.max (String.fromInt max)
-            , on "change" <|
+            , on "input" <|
                 Decode.map toMsg
                     (Decode.at [ "target", "valueAsNumber" ] Decode.int)
             , style "width" "16rem"
@@ -269,7 +311,8 @@ viewImage : Model -> Html Msg
 viewImage model =
     section [ id "image-section" ]
         [ img
-            [ src (Url.absolute [ "image" ] (toImageUrlParams model))
+            [ src (Url.absolute [ "image" ] (toImageUrlParams model.path (toSettings model.image)))
+            , on "load" (Decode.succeed OnImageLoad)
             , on "click" <|
                 Decode.map4 (\x y tx ty -> OnImageClick ( x - tx, y - ty ))
                     (Decode.field "x" Decode.int)
@@ -286,6 +329,9 @@ viewImage model =
 viewZones : Model -> Html Msg
 viewZones model =
     let
+        settings =
+            toSettings model.image
+
         zone t i v =
             v + (i * m t v)
 
@@ -297,19 +343,32 @@ viewZones model =
     in
     ul [] <|
         List.map2 (\x i -> li [] [ text (String.left 5 (String.fromFloat (x - i))) ])
-            (List.map (zone 0.95 model.zone9 << zone 0.5 model.zone5 << zone 0.15 model.zone1) vs)
+            (List.map (zone 0.95 settings.zone9 << zone 0.5 settings.zone5 << zone 0.15 settings.zone1) vs)
             vs
 
 
-toImageUrlParams : Model -> List Url.QueryParameter
-toImageUrlParams model =
-    [ Url.string "gamma" (String.fromFloat model.gamma)
-    , Url.string "zone-1" (String.fromFloat model.zone1)
-    , Url.string "zone-5" (String.fromFloat model.zone5)
-    , Url.string "zone-9" (String.fromFloat model.zone9)
-    , Url.string "blackpoint" (String.fromFloat model.blackpoint)
-    , Url.string "whitepoint" (String.fromFloat model.whitepoint)
-    , Url.string "path" model.path
+toSettings : Image -> Settings
+toSettings image =
+    case image of
+        Ready s ->
+            s
+
+        Loading s ->
+            s
+
+        Queued s _ ->
+            s
+
+
+toImageUrlParams : String -> Settings -> List Url.QueryParameter
+toImageUrlParams path settings =
+    [ Url.string "gamma" (String.fromFloat settings.gamma)
+    , Url.string "zone-1" (String.fromFloat settings.zone1)
+    , Url.string "zone-5" (String.fromFloat settings.zone5)
+    , Url.string "zone-9" (String.fromFloat settings.zone9)
+    , Url.string "blackpoint" (String.fromFloat settings.blackpoint)
+    , Url.string "whitepoint" (String.fromFloat settings.whitepoint)
+    , Url.string "path" path
     ]
 
 
