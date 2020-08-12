@@ -41,6 +41,8 @@ packages:
 #
 extra-deps:
 - massiv-io-0.1.8.0
+- hip-1.5.6.0@sha256:296c55622f62485422c0a593c7306af1a5abf8ba9f866dcdffc281b01eba65d7,6988
+- JuicyPixels-3.3.5@sha256:5c67dc066d67f5045221a8202f701f4c77eab8220f44414c00fadcdc3e4f872b,3911
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

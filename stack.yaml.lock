@@ -11,6 +11,20 @@ packages:
       sha256: 43742bd100a36c8b1c5a560e83f527cfac74b19461e804d2c0af385efeef281a
   original:
     hackage: massiv-io-0.1.8.0
+- completed:
+    hackage: hip-1.5.6.0@sha256:296c55622f62485422c0a593c7306af1a5abf8ba9f866dcdffc281b01eba65d7,6988
+    pantry-tree:
+      size: 7456
+      sha256: d79395e6ec9caf1132a7e001f6fe9b8ebada31e0e52087a4a1a971e3f295a7f4
+  original:
+    hackage: hip-1.5.6.0@sha256:296c55622f62485422c0a593c7306af1a5abf8ba9f866dcdffc281b01eba65d7,6988
+- completed:
+    hackage: JuicyPixels-3.3.5@sha256:5c67dc066d67f5045221a8202f701f4c77eab8220f44414c00fadcdc3e4f872b,3911
+    pantry-tree:
+      size: 2724
+      sha256: e509268878581ec17929cab9ee6cc30ef05f6c203e760f49865547249fbb9d48
+  original:
+    hackage: JuicyPixels-3.3.5@sha256:5c67dc066d67f5045221a8202f701f4c77eab8220f44414c00fadcdc3e4f872b,3911
 snapshots:
 - completed:
     size: 525663
