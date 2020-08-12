@@ -25,6 +25,7 @@ dependencies:
   - data-default
   - directory
   - filepath
+  - hip
   - http-media
   - http-types
   - massiv
@@ -58,19 +59,19 @@ executables:
     - -Wincomplete-uni-patterns
     - -Wredundant-constraints
 
-benchmarks:
-  positive-benchmarks:
-    source-dirs: benchmark
-    main: Main.hs
-    dependencies:
-      - base
-      - positive
-      - criterion
-    ghc-options:
-      - -rtsopts
-      - -threaded
-      - -with-rtsopts=-N
-      - -O2
+# benchmarks:
+#   positive-benchmarks:
+#     source-dirs: benchmark
+#     main: Main.hs
+#     dependencies:
+#       - base
+#       - positive
+#       - criterion
+#     ghc-options:
+#       - -rtsopts
+#       - -threaded
+#       - -with-rtsopts=-N
+#       - -O2
 
 tests:
   positive-test:

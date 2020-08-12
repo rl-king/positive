@@ -2,6 +2,7 @@ module Main where
 
 import Data.Foldable
 import qualified Data.Massiv.Array.IO as Massiv
+import qualified Graphics.Image as Image
 import Positive.Server
 import System.Directory
 import System.Environment
@@ -18,7 +19,7 @@ main = do
         \path -> do
           let path_ x = dir Path.</> x <> path
           image <- readImage $ path_ ""
-          Massiv.writeImage (path_ "positive-") $
+          Image.writeImageExact (path_ "positive-") $
             processImage 2.2 0 0 0 0 0 image
           print path
     _ ->

@@ -16,6 +16,7 @@ import qualified Data.Massiv.Array as Array
 import qualified Data.Massiv.Array.IO as Massiv
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Graphics.Image as HIP
 import qualified Graphics.Pixel.ColorSpace as ColorSpace
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
@@ -27,7 +28,7 @@ import System.IO
 -- CACHE
 
 newtype State = State
-  { _cachedImage :: TVar (Maybe (Text, MonochromeImage Array.S))
+  { _cachedImage :: TVar (Maybe (Text, MonochromeImage))
   }
 
 -- API
@@ -72,14 +73,20 @@ handlers state =
 handleImage :: State -> Text -> Double -> Double -> Double -> Double -> Double -> Double -> Servant.Handler BS.ByteString
 handleImage state path g z1 z5 z9 bp wp = do
   image <- liftIO $ getImage state path
-  pure . Massiv.encodeAutoJPG (Massiv.Auto Massiv.JPG) def $
-    processImage g z1 z5 z9 bp wp image
+  let x = HIP.unImage $ processImage g z1 z5 z9 bp wp image :: HIP.Array HIP.S HIP.Ix2 (ColorSpace.Pixel Massiv.SRGB Double)
+      y = Massiv.convertImage x :: Massiv.Image Array.D (Massiv.CMYK (Massiv.AdobeRGB 'Massiv.NonLinear)) Massiv.Word8
+  pure ""
+
+encode :: HIP.Image HIP.RGB Double -> Handler BS.ByteString
+encode =
+  Massiv.encodeJPG (Massiv.JPG) def
+    . HIP.unImage
 
 -- handleCoordinate :: State -> Text -> Double -> Double -> Double -> Double -> Double -> Double -> (Int, Int) -> Servant.Handler Double
 -- handleCoordinate state path g z1 z5 z9 bp wp (x, y) = do
 --   image <- liftIO $ getImage state path
 --   let image2 =
---         Array.compute $ processImage g z1 z5 z9 bp wp image :: MonochromeImage Array.S
+--         Array.compute $ processImage g z1 z5 z9 bp wp image :: MonochromeImage
 --   case Array.index image2 (Array.Ix2 y x) of
 --     -- Just (PixelY v) -> pure v
 --     -- Nothing -> pure 0
@@ -92,7 +99,7 @@ handleDirectory dir = do
 
 -- IMAGE
 
-getImage :: State -> Text -> IO (MonochromeImage Array.S)
+getImage :: State -> Text -> IO (MonochromeImage)
 getImage (State cachedImage) path = do
   maybeImage <- readTVarIO cachedImage
   case maybeImage of
@@ -110,21 +117,21 @@ getImage (State cachedImage) path = do
         atomically $ writeTVar cachedImage (Just (path, imageNew))
         pure imageNew
 
-type MonochromeImage r =
-  Massiv.Image r Massiv.SRGB Double
+type MonochromeImage =
+  HIP.Image HIP.RGB Double
 
 type MonochromePixel =
-  ColorSpace.Pixel Massiv.SRGB Double
+  HIP.Pixel HIP.RGB Double
 
-readImage :: String -> IO (MonochromeImage Array.S)
+readImage :: String -> IO (MonochromeImage)
 readImage =
-  Massiv.readImageAuto
+  HIP.readImageRGB
 
 -- PROCESS
 
-processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage Array.S -> MonochromeImage Array.D
+processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage -> MonochromeImage
 processImage g z1 z5 z9 bp wp =
-  Array.map (whitepoint wp . blackpoint bp . zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert)
+  HIP.map (whitepoint wp . blackpoint bp . zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert)
 
 invert :: MonochromePixel -> MonochromePixel
 invert =

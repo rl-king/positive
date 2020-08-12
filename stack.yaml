@@ -39,7 +39,13 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
-# extra-deps:
+extra-deps:
+  - Color-0.2.0@sha256:94c43c4d8f943ba0642ee58a9b8a665b01a3ac2893c40a16ffdabaacb956c58f,8159
+  - massiv-io-0.3.0.1@sha256:393df632ea8c3b0549a2b3a2fbaa6a9ef1202a05dd9b3f44555a9f6a31327652,3667
+  - git: git@github.com:lehins/hip.git
+    commit: de485419b25c071be8fc8e8072894c9da00206c2
+    subdirs:
+      - hip
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

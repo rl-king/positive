@@ -3,7 +3,34 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: Color-0.2.0@sha256:94c43c4d8f943ba0642ee58a9b8a665b01a3ac2893c40a16ffdabaacb956c58f,8159
+    pantry-tree:
+      size: 6965
+      sha256: 35dffbacfb79d22ea2a5b6aa9cf49c1c3dcdbf1e42dca4f2db31e85b847f1f99
+  original:
+    hackage: Color-0.2.0@sha256:94c43c4d8f943ba0642ee58a9b8a665b01a3ac2893c40a16ffdabaacb956c58f,8159
+- completed:
+    hackage: massiv-io-0.3.0.1@sha256:393df632ea8c3b0549a2b3a2fbaa6a9ef1202a05dd9b3f44555a9f6a31327652,3667
+    pantry-tree:
+      size: 1965
+      sha256: 41becc9b5c2f3c70722a67a984015f30b3aaca40be977e7715f7f9cc4492d075
+  original:
+    hackage: massiv-io-0.3.0.1@sha256:393df632ea8c3b0549a2b3a2fbaa6a9ef1202a05dd9b3f44555a9f6a31327652,3667
+- completed:
+    subdir: hip
+    name: hip
+    version: 2.0.0.0
+    git: git@github.com:lehins/hip.git
+    pantry-tree:
+      size: 6466
+      sha256: ba726641ff74ba024ef56574fe40603bb8e9610e343904b3ca93df5ef515f521
+    commit: de485419b25c071be8fc8e8072894c9da00206c2
+  original:
+    subdir: hip
+    git: git@github.com:lehins/hip.git
+    commit: de485419b25c071be8fc8e8072894c9da00206c2
 snapshots:
 - completed:
     size: 532380
