@@ -7,14 +7,11 @@
 
 module Positive.Server where
 
-import Control.Concurrent.STM
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy as BS
--- import qualified Data.HIP.Array as Array
--- import qualified Data.HIP.Array.IO as HIP
+import Data.IORef
 import Data.Text (Text)
 import qualified Data.Text as Text
--- import qualified Graphics.ColorSpace as ColorSpace
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
@@ -23,9 +20,12 @@ import System.Directory
 import qualified System.FilePath.Posix as Path
 import System.IO
 
+-- STATE
+
 newtype State = State
-  { _cachedImage :: TVar (Maybe (Text, MonochromeImage HIP.VS))
-  }
+  {sCurrentImage :: IORef (Maybe (Text, MonochromeImage HIP.VS))}
+
+-- API
 
 type Api =
   -- IMAGE
@@ -47,16 +47,20 @@ type Api =
       -- RAW
       Raw
 
+-- SERVER
+
 server :: IO ()
-server = do
-  cachedImage <- newTVarIO Nothing
-  runSettings settings (serve (Proxy @Api) (handlers (State cachedImage)))
-  where
-    settings =
-      setPort 8080 $
-        setBeforeMainLoop
-          (hPutStrLn stderr ("listening on port " ++ show @Int 8080))
-          defaultSettings
+server =
+  let settings =
+        setPort 8080 $
+          setBeforeMainLoop
+            (hPutStrLn stderr ("listening on port " ++ show @Int 8080))
+            defaultSettings
+   in do
+        ref <- newIORef Nothing
+        runSettings settings (serve (Proxy @Api) (handlers (State ref)))
+
+-- HANDLERS
 
 handlers :: State -> Server Api
 handlers state =
@@ -76,21 +80,21 @@ handleDirectory dir = do
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
 getImage :: State -> Text -> IO (MonochromeImage HIP.VS)
-getImage (State cachedImage) path = do
-  maybeImage <- readTVarIO cachedImage
+getImage (State ref) path = do
+  maybeImage <- readIORef ref
   case maybeImage of
     Nothing -> do
       putStrLn "Read image"
-      image <- readImage (Text.unpack path)
-      atomically $ writeTVar cachedImage (Just (path, image))
+      image <- readImageFromDisk (Text.unpack path)
+      writeIORef ref (Just (path, image))
       pure image
     Just (cachedPath, cachedImage')
       | path == cachedPath ->
         putStrLn "From cache image" >> pure cachedImage'
       | otherwise -> do
         putStrLn "Read image"
-        imageNew <- readImage (Text.unpack path)
-        atomically $ writeTVar cachedImage (Just (path, imageNew))
+        imageNew <- readImageFromDisk (Text.unpack path)
+        writeIORef ref (Just (path, imageNew))
         pure imageNew
 
 -- IMAGE
@@ -101,10 +105,10 @@ type MonochromeImage r =
 type MonochromePixel =
   HIP.Pixel HIP.Y Double
 
-readImage :: String -> IO (MonochromeImage HIP.VS)
-readImage path =
+readImageFromDisk :: String -> IO (MonochromeImage HIP.VS)
+readImageFromDisk path =
   HIP.resize HIP.Bilinear HIP.Edge (900, 600)
-    <$> HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
+    . HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
     <$> HIP.readImageY HIP.VS path
 
 processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage HIP.VS -> MonochromeImage HIP.VS
