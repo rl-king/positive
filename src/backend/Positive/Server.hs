@@ -32,19 +32,9 @@ type Api =
   ImageApi :<|> SettingsApi
 
 type ImageApi =
-  "image"
-    :> QueryParam' '[Required, Strict] "path" Text
-    :> QueryParam' '[Required, Strict] "gamma" Double
-    :> QueryParam' '[Required, Strict] "zone-1" Double
-    :> QueryParam' '[Required, Strict] "zone-5" Double
-    :> QueryParam' '[Required, Strict] "zone-9" Double
-    :> QueryParam' '[Required, Strict] "blackpoint" Double
-    :> QueryParam' '[Required, Strict] "whitepoint" Double
-    :> Get '[Image] BS.ByteString
-      :<|> "directory"
-    :> QueryParam' '[Required, Strict] "dir" Text
-    :> Get '[JSON] [Text]
-      :<|> Raw
+  "image" :> QueryParam' '[Required, Strict] "image-settings" ImageSettings :> Get '[Image] BS.ByteString
+    :<|> "directory" :> QueryParam' '[Required, Strict] "dir" Text :> Get '[JSON] [Text]
+    :<|> Raw
 
 type SettingsApi =
   "image" :> "settings" :> Get '[JSON] ImageSettings
@@ -72,13 +62,14 @@ handlers state =
   )
     :<|> undefined
 
-handleImage :: State -> Text -> Double -> Double -> Double -> Double -> Double -> Double -> Servant.Handler BS.ByteString
-handleImage state path g z1 z5 z9 bp wp = do
-  image <- liftIO $ getImage state path
+handleImage :: State -> ImageSettings -> Servant.Handler BS.ByteString
+handleImage state imageSettings = do
+  liftIO $ print imageSettings
+  image <- liftIO $ getImage state (iPath imageSettings)
   pure
     . HIP.encode HIP.PNG []
     . HIP.exchange HIP.VS
-    $ processImage g z1 z5 z9 bp wp image
+    $ processImage imageSettings image
 
 handleDirectory :: Text -> Servant.Handler [Text]
 handleDirectory dir = do
@@ -114,9 +105,17 @@ readImageFromDisk path =
     . HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
     <$> HIP.readImageY HIP.RPU path
 
-processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
-processImage g z1 z5 z9 bp wp =
-  HIP.map (whitepoint wp . blackpoint bp . zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert)
+processImage :: ImageSettings -> MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
+processImage is =
+  HIP.map
+    ( whitepoint (iWhitepoint is)
+        . blackpoint (iBlackpoint is)
+        . zone 0.95 (iZone9 is)
+        . zone 0.5 (iZone5 is)
+        . zone 0.15 (iZone1 is)
+        . gamma (iGamma is)
+        . invert
+    )
 
 -- FILTERS
 

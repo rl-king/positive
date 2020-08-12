@@ -48,7 +48,7 @@ getImageSettings =
                                         }
                                     )
                                 )
-                                (Json.Decode.decodeString Generated.Data.ImageSettings.decodeCoordinate c)
+                                (Json.Decode.decodeString Generated.Data.ImageSettings.decodeImageSettings c)
                 )
         , timeout = Nothing
         , tracker = Nothing

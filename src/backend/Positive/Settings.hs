@@ -7,21 +7,35 @@
 module Positive.Settings where
 
 import qualified Data.Aeson as Aeson
-import Data.Text (Text)
+import Data.Bifunctor
+import qualified Data.ByteString.Base64 as Base64
+import Data.Text as Text
+import Data.Text.Encoding as Text
 import GHC.Generics (Generic)
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
+import Servant
 
 data ImageSettings = ImageSettings
-  { isPath :: Text,
-    isGamma :: Double,
-    isZone1 :: Double,
-    isZone5 :: Double,
-    isZone9 :: Double,
-    isBlackpoint :: Double,
-    isWhitepoint :: Double
+  { iPath :: Text,
+    iGamma :: Double,
+    iZone1 :: Double,
+    iZone5 :: Double,
+    iZone9 :: Double,
+    iBlackpoint :: Double,
+    iWhitepoint :: Double
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+-- instance ToHttpApiData ImageSettings where
+--   toUrlPiece = toUrlPiece . unrefine . unImageWidth
+--   toQueryParam = toQueryParam . unrefine . unImageWidth
+
+instance FromHttpApiData ImageSettings where
+  parseUrlPiece piece =
+    first Text.pack $
+      Aeson.eitherDecodeStrict =<< Base64.decode (Text.encodeUtf8 piece)
+  parseQueryParam = parseUrlPiece
 
 instance Elm.HasElmType ImageSettings where
   elmDefinition =
@@ -38,7 +52,7 @@ instance Elm.HasElmDecoder Aeson.Value ImageSettings where
         @ImageSettings
         Elm.defaultOptions
         Aeson.defaultOptions
-        "Generated.Data.ImageSettings.decodeCoordinate"
+        "Generated.Data.ImageSettings.decodeImageSettings"
 
 instance Elm.HasElmEncoder Aeson.Value ImageSettings where
   elmEncoderDefinition =
@@ -47,4 +61,4 @@ instance Elm.HasElmEncoder Aeson.Value ImageSettings where
         @ImageSettings
         Elm.defaultOptions
         Aeson.defaultOptions
-        "Generated.Data.ImageSettings.encodeCoordinate"
+        "Generated.Data.ImageSettings.encodeImageSettings"

@@ -1,8 +1,9 @@
 module Main exposing (main)
 
+import Base64
 import Browser
 import Browser.Navigation as Navigation
-import Generated.Data.ImageSettings
+import Generated.Data.ImageSettings as ImageSettings exposing (ImageSettings)
 import Generated.Request
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
@@ -11,7 +12,7 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Url exposing (Url)
-import Url.Builder as Url
+import Url.Builder
 import Url.Parser
 import Url.Parser.Query
 
@@ -50,15 +51,14 @@ type alias Model =
     , coordinateValue : Maybe Float
     , drag : Maybe Drag
     , key : Navigation.Key
-    , path : String
     , fileNames : List String
     }
 
 
 type Image
-    = Ready Settings
-    | Loading Settings
-    | Queued Settings Settings
+    = Ready ImageSettings
+    | Loading ImageSettings
+    | Queued ImageSettings ImageSettings
 
 
 type alias Coordinate =
@@ -75,29 +75,18 @@ type alias Drag =
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( { image = Ready (Settings 2.2 0 0 0 0 0)
+    ( { image = Ready (ImageSettings (fromUrl url) 2.2 0 0 0 0 0)
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
       , fileNames = []
-      , path = fromUrl url
       }
     , Http.get
-        { url = Url.absolute [ "directory" ] [ Url.string "dir" "assets" ]
+        { url = Url.Builder.absolute [ "directory" ] [ Url.Builder.string "dir" "assets" ]
         , expect =
             Http.expectJson GotDirectory (Decode.list Decode.string)
         }
     )
-
-
-type alias Settings =
-    { gamma : Float
-    , zone1 : Float
-    , zone5 : Float
-    , zone9 : Float
-    , blackpoint : Float
-    , whitepoint : Float
-    }
 
 
 fromUrl : Url -> String
@@ -143,7 +132,13 @@ update msg model =
             ( model, Navigation.load href )
 
         UrlChanged url ->
-            ( { model | path = fromUrl url }, Cmd.none )
+            let
+                currentSettings =
+                    toSettings model.image
+            in
+            ( { model | image = Ready { currentSettings | iPath = fromUrl url } }
+            , Cmd.none
+            )
 
         GotDirectory (Ok fileNames) ->
             ( { model | fileNames = fileNames }, Cmd.none )
@@ -169,30 +164,30 @@ update msg model =
             ( model
             , Http.post
                 { url =
-                    Url.absolute [ "image", "coordinate" ]
-                        (toImageUrlParams model.path (toSettings model.image))
+                    Url.Builder.absolute [ "image", "coordinate" ]
+                        [ toImageUrlParams (toSettings model.image) ]
                 , expect = Http.expectJson GotValueAtCoordinate Decode.float
                 , body = Http.jsonBody (Encode.list identity [ Encode.int x, Encode.int y ])
                 }
             )
 
         OnGammaChange gamma ->
-            ( updateSettings (\s -> { s | gamma = toFloat gamma / 100 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iGamma = toFloat gamma / 100 }) model, Cmd.none )
 
         OnZone1Change zone ->
-            ( updateSettings (\s -> { s | zone1 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iZone1 = toFloat zone / 1000 }) model, Cmd.none )
 
         OnZone5Change zone ->
-            ( updateSettings (\s -> { s | zone5 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iZone5 = toFloat zone / 1000 }) model, Cmd.none )
 
         OnZone9Change zone ->
-            ( updateSettings (\s -> { s | zone9 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iZone9 = toFloat zone / 1000 }) model, Cmd.none )
 
         OnBlackpointChange bp ->
-            ( updateSettings (\s -> { s | blackpoint = toFloat bp / 100 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iBlackpoint = toFloat bp / 100 }) model, Cmd.none )
 
         OnWhitepointChange wp ->
-            ( updateSettings (\s -> { s | whitepoint = toFloat wp / 100 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iWhitepoint = toFloat wp / 100 }) model, Cmd.none )
 
         GotValueAtCoordinate value ->
             ( { model | coordinateValue = Result.toMaybe value }
@@ -211,7 +206,7 @@ update msg model =
                     ( { model | image = Ready n }, Cmd.none )
 
 
-updateSettings : (Settings -> Settings) -> Model -> Model
+updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
     case model.image of
         Ready s ->
@@ -251,7 +246,7 @@ viewFiles fileNames =
 viewFile : String -> Html Msg
 viewFile fileName =
     li []
-        [ a [ href (Url.absolute [] [ Url.string "path" ("assets/" ++ fileName) ]) ]
+        [ a [ href (Url.Builder.absolute [] [ Url.Builder.string "path" ("assets/" ++ fileName) ]) ]
             [ text fileName ]
         ]
 
@@ -269,10 +264,10 @@ viewSettings model =
             ]
         , div []
             [ label [] [ text "gamma" ]
-            , p [] [ text (String.fromFloat settings.gamma) ]
+            , p [] [ text (String.fromFloat settings.iGamma) ]
             , input
                 [ type_ "range"
-                , value (String.fromInt (floor (settings.gamma * 100)))
+                , value (String.fromInt (floor (settings.iGamma * 100)))
                 , Attributes.min "0"
                 , Attributes.max "2000"
                 , on "input" <|
@@ -282,11 +277,11 @@ viewSettings model =
                 ]
                 []
             ]
-        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.zone1 * 1000)
-        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.zone5 * 1000)
-        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.zone9 * 1000)
-        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.blackpoint * 100)
-        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.whitepoint * 100)
+        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.iZone1 * 1000)
+        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.iZone5 * 1000)
+        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.iZone9 * 1000)
+        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.iBlackpoint * 100)
+        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.iWhitepoint * 100)
         ]
 
 
@@ -313,7 +308,7 @@ viewImage : Model -> Html Msg
 viewImage model =
     section [ id "image-section" ]
         [ img
-            [ src (Url.absolute [ "image" ] (toImageUrlParams model.path (toSettings model.image)))
+            [ src (Url.Builder.absolute [ "image" ] [ toImageUrlParams (toSettings model.image) ])
             , on "load" (Decode.succeed OnImageLoad)
             , on "click" <|
                 Decode.map4 (\x y tx ty -> OnImageClick ( x - tx, y - ty ))
@@ -345,11 +340,11 @@ viewZones model =
     in
     ul [] <|
         List.map2 (\x i -> li [] [ text (String.left 5 (String.fromFloat (x - i))) ])
-            (List.map (zone 0.95 settings.zone9 << zone 0.5 settings.zone5 << zone 0.15 settings.zone1) vs)
+            (List.map (zone 0.95 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.15 settings.iZone1) vs)
             vs
 
 
-toSettings : Image -> Settings
+toSettings : Image -> ImageSettings
 toSettings image =
     case image of
         Ready s ->
@@ -362,16 +357,12 @@ toSettings image =
             s
 
 
-toImageUrlParams : String -> Settings -> List Url.QueryParameter
-toImageUrlParams path settings =
-    [ Url.string "gamma" (String.fromFloat settings.gamma)
-    , Url.string "zone-1" (String.fromFloat settings.zone1)
-    , Url.string "zone-5" (String.fromFloat settings.zone5)
-    , Url.string "zone-9" (String.fromFloat settings.zone9)
-    , Url.string "blackpoint" (String.fromFloat settings.blackpoint)
-    , Url.string "whitepoint" (String.fromFloat settings.whitepoint)
-    , Url.string "path" path
-    ]
+toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
+toImageUrlParams =
+    Url.Builder.string "image-settings"
+        << Base64.encode
+        << Encode.encode 0
+        << ImageSettings.encodeImageSettings
 
 
 viewZoneDot : Maybe Drag -> Html Msg
