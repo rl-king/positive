@@ -7,7 +7,7 @@
 
 module Positive.Server where
 
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString.Lazy as BS
 import Data.IORef
 import Data.Text (Text)
@@ -19,7 +19,7 @@ import Positive.Settings
 import Servant
 import System.Directory
 import qualified System.FilePath.Posix as Path
-import System.IO
+import System.Log.FastLogger (TimedFastLogger, toLogStr)
 
 -- STATE
 
@@ -41,31 +41,32 @@ type SettingsApi =
 
 -- SERVER
 
-server :: IO ()
-server =
+server :: TimedFastLogger -> IO ()
+server logger =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
-            (hPutStrLn stderr ("listening on port " ++ show @Int 8080))
+            (logMsg logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
    in do
         ref <- newIORef Nothing
-        runSettings settings (serve (Proxy @Api) (handlers (State ref)))
+        runSettings settings (serve (Proxy @Api) (handlers logger (State ref)))
 
 -- HANDLERS
 
-handlers :: State -> Server Api
-handlers state =
-  ( handleImage state
+handlers :: TimedFastLogger -> State -> Server Api
+handlers logger state =
+  ( handleImage logger state
       :<|> handleDirectory
       :<|> serveDirectoryFileServer "./"
   )
     :<|> undefined
 
-handleImage :: State -> ImageSettings -> Servant.Handler BS.ByteString
-handleImage state imageSettings = do
-  liftIO $ print imageSettings
-  image <- liftIO $ getImage state (iPath imageSettings)
+handleImage :: TimedFastLogger -> State -> ImageSettings -> Servant.Handler BS.ByteString
+handleImage logger state imageSettings = do
+  image <- getImage logger state (iPath imageSettings)
+  logMsg logger $ "Size: " <> tshow (HIP.dims image)
+  logMsg logger "Processing image"
   pure
     . HIP.encode HIP.PNG []
     . HIP.exchange HIP.VS
@@ -76,20 +77,20 @@ handleDirectory dir = do
   files <- liftIO $ listDirectory (Text.unpack dir)
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
-getImage :: State -> Text -> IO (MonochromeImage HIP.RPU)
-getImage state@(State ref) path = do
-  maybeImage <- readIORef ref
+getImage :: MonadIO m => TimedFastLogger -> State -> Text -> m (MonochromeImage HIP.RPU)
+getImage logger state@(State ref) path = do
+  maybeImage <- liftIO $ readIORef ref
   case maybeImage of
     Nothing -> do
-      putStrLn "Reading image"
-      image <- readImageFromDisk (Text.unpack path)
-      putStrLn "Read image"
-      modifyIORef' ref (const (Just (path, image)))
-      putStrLn "Updated IORef"
+      logMsg logger "Reading image"
+      image <- liftIO $ readImageFromDisk (Text.unpack path)
+      logMsg logger "Read image"
+      liftIO $ modifyIORef' ref (const (Just (path, image)))
+      logMsg logger "Updated IORef"
       pure image
     Just (cachedPath, cachedImage')
-      | path == cachedPath -> putStrLn "From cache image" >> pure cachedImage'
-      | otherwise -> modifyIORef' ref (const Nothing) >> getImage state path
+      | path == cachedPath -> logMsg logger "From cache image" >> pure cachedImage'
+      | otherwise -> liftIO $ modifyIORef' ref (const Nothing) >> getImage logger state path
 
 -- IMAGE
 
@@ -107,15 +108,14 @@ readImageFromDisk path =
 
 processImage :: ImageSettings -> MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
 processImage is =
-  HIP.map
-    ( whitepoint (iWhitepoint is)
-        . blackpoint (iBlackpoint is)
-        . zone 0.95 (iZone9 is)
-        . zone 0.5 (iZone5 is)
-        . zone 0.15 (iZone1 is)
-        . gamma (iGamma is)
-        . invert
-    )
+  HIP.map $
+    whitepoint (iWhitepoint is)
+      . blackpoint (iBlackpoint is)
+      . zone 0.95 (iZone9 is)
+      . zone 0.5 (iZone5 is)
+      . zone 0.15 (iZone1 is)
+      . gamma (iGamma is)
+      . invert
 
 -- FILTERS
 
@@ -155,3 +155,13 @@ instance Accept Image where
 
 instance MimeRender Image BS.ByteString where
   mimeRender _ = id
+
+-- LOG
+
+logMsg :: MonadIO m => TimedFastLogger -> Text -> m ()
+logMsg logger msg =
+  liftIO $ logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
+
+tshow :: Show a => a -> Text
+tshow =
+  Text.pack . show

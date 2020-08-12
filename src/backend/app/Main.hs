@@ -18,13 +18,20 @@ import qualified System.Directory as Directory
 import qualified System.Exit
 import System.FilePath.Posix ((</>))
 import qualified System.FilePath.Posix as Path
+import System.Log.FastLogger (TimedFastLogger)
+import qualified System.Log.FastLogger as FastLogger
 import qualified System.Process as Process
 
 main :: IO ()
-main = codeGen >> server
+main = do
+  timeCache <- FastLogger.newTimeCache FastLogger.simpleTimeFormat
+  FastLogger.withTimedFastLogger
+    timeCache
+    (FastLogger.LogStdout FastLogger.defaultBufSize)
+    (\logger -> codeGen logger >> server logger)
 
-codeGen :: IO ()
-codeGen = do
+codeGen :: TimedFastLogger -> IO ()
+codeGen logger = do
   let endpointDefinitions =
         fmap (Servant.To.Elm.elmEndpointDefinition (Expression.String "") ["Generated", "Request"]) $
           Servant.To.Elm.elmEndpoints @SettingsApi
@@ -34,7 +41,7 @@ codeGen = do
         Pretty.modules $
           Simplification.simplifyDefinition
             <$> jsonDefinitions <> endpointDefinitions
-  putStrLn "Removing src/frontend/Generated before generating code"
+  logMsg logger "Removing src/frontend/Generated before generating code"
   Directory.removeDirectoryRecursive "src/frontend/Generated"
   for_ (HashMap.toList modules) $ \(modulePath, contents) -> do
     (filename, location) <-
@@ -49,14 +56,14 @@ codeGen = do
           Directory.createDirectoryIfMissing True p
           pure (Text.unpack $ moduleName <> ".elm", p)
     writeFile (location </> filename) (show contents)
-    putStrLn $ "Wrote elm file: " <> (location </> filename)
-  runElmFormat
+    logMsg logger $ "Wrote elm file: " <> Text.pack (location </> filename)
+  runElmFormat logger
 
-runElmFormat :: IO ()
-runElmFormat = do
+runElmFormat :: TimedFastLogger -> IO ()
+runElmFormat logger = do
   let args = ["--elm-version=0.19", "--yes", "src/frontend/Generated"]
   result <- Process.withCreateProcess (Process.proc "elm-format" args) $
     \_ _ _ handler -> Process.waitForProcess handler
   case result of
-    System.Exit.ExitSuccess -> putStrLn "Formatted generated code with elm-format"
-    _ -> putStrLn $ "Something went wrong trying to format the generated Elm code: " <> show result
+    System.Exit.ExitSuccess -> logMsg logger "Formatted generated code with elm-format"
+    _ -> logMsg logger $ "Something went wrong trying to format the generated Elm code: " <> tshow result
