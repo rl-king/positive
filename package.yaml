@@ -23,12 +23,11 @@ dependencies:
   - bytestring
   - directory
   - filepath
+  - hip
   - http-media
   - http-types
   - massiv
   - massiv-io
-  - psqueues
-  - safe-exceptions
   - servant
   - servant-server
   - stm
@@ -55,20 +54,6 @@ executables:
     - -Wincomplete-record-updates
     - -Wincomplete-uni-patterns
     - -Wredundant-constraints
-
-benchmarks:
-  positive-benchmarks:
-    source-dirs: benchmark
-    main: Main.hs
-    dependencies:
-      - base
-      - positive
-      - criterion
-    ghc-options:
-      - -rtsopts
-      - -threaded
-      - -with-rtsopts=-N
-      - -O2
 
 tests:
   positive-test:
