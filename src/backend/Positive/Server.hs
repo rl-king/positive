@@ -15,6 +15,7 @@ import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
+import Positive.Settings
 import Servant
 import System.Directory
 import qualified System.FilePath.Posix as Path
@@ -22,13 +23,15 @@ import System.IO
 
 -- STATE
 
-newtype State = State
-  {sCurrentImage :: IORef (Maybe (Text, MonochromeImage HIP.VS))}
+newtype State
+  = State (IORef (Maybe (Text, MonochromeImage HIP.RPU)))
 
 -- API
 
 type Api =
-  -- IMAGE
+  ImageApi :<|> SettingsApi
+
+type ImageApi =
   "image"
     :> QueryParam' '[Required, Strict] "path" Text
     :> QueryParam' '[Required, Strict] "gamma" Double
@@ -38,14 +41,13 @@ type Api =
     :> QueryParam' '[Required, Strict] "blackpoint" Double
     :> QueryParam' '[Required, Strict] "whitepoint" Double
     :> Get '[Image] BS.ByteString
-      :<|>
-      -- RAW
-      "directory"
+      :<|> "directory"
     :> QueryParam' '[Required, Strict] "dir" Text
     :> Get '[JSON] [Text]
-      :<|>
-      -- RAW
-      Raw
+      :<|> Raw
+
+type SettingsApi =
+  "image" :> "settings" :> Get '[JSON] ImageSettings
 
 -- SERVER
 
@@ -64,56 +66,59 @@ server =
 
 handlers :: State -> Server Api
 handlers state =
-  handleImage state
-    :<|> handleDirectory
-    :<|> serveDirectoryFileServer "./"
+  ( handleImage state
+      :<|> handleDirectory
+      :<|> serveDirectoryFileServer "./"
+  )
+    :<|> undefined
 
 handleImage :: State -> Text -> Double -> Double -> Double -> Double -> Double -> Double -> Servant.Handler BS.ByteString
 handleImage state path g z1 z5 z9 bp wp = do
   image <- liftIO $ getImage state path
-  pure $ HIP.encode HIP.PNG [] $
-    processImage g z1 z5 z9 bp wp image
+  pure
+    . HIP.encode HIP.PNG []
+    . HIP.exchange HIP.VS
+    $ processImage g z1 z5 z9 bp wp image
 
 handleDirectory :: Text -> Servant.Handler [Text]
 handleDirectory dir = do
   files <- liftIO $ listDirectory (Text.unpack dir)
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
-getImage :: State -> Text -> IO (MonochromeImage HIP.VS)
-getImage (State ref) path = do
+getImage :: State -> Text -> IO (MonochromeImage HIP.RPU)
+getImage state@(State ref) path = do
   maybeImage <- readIORef ref
   case maybeImage of
     Nothing -> do
-      putStrLn "Read image"
+      putStrLn "Reading image"
       image <- readImageFromDisk (Text.unpack path)
-      writeIORef ref (Just (path, image))
+      putStrLn "Read image"
+      modifyIORef' ref (const (Just (path, image)))
+      putStrLn "Updated IORef"
       pure image
     Just (cachedPath, cachedImage')
-      | path == cachedPath ->
-        putStrLn "From cache image" >> pure cachedImage'
-      | otherwise -> do
-        putStrLn "Read image"
-        imageNew <- readImageFromDisk (Text.unpack path)
-        writeIORef ref (Just (path, imageNew))
-        pure imageNew
+      | path == cachedPath -> putStrLn "From cache image" >> pure cachedImage'
+      | otherwise -> modifyIORef' ref (const Nothing) >> getImage state path
 
 -- IMAGE
 
-type MonochromeImage r =
-  HIP.Image r HIP.Y Double
+type MonochromeImage arr =
+  HIP.Image arr HIP.Y Double
 
 type MonochromePixel =
   HIP.Pixel HIP.Y Double
 
-readImageFromDisk :: String -> IO (MonochromeImage HIP.VS)
+readImageFromDisk :: String -> IO (MonochromeImage HIP.RPU)
 readImageFromDisk path =
   HIP.resize HIP.Bilinear HIP.Edge (900, 600)
     . HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
-    <$> HIP.readImageY HIP.VS path
+    <$> HIP.readImageY HIP.RPU path
 
-processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage HIP.VS -> MonochromeImage HIP.VS
+processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
 processImage g z1 z5 z9 bp wp =
   HIP.map (whitepoint wp . blackpoint bp . zone 0.95 z9 . zone 0.5 z5 . zone 0.15 z1 . gamma g . invert)
+
+-- FILTERS
 
 invert :: MonochromePixel -> MonochromePixel
 invert =

@@ -5,12 +5,26 @@
 
 packages:
 - completed:
-    hackage: massiv-io-0.1.8.0@sha256:611c08bee2c049c00ab5620af9eb8df37d4ab1d3dd63b75678bd5dc598b97497,2345
+    hackage: JuicyPixels-3.3.5@sha256:5c67dc066d67f5045221a8202f701f4c77eab8220f44414c00fadcdc3e4f872b,3911
     pantry-tree:
-      size: 1431
-      sha256: 43742bd100a36c8b1c5a560e83f527cfac74b19461e804d2c0af385efeef281a
+      size: 2724
+      sha256: e509268878581ec17929cab9ee6cc30ef05f6c203e760f49865547249fbb9d48
   original:
-    hackage: massiv-io-0.1.8.0
+    hackage: JuicyPixels-3.3.5@sha256:5c67dc066d67f5045221a8202f701f4c77eab8220f44414c00fadcdc3e4f872b,3911
+- completed:
+    hackage: elm-syntax-0.3.0.0@sha256:8fd57f8e15e499c11b78983bce3c4b237eb2f22e467a55d51702b43a18c61323,2257
+    pantry-tree:
+      size: 788
+      sha256: 47dc847d2d26cf6fd3abfff8e8e254f56bfcb0c606c350709bf3d4acfd05cff4
+  original:
+    hackage: elm-syntax-0.3.0.0@sha256:8fd57f8e15e499c11b78983bce3c4b237eb2f22e467a55d51702b43a18c61323,2257
+- completed:
+    hackage: haskell-to-elm-0.3.0.0@sha256:b8a016087523596c7420fc0b78611b2ffa9b8094c8c5930b89ef7bbec82401a5,3614
+    pantry-tree:
+      size: 505
+      sha256: 50eacf6c6c0386453d8504bcfff3803f9df8867b8802e12013c9146fd29624b3
+  original:
+    hackage: haskell-to-elm-0.3.0.0@sha256:b8a016087523596c7420fc0b78611b2ffa9b8094c8c5930b89ef7bbec82401a5,3614
 - completed:
     hackage: hip-1.5.6.0@sha256:296c55622f62485422c0a593c7306af1a5abf8ba9f866dcdffc281b01eba65d7,6988
     pantry-tree:
@@ -19,15 +33,29 @@ packages:
   original:
     hackage: hip-1.5.6.0@sha256:296c55622f62485422c0a593c7306af1a5abf8ba9f866dcdffc281b01eba65d7,6988
 - completed:
-    hackage: JuicyPixels-3.3.5@sha256:5c67dc066d67f5045221a8202f701f4c77eab8220f44414c00fadcdc3e4f872b,3911
+    hackage: repa-3.4.1.4@sha256:70ef4758937baa29be1ac0a78ecbccf341b3f276c9efb632b4829eea80445e2d,3315
     pantry-tree:
-      size: 2724
-      sha256: e509268878581ec17929cab9ee6cc30ef05f6c203e760f49865547249fbb9d48
+      size: 2965
+      sha256: 294773b0e6be4a4198133715d4c7f2d0d8e5aec4adea7e59578d1b3823a7879d
   original:
-    hackage: JuicyPixels-3.3.5@sha256:5c67dc066d67f5045221a8202f701f4c77eab8220f44414c00fadcdc3e4f872b,3911
+    hackage: repa-3.4.1.4@sha256:70ef4758937baa29be1ac0a78ecbccf341b3f276c9efb632b4829eea80445e2d,3315
+- completed:
+    hackage: servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
+    pantry-tree:
+      size: 386
+      sha256: 3d45dc52822a30de2ee524358bf91ad77c041c4385ab75d636effa17e02e351e
+  original:
+    hackage: servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
+- completed:
+    hackage: servant-to-elm-0.4.1.0@sha256:89a28455449a7b4ee57f85ee5422ad87cd0e2a72fb9b7b9bd0a554639f29566b,3042
+    pantry-tree:
+      size: 433
+      sha256: 8c7e8e9d6917c17bb8c94824c6310b682f1126f651ddbcaabd25e852b369f37c
+  original:
+    hackage: servant-to-elm-0.4.1.0@sha256:89a28455449a7b4ee57f85ee5422ad87cd0e2a72fb9b7b9bd0a554639f29566b,3042
 snapshots:
 - completed:
-    size: 525663
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/14.yaml
-    sha256: 6edc48df46eb8bf7b861e98dd30d021a92c2e1820c9bb6528aac5d997b0e14ef
-  original: lts-14.14
+    size: 494638
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/15/11.yaml
+    sha256: 5747328cdcbb8fe9c96fc048b5566167c80dd176a41b52d3b363058e3cc1dc5d
+  original: lts-15.11

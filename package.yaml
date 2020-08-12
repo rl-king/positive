@@ -20,17 +20,24 @@ description:         Please see the README on GitHub at <https://github.com/rl-k
 
 dependencies:
   - base >= 4.7 && < 5
+  - aeson
   - bytestring
   - directory
+  - elm-syntax
   - filepath
+  - generics-sop
+  - haskell-to-elm
   - hip
   - http-media
   - http-types
+  - process
   - servant
   - servant-server
+  - servant-to-elm
   - text
   - wai
   - warp
+  - unordered-containers
 
 library:
   source-dirs: src/backend
