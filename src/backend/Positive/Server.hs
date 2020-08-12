@@ -67,7 +67,7 @@ handlers state =
 handleImage :: State -> Text -> Double -> Double -> Double -> Double -> Double -> Double -> Servant.Handler BS.ByteString
 handleImage state path g z1 z5 z9 bp wp = do
   image <- liftIO $ getImage state path
-  pure $ HIP.encode HIP.JPG [] $
+  pure $ HIP.encode HIP.PNG [] $
     processImage g z1 z5 z9 bp wp image
 
 handleDirectory :: Text -> Servant.Handler [Text]
@@ -102,8 +102,10 @@ type MonochromePixel =
   HIP.Pixel HIP.Y Double
 
 readImage :: String -> IO (MonochromeImage HIP.VS)
-readImage =
-  HIP.readImageY HIP.VS
+readImage path =
+  HIP.resize HIP.Bilinear HIP.Edge (900, 600)
+    <$> HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
+    <$> HIP.readImageY HIP.VS path
 
 processImage :: Double -> Double -> Double -> Double -> Double -> Double -> MonochromeImage HIP.VS -> MonochromeImage HIP.VS
 processImage g z1 z5 z9 bp wp =
