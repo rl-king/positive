@@ -178,13 +178,13 @@ update msg model =
             ( updateSettings (\s -> { s | gamma = toFloat gamma / 100 }) model, Cmd.none )
 
         OnZone1Change zone ->
-            ( updateSettings (\s -> { s | zone1 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | zone1 = toFloat zone / 500 }) model, Cmd.none )
 
         OnZone5Change zone ->
-            ( updateSettings (\s -> { s | zone5 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | zone5 = toFloat zone / 500 }) model, Cmd.none )
 
         OnZone9Change zone ->
-            ( updateSettings (\s -> { s | zone9 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | zone9 = toFloat zone / 500 }) model, Cmd.none )
 
         OnBlackpointChange bp ->
             ( updateSettings (\s -> { s | blackpoint = toFloat bp / 100 }) model, Cmd.none )
@@ -280,9 +280,9 @@ viewSettings model =
                 ]
                 []
             ]
-        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.zone1 * 1000)
-        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.zone5 * 1000)
-        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.zone9 * 1000)
+        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.zone1 * 500)
+        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.zone5 * 500)
+        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.zone9 * 500)
         , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.blackpoint * 100)
         , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.whitepoint * 100)
         ]

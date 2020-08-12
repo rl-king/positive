@@ -21,6 +21,8 @@ description:         Please see the README on GitHub at <https://github.com/rl-k
 dependencies:
   - base >= 4.7 && < 5
   - bytestring
+  - Color
+  - data-default
   - directory
   - filepath
   - http-media

@@ -18,14 +18,15 @@ import Unsafe.Coerce
 main :: IO ()
 main = do
   image <- readImage "assets/raw0001.png"
+  let (Array.Sz2 w h) = Array.size image
   print (Array.size image)
   print (Array.getComp image)
   print (Array.elemsCount image)
-  Hip.writeImage "resized.png" (res image)
+  Hip.writeImage "resized.png" (res (div w 10) (div h 10) image)
   defaultMain
     [ bench "process image" $ whnf process image
     , bench "to vector" $ whnf conv image
-    , bench "to vector and resize" $ whnf res image
+    , bench "to vector and resize" $ whnf (res (div w 10) (div h 10)) image
 
 
     -- , bench "process and encode png image" $ whnf (Massiv.encodeImage Massiv.imageWriteFormats "x.png" . process) image
@@ -33,9 +34,9 @@ main = do
     -- , bench "process and encode jpg image" $ whnf (Massiv.encodeImage Massiv.imageWriteFormats "x.jpg" . process) image
     ]
 
-res :: Massiv.Image Array.S ColorSpace.Y Double -> Hip.Image Hip.VU Y (Double)
-res =
-  resize Bilinear Edge (100, 640) . fromLists . conv
+res :: Int -> Int -> Massiv.Image Array.S ColorSpace.Y Double -> Hip.Image Hip.VU Y Double
+res w h =
+  resize Bilinear Edge (w, 640) . fromLists . conv
 
 
 conv :: Massiv.Image Array.S ColorSpace.Y Double -> [[Hip.Pixel Hip.Y Double]]
