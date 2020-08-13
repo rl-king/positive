@@ -33,6 +33,7 @@ dependencies:
   - http-media
   - http-types
   - process
+  - safe-exceptions
   - servant
   - servant-server
   - servant-to-elm

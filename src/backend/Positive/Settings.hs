@@ -10,6 +10,7 @@ import qualified Data.Aeson as Aeson
 import Data.Bifunctor
 import qualified Data.ByteString.Base64 as Base64
 import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import Data.Text as Text
 import Data.Text.Encoding as Text
 import GHC.Generics (Generic)
@@ -17,10 +18,26 @@ import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import Servant
 
+-- FILMROLLSETTINGS
+
 newtype FilmRollSettings = FilmRollSettings
-  { unSettings :: HashMap Text ImageSettings
+  { unFilmRollSettings :: HashMap Text ImageSettings
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+init :: ImageSettings -> FilmRollSettings
+init imageSettings =
+  FilmRollSettings $ HashMap.insert (iPath imageSettings) imageSettings mempty
+
+insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
+insert imageSettings =
+  FilmRollSettings . HashMap.insert (iPath imageSettings) imageSettings . unFilmRollSettings
+
+toList :: FilmRollSettings -> [ImageSettings]
+toList =
+  HashMap.elems . unFilmRollSettings
+
+-- IMAGESETTINGS
 
 data ImageSettings = ImageSettings
   { iPath :: Text,

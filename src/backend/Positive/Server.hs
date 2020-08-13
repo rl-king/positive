@@ -10,15 +10,17 @@
 module Positive.Server where
 
 import Control.Concurrent.MVar
+import Control.Exception.Safe (tryIO)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as ByteString
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
-import Positive.Settings
+import Positive.Settings as Settings
 import Servant
 import Servant.API.Generic
 import Servant.Server.Generic
@@ -41,7 +43,7 @@ data Api route = Api
   deriving (Generic)
 
 data ImageApi route = ImageApi
-  { iaImage :: route :- "image" :> QueryParam' '[Required, Strict] "image-settings" ImageSettings :> Get '[Image] BS.ByteString,
+  { iaImage :: route :- "image" :> QueryParam' '[Required, Strict] "image-settings" ImageSettings :> Get '[Image] ByteString,
     iaListDirectory :: route :- "directory" :> QueryParam' '[Required, Strict] "dir" Text :> Get '[JSON] [Text],
     iaRaw :: route :- Raw
   }
@@ -53,7 +55,12 @@ data SettingsApi route = SettingsApi
         :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent
+        :> PostNoContent '[JSON] NoContent,
+    saGetSettings ::
+      route :- "image"
+        :> "settings"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> Get '[JSON] [ImageSettings]
   }
   deriving (Generic)
 
@@ -85,11 +92,12 @@ handlers logger state =
       aSettingsApi =
         genericServerT
           SettingsApi
-            { saSaveSettings = handleSaveSettings logger
+            { saSaveSettings = handleSaveSettings logger,
+              saGetSettings = handleGetSettings logger
             }
     }
 
-handleImage :: TimedFastLogger -> LoadedImage -> ImageSettings -> Servant.Handler BS.ByteString
+handleImage :: TimedFastLogger -> LoadedImage -> ImageSettings -> Servant.Handler ByteString
 handleImage logger state imageSettings = do
   image <- getImage logger state (iPath imageSettings)
   logMsg logger "Processing image"
@@ -100,10 +108,39 @@ handleImage logger state imageSettings = do
 
 handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler NoContent
 handleSaveSettings logger dir imageSettings = do
-  -- settings :: Either String FilmRollSettings <-
-  --   liftIO . Aeson.eitherDecodeFileStrict $ Text.unpack dir </> "image-settings.png"
-  -- logMsg logger (tshow settings)
-  pure NoContent
+  let path = Text.unpack dir </> "image-settings.json"
+  exists <- liftIO $ doesPathExist path
+  if exists
+    then do
+      result :: Either String FilmRollSettings <- liftIO $ Aeson.eitherDecodeFileStrict path
+      case result of
+        Left err -> do
+          logMsg logger $ Text.pack err
+          throwError err500
+        Right settings -> do
+          liftIO . ByteString.writeFile path . Aeson.encode $ Settings.insert imageSettings settings
+          logMsg logger "Updated settings"
+          pure NoContent
+    else do
+      logMsg logger "No settings file found, creating one now"
+      liftIO . ByteString.writeFile path . Aeson.encode $ Settings.init imageSettings
+      logMsg logger $ "Wrote: " <> Text.pack path
+      pure NoContent
+
+handleGetSettings :: TimedFastLogger -> Text -> Servant.Handler [ImageSettings]
+handleGetSettings logger dir = do
+  let path = Text.unpack dir </> "image-settings.json"
+  exists <- liftIO $ doesPathExist path
+  if not exists
+    then throwError err404
+    else do
+      result :: Either String FilmRollSettings <- liftIO $ Aeson.eitherDecodeFileStrict path
+      case result of
+        Left err -> do
+          logMsg logger $ Text.pack err
+          throwError err500
+        Right settings ->
+          pure $ Settings.toList settings
 
 handleDirectory :: Text -> Servant.Handler [Text]
 handleDirectory dir = do
@@ -190,7 +227,7 @@ instance Accept Image where
   contentType _ =
     "image" Media.// "png"
 
-instance MimeRender Image BS.ByteString where
+instance MimeRender Image ByteString where
   mimeRender _ = id
 
 -- LOG
