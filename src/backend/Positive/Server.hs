@@ -75,25 +75,19 @@ server logger =
 handlers :: TimedFastLogger -> LoadedImage -> Api (AsServerT Handler)
 handlers logger state =
   Api
-    { aImageApi = imageApiHandlers logger state,
-      aSettingsApi = settingsApiHandlers logger
+    { aImageApi =
+        genericServerT
+          ImageApi
+            { iaImage = handleImage logger state,
+              iaListDirectory = handleDirectory,
+              iaRaw = serveDirectoryFileServer "./"
+            },
+      aSettingsApi =
+        genericServerT
+          SettingsApi
+            { saSaveSettings = handleSaveSettings logger
+            }
     }
-
-imageApiHandlers :: TimedFastLogger -> LoadedImage -> ToServant ImageApi (AsServerT Handler)
-imageApiHandlers logger state =
-  genericServerT
-    ImageApi
-      { iaImage = handleImage logger state,
-        iaListDirectory = handleDirectory,
-        iaRaw = serveDirectoryFileServer "./"
-      }
-
-settingsApiHandlers :: TimedFastLogger -> ToServant SettingsApi (AsServerT Handler)
-settingsApiHandlers logger =
-  genericServerT
-    SettingsApi
-      { saSaveSettings = handleSaveSettings logger
-      }
 
 handleImage :: TimedFastLogger -> LoadedImage -> ImageSettings -> Servant.Handler BS.ByteString
 handleImage logger state imageSettings = do
