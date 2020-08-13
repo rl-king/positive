@@ -44,7 +44,6 @@ data Api route = Api
 
 data ImageApi route = ImageApi
   { iaImage :: route :- "image" :> QueryParam' '[Required, Strict] "image-settings" ImageSettings :> Get '[Image] ByteString,
-    iaListDirectory :: route :- "directory" :> QueryParam' '[Required, Strict] "dir" Text :> Get '[JSON] [Text],
     iaRaw :: route :- Raw
   }
   deriving (Generic)
@@ -60,7 +59,12 @@ data SettingsApi route = SettingsApi
       route :- "image"
         :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> Get '[JSON] [ImageSettings]
+        :> Get '[JSON] [ImageSettings],
+    saListDirectory ::
+      route :- "image"
+        :> "list"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> Get '[JSON] [Text]
   }
   deriving (Generic)
 
@@ -86,14 +90,14 @@ handlers logger state =
         genericServerT
           ImageApi
             { iaImage = handleImage logger state,
-              iaListDirectory = handleDirectory,
               iaRaw = serveDirectoryFileServer "./"
             },
       aSettingsApi =
         genericServerT
           SettingsApi
             { saSaveSettings = handleSaveSettings logger,
-              saGetSettings = handleGetSettings logger
+              saGetSettings = handleGetSettings logger,
+              saListDirectory = handleDirectory
             }
     }
 

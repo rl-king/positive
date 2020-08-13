@@ -1,4 +1,4 @@
-module Generated.Request exposing (getImageSettings, postImageSettings)
+module Generated.Request exposing (getImageList, getImageSettings, postImageSettings)
 
 import Generated.Data.ImageSettings
 import Http
@@ -105,6 +105,58 @@ getImageSettings a =
                                     )
                                 )
                                 (Json.Decode.decodeString (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings) d)
+                )
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+getImageList :
+    String
+    ->
+        Cmd
+            (Result
+                ( Http.Error
+                , Maybe
+                    { metadata : Http.Metadata
+                    , body : String
+                    }
+                )
+                (List String)
+            )
+getImageList a =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url = "/image/list?dir=" ++ a
+        , body = Http.emptyBody
+        , expect =
+            Http.expectStringResponse identity
+                (\b ->
+                    case b of
+                        Http.BadUrl_ c ->
+                            Err ( Http.BadUrl c, Nothing )
+
+                        Http.Timeout_ ->
+                            Err ( Http.Timeout, Nothing )
+
+                        Http.NetworkError_ ->
+                            Err ( Http.NetworkError, Nothing )
+
+                        Http.BadStatus_ c d ->
+                            Err ( Http.BadStatus c.statusCode, Just { metadata = c, body = d } )
+
+                        Http.GoodStatus_ c d ->
+                            Result.mapError
+                                (\e ->
+                                    ( Http.BadBody (Json.Decode.errorToString e)
+                                    , Just
+                                        { metadata = c
+                                        , body = d
+                                        }
+                                    )
+                                )
+                                (Json.Decode.decodeString (Json.Decode.list Json.Decode.string) d)
                 )
         , timeout = Nothing
         , tracker = Nothing

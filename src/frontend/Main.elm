@@ -85,11 +85,8 @@ init _ url key =
       , fileNames = []
       }
     , Cmd.batch
-        [ Http.get
-            { url = Url.Builder.absolute [ "directory" ] [ Url.Builder.string "dir" "assets" ]
-            , expect =
-                Http.expectJson GotDirectory (Decode.list Decode.string)
-            }
+        [ Cmd.map GotDirectory <|
+            Request.getImageList "assets"
         , Cmd.map GotFilmRollSettings <|
             Request.getImageSettings "assets"
         ]
@@ -118,7 +115,7 @@ type alias HttpResult a =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
-    | GotDirectory (Result Http.Error (List String))
+    | GotDirectory (HttpResult (List String))
     | GotSaveImageSettings (HttpResult ())
     | GotFilmRollSettings (HttpResult (List ImageSettings))
     | DragStart Coordinate
