@@ -35,8 +35,8 @@ newtype LoadedImage
 -- API
 
 data Api route = Api
-  { aImageApi :: route :- ToServantApi ImageApi,
-    aSettingsApi :: route :- ToServantApi SettingsApi
+  { aSettingsApi :: route :- ToServantApi SettingsApi,
+    aImageApi :: route :- ToServantApi ImageApi
   }
   deriving (Generic)
 
