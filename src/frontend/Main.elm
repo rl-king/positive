@@ -3,6 +3,7 @@ module Main exposing (main)
 import Base64
 import Browser
 import Browser.Navigation as Navigation
+import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings exposing (ImageSettings)
 import Generated.Request as Request
 import Html exposing (..)
@@ -48,6 +49,7 @@ subscriptions model =
 
 type alias Model =
     { image : Image
+    , filmRollSettings : Dict String ImageSettings
     , coordinateValue : Maybe Float
     , drag : Maybe Drag
     , key : Navigation.Key
@@ -76,16 +78,21 @@ type alias Drag =
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     ( { image = Ready (ImageSettings (fromUrl url) 2.2 0 0 0 0 0)
+      , filmRollSettings = Dict.empty
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
       , fileNames = []
       }
-    , Http.get
-        { url = Url.Builder.absolute [ "directory" ] [ Url.Builder.string "dir" "assets" ]
-        , expect =
-            Http.expectJson GotDirectory (Decode.list Decode.string)
-        }
+    , Cmd.batch
+        [ Http.get
+            { url = Url.Builder.absolute [ "directory" ] [ Url.Builder.string "dir" "assets" ]
+            , expect =
+                Http.expectJson GotDirectory (Decode.list Decode.string)
+            }
+        , Cmd.map GotFilmRollSettings <|
+            Request.getImageSettings "assets"
+        ]
     )
 
 
@@ -112,7 +119,8 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | GotDirectory (Result Http.Error (List String))
-    | GotImageSettings (HttpResult ())
+    | GotSaveImageSettings (HttpResult ())
+    | GotFilmRollSettings (HttpResult (List ImageSettings))
     | DragStart Coordinate
     | DragAt Coordinate
     | DragEnd
@@ -152,7 +160,19 @@ update msg model =
         GotDirectory (Err err) ->
             ( model, Cmd.none )
 
-        GotImageSettings _ ->
+        GotFilmRollSettings (Ok settings) ->
+            ( { model
+                | filmRollSettings =
+                    Dict.fromList <|
+                        List.map (\s -> ( s.iPath, s )) settings
+              }
+            , Cmd.none
+            )
+
+        GotFilmRollSettings (Err err) ->
+            ( model, Cmd.none )
+
+        GotSaveImageSettings _ ->
             ( model, Cmd.none )
 
         DragStart coordinates ->
@@ -216,7 +236,7 @@ update msg model =
 
         SaveSettings settings ->
             ( model
-            , Cmd.map GotImageSettings <|
+            , Cmd.map GotSaveImageSettings <|
                 Request.postImageSettings "assets" settings
             )
 
