@@ -9,12 +9,18 @@ module Positive.Settings where
 import qualified Data.Aeson as Aeson
 import Data.Bifunctor
 import qualified Data.ByteString.Base64 as Base64
+import Data.HashMap.Strict (HashMap)
 import Data.Text as Text
 import Data.Text.Encoding as Text
 import GHC.Generics (Generic)
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import Servant
+
+newtype FilmRollSettings = FilmRollSettings
+  { unSettings :: HashMap Text ImageSettings
+  }
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
 
 data ImageSettings = ImageSettings
   { iPath :: Text,

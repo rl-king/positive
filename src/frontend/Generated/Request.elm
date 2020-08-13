@@ -1,33 +1,35 @@
-module Generated.Request exposing (getImageSettings)
+module Generated.Request exposing (postImageSettings)
 
 import Generated.Data.ImageSettings
 import Http
-import Json.Decode
 
 
-getImageSettings :
-    Cmd
-        (Result
-            ( Http.Error
-            , Maybe
-                { metadata : Http.Metadata
-                , body : String
-                }
+postImageSettings :
+    String
+    -> Generated.Data.ImageSettings.ImageSettings
+    ->
+        Cmd
+            (Result
+                ( Http.Error
+                , Maybe
+                    { metadata : Http.Metadata
+                    , body : String
+                    }
+                )
+                ()
             )
-            Generated.Data.ImageSettings.ImageSettings
-        )
-getImageSettings =
+postImageSettings a b =
     Http.request
-        { method = "GET"
+        { method = "POST"
         , headers = []
-        , url = "/image/settings"
-        , body = Http.emptyBody
+        , url = "/image/settings?dir=" ++ a
+        , body = Http.jsonBody (Generated.Data.ImageSettings.encodeImageSettings b)
         , expect =
             Http.expectStringResponse identity
-                (\a ->
-                    case a of
-                        Http.BadUrl_ b ->
-                            Err ( Http.BadUrl b, Nothing )
+                (\c ->
+                    case c of
+                        Http.BadUrl_ d ->
+                            Err ( Http.BadUrl d, Nothing )
 
                         Http.Timeout_ ->
                             Err ( Http.Timeout, Nothing )
@@ -35,20 +37,21 @@ getImageSettings =
                         Http.NetworkError_ ->
                             Err ( Http.NetworkError, Nothing )
 
-                        Http.BadStatus_ b c ->
-                            Err ( Http.BadStatus b.statusCode, Just { metadata = b, body = c } )
+                        Http.BadStatus_ d e ->
+                            Err ( Http.BadStatus d.statusCode, Just { metadata = d, body = e } )
 
-                        Http.GoodStatus_ b c ->
-                            Result.mapError
-                                (\d ->
-                                    ( Http.BadBody (Json.Decode.errorToString d)
+                        Http.GoodStatus_ d e ->
+                            if e == "" then
+                                Ok ()
+
+                            else
+                                Err
+                                    ( Http.BadBody "Expected the response body to be empty"
                                     , Just
-                                        { metadata = b
-                                        , body = c
+                                        { metadata = d
+                                        , body = e
                                         }
                                     )
-                                )
-                                (Json.Decode.decodeString Generated.Data.ImageSettings.decodeImageSettings c)
                 )
         , timeout = Nothing
         , tracker = Nothing

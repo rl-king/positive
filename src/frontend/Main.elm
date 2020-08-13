@@ -4,7 +4,7 @@ import Base64
 import Browser
 import Browser.Navigation as Navigation
 import Generated.Data.ImageSettings as ImageSettings exposing (ImageSettings)
-import Generated.Request
+import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (..)
@@ -104,10 +104,15 @@ fromUrl url =
 -- UPDATE
 
 
+type alias HttpResult a =
+    Result ( Http.Error, Maybe { metadata : Http.Metadata, body : String } ) a
+
+
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | GotDirectory (Result Http.Error (List String))
+    | GotImageSettings (HttpResult ())
     | DragStart Coordinate
     | DragAt Coordinate
     | DragEnd
@@ -120,6 +125,7 @@ type Msg
     | OnWhitepointChange Int
     | GotValueAtCoordinate (Result Http.Error Float)
     | OnImageLoad
+    | SaveSettings ImageSettings
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -144,6 +150,9 @@ update msg model =
             ( { model | fileNames = fileNames }, Cmd.none )
 
         GotDirectory (Err err) ->
+            ( model, Cmd.none )
+
+        GotImageSettings _ ->
             ( model, Cmd.none )
 
         DragStart coordinates ->
@@ -205,6 +214,12 @@ update msg model =
                 Queued _ n ->
                     ( { model | image = Ready n }, Cmd.none )
 
+        SaveSettings settings ->
+            ( model
+            , Cmd.map GotImageSettings <|
+                Request.postImageSettings "assets" settings
+            )
+
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
@@ -258,7 +273,8 @@ viewSettings model =
             toSettings model.image
     in
     section [ id "settings" ]
-        [ div []
+        [ button [ onClick (SaveSettings settings) ] [ text "save" ]
+        , div []
             [ label [] [ text "pos" ]
             , p [] [ text (Debug.toString model.coordinateValue) ]
             ]

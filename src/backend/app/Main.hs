@@ -13,6 +13,7 @@ import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Server
 import Positive.Settings
+import Servant.API.Generic (ToServantApi)
 import qualified Servant.To.Elm
 import qualified System.Directory as Directory
 import qualified System.Exit
@@ -34,7 +35,7 @@ codeGen :: TimedFastLogger -> IO ()
 codeGen logger = do
   let endpointDefinitions =
         fmap (Servant.To.Elm.elmEndpointDefinition (Expression.String "") ["Generated", "Request"]) $
-          Servant.To.Elm.elmEndpoints @SettingsApi
+          Servant.To.Elm.elmEndpoints @(ToServantApi SettingsApi)
       jsonDefinitions =
         Elm.jsonDefinitions @ImageSettings
       modules =

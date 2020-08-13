@@ -1,15 +1,18 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Positive.Server where
 
+import Control.Concurrent.MVar
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as BS
-import Data.IORef
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
@@ -17,27 +20,42 @@ import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
 import Positive.Settings
 import Servant
+import Servant.API.Generic
+import Servant.Server.Generic
 import System.Directory
+import System.FilePath.Posix ((</>))
 import qualified System.FilePath.Posix as Path
 import System.Log.FastLogger (TimedFastLogger, toLogStr)
 
 -- STATE
 
-newtype State
-  = State (IORef (Maybe (Text, MonochromeImage HIP.RPU)))
+newtype LoadedImage
+  = LoadedImage (MVar (Text, MonochromeImage HIP.VU))
 
 -- API
 
-type Api =
-  ImageApi :<|> SettingsApi
+data Api route = Api
+  { aImageApi :: route :- ToServantApi ImageApi,
+    aSettingsApi :: route :- ToServantApi SettingsApi
+  }
+  deriving (Generic)
 
-type ImageApi =
-  "image" :> QueryParam' '[Required, Strict] "image-settings" ImageSettings :> Get '[Image] BS.ByteString
-    :<|> "directory" :> QueryParam' '[Required, Strict] "dir" Text :> Get '[JSON] [Text]
-    :<|> Raw
+data ImageApi route = ImageApi
+  { iaImage :: route :- "image" :> QueryParam' '[Required, Strict] "image-settings" ImageSettings :> Get '[Image] BS.ByteString,
+    iaListDirectory :: route :- "directory" :> QueryParam' '[Required, Strict] "dir" Text :> Get '[JSON] [Text],
+    iaRaw :: route :- Raw
+  }
+  deriving (Generic)
 
-type SettingsApi =
-  "image" :> "settings" :> Get '[JSON] ImageSettings
+data SettingsApi route = SettingsApi
+  { saSaveSettings ::
+      route :- "image"
+        :> "settings"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> ReqBody '[JSON] ImageSettings
+        :> PostNoContent '[JSON] NoContent
+  }
+  deriving (Generic)
 
 -- SERVER
 
@@ -49,48 +67,71 @@ server logger =
             (logMsg logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
    in do
-        ref <- newIORef Nothing
-        runSettings settings (serve (Proxy @Api) (handlers logger (State ref)))
+        ref <- newEmptyMVar
+        runSettings settings (genericServeT id (handlers logger (LoadedImage ref)))
 
 -- HANDLERS
 
-handlers :: TimedFastLogger -> State -> Server Api
+handlers :: TimedFastLogger -> LoadedImage -> Api (AsServerT Handler)
 handlers logger state =
-  ( handleImage logger state
-      :<|> handleDirectory
-      :<|> serveDirectoryFileServer "./"
-  )
-    :<|> undefined
+  Api
+    { aImageApi = imageApiHandlers logger state,
+      aSettingsApi = settingsApiHandlers logger
+    }
 
-handleImage :: TimedFastLogger -> State -> ImageSettings -> Servant.Handler BS.ByteString
+imageApiHandlers :: TimedFastLogger -> LoadedImage -> ToServant ImageApi (AsServerT Handler)
+imageApiHandlers logger state =
+  genericServerT
+    ImageApi
+      { iaImage = handleImage logger state,
+        iaListDirectory = handleDirectory,
+        iaRaw = serveDirectoryFileServer "./"
+      }
+
+settingsApiHandlers :: TimedFastLogger -> ToServant SettingsApi (AsServerT Handler)
+settingsApiHandlers logger =
+  genericServerT
+    SettingsApi
+      { saSaveSettings = handleSaveSettings logger
+      }
+
+handleImage :: TimedFastLogger -> LoadedImage -> ImageSettings -> Servant.Handler BS.ByteString
 handleImage logger state imageSettings = do
   image <- getImage logger state (iPath imageSettings)
-  logMsg logger $ "Size: " <> tshow (HIP.dims image)
   logMsg logger "Processing image"
   pure
     . HIP.encode HIP.PNG []
     . HIP.exchange HIP.VS
     $ processImage imageSettings image
 
+handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler NoContent
+handleSaveSettings logger dir imageSettings = do
+  -- settings :: Either String FilmRollSettings <-
+  --   liftIO . Aeson.eitherDecodeFileStrict $ Text.unpack dir </> "image-settings.png"
+  -- logMsg logger (tshow settings)
+  pure NoContent
+
 handleDirectory :: Text -> Servant.Handler [Text]
 handleDirectory dir = do
   files <- liftIO $ listDirectory (Text.unpack dir)
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
-getImage :: MonadIO m => TimedFastLogger -> State -> Text -> m (MonochromeImage HIP.RPU)
-getImage logger state@(State ref) path = do
-  maybeImage <- liftIO $ readIORef ref
+getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Text -> m (MonochromeImage HIP.RPU)
+getImage logger state@(LoadedImage ref) path = do
+  maybeImage <- liftIO $ tryReadMVar ref
   case maybeImage of
     Nothing -> do
       logMsg logger "Reading image"
-      image <- liftIO $ readImageFromDisk (Text.unpack path)
+      image <- liftIO $ resizeImage <$> readImageFromDisk (Text.unpack path)
       logMsg logger "Read image"
-      liftIO $ modifyIORef' ref (const (Just (path, image)))
-      logMsg logger "Updated IORef"
+      liftIO $ putMVar ref (path, HIP.exchange HIP.VU image)
+      logMsg logger "Updated MVar"
       pure image
     Just (cachedPath, cachedImage')
-      | path == cachedPath -> logMsg logger "From cache image" >> pure cachedImage'
-      | otherwise -> liftIO $ modifyIORef' ref (const Nothing) >> getImage logger state path
+      | path == cachedPath -> do
+        logMsg logger "From MVar image"
+        pure (HIP.exchange HIP.RPU cachedImage')
+      | otherwise -> liftIO $ getImage logger state path
 
 -- IMAGE
 
@@ -101,10 +142,12 @@ type MonochromePixel =
   HIP.Pixel HIP.Y Double
 
 readImageFromDisk :: String -> IO (MonochromeImage HIP.RPU)
-readImageFromDisk path =
-  HIP.resize HIP.Bilinear HIP.Edge (900, 600)
-    . HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
-    <$> HIP.readImageY HIP.RPU path
+readImageFromDisk =
+  HIP.readImageY HIP.RPU
+
+resizeImage :: MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
+resizeImage =
+  HIP.resize HIP.Bilinear HIP.Edge (900, 600) . HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
 
 processImage :: ImageSettings -> MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
 processImage is =
