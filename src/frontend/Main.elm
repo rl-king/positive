@@ -85,7 +85,7 @@ init _ url key =
         { dir, filename } =
             fromUrl url
     in
-    ( { image = Ready (ImageSettings filename 2.2 0 0 0 0 0)
+    ( { image = Ready (ImageSettings filename 0 0 2.2 0 0 0 0 0)
       , filmRollSettings = Dict.empty
       , coordinateValue = Nothing
       , drag = Nothing
@@ -137,6 +137,7 @@ type Msg
     | DragAt Coordinate
     | DragEnd
     | OnImageClick ( Int, Int )
+    | Rotate
     | OnGammaChange Int
     | OnZone1Change Int
     | OnZone5Change Int
@@ -226,6 +227,9 @@ update msg model =
                 , body = Http.jsonBody (Encode.list identity [ Encode.int x, Encode.int y ])
                 }
             )
+
+        Rotate ->
+            ( updateSettings (\s -> { s | iRotate = s.iRotate + degrees 90 }) model, Cmd.none )
 
         OnGammaChange gamma ->
             ( updateSettings (\s -> { s | iGamma = toFloat gamma / 100 }) model, Cmd.none )
@@ -346,7 +350,8 @@ viewSettings model =
         , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.iZone9 * 1000)
         , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.iBlackpoint * 100)
         , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.iWhitepoint * 100)
-        , button [ onClick (SaveSettings settings) ] [ text "save" ]
+        , button [ onClick Rotate ] [ text "Rotate" ]
+        , button [ onClick (SaveSettings settings) ] [ text "Save" ]
         ]
 
 
@@ -370,13 +375,17 @@ viewZoneSlider toMsg ( min, max ) title val =
 
 viewImage : Model -> Html Msg
 viewImage model =
+    let
+        imageSettings =
+            toSettings model.image
+    in
     section [ id "image-section" ]
         [ viewMaybe model.imageWidth <|
             \imageWidth ->
                 img
                     [ src <|
                         Url.Builder.absolute [ "image" ]
-                            [ toImageUrlParams (toSettings model.image)
+                            [ toImageUrlParams imageSettings
                             , Url.Builder.int "preview-width" imageWidth
                             , Url.Builder.string "dir" model.dir
                             ]
@@ -388,6 +397,10 @@ viewImage model =
                             (Decode.at [ "target", "x" ] Decode.int)
                             (Decode.at [ "target", "y" ] Decode.int)
                     , style "user-select" "none"
+                    , style "transform" <|
+                        "rotate("
+                            ++ String.fromFloat imageSettings.iRotate
+                            ++ "rad)"
                     ]
                     []
 

@@ -41,6 +41,8 @@ toList =
 
 data ImageSettings = ImageSettings
   { iFilename :: Text,
+    iRotate :: Double,
+    iCrop :: Int,
     iGamma :: Double,
     iZone1 :: Double,
     iZone5 :: Double,
