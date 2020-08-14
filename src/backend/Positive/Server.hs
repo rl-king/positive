@@ -47,6 +47,7 @@ data Api route = Api
 data ImageApi route = ImageApi
   { iaImage ::
       route :- "image"
+        :> QueryParam' '[Required, Strict] "dir" Text
         :> QueryParam' '[Required, Strict] "preview-width" Int
         :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
         :> Get '[Image] ByteString,
@@ -107,9 +108,11 @@ handlers logger state =
             }
     }
 
-handleImage :: TimedFastLogger -> LoadedImage -> Int -> ImageSettings -> Servant.Handler ByteString
-handleImage logger state previewWidth imageSettings = do
-  image <- getImage logger state previewWidth (iPath imageSettings)
+handleImage :: TimedFastLogger -> LoadedImage -> Text -> Int -> ImageSettings -> Servant.Handler ByteString
+handleImage logger state dir previewWidth imageSettings = do
+  image <-
+    getImage logger state previewWidth $
+      Text.pack (Text.unpack dir </> Text.unpack (iFilename imageSettings))
   logMsg logger "Processing image"
   start <- liftIO Time.getCurrentTime
   processed <- liftIO . evaluate $ processImage imageSettings image

@@ -57,6 +57,7 @@ type alias Model =
     , key : Navigation.Key
     , fileNames : List String
     , imageWidth : Maybe Int
+    , dir : String
     }
 
 
@@ -80,32 +81,39 @@ type alias Drag =
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( { image = Ready (ImageSettings (fromUrl url) 2.2 0 0 0 0 0)
+    let
+        { dir, filename } =
+            fromUrl url
+    in
+    ( { image = Ready (ImageSettings filename 2.2 0 0 0 0 0)
       , filmRollSettings = Dict.empty
       , coordinateValue = Nothing
       , drag = Nothing
       , key = key
       , fileNames = []
       , imageWidth = Nothing
+      , dir = dir
       }
     , Cmd.batch
         [ Cmd.map GotDirectory <|
-            Request.getImageList "assets"
+            Request.getImageList dir
         , Cmd.map GotFilmRollSettings <|
-            Request.getImageSettings "assets"
+            Request.getImageSettings dir
         , Task.attempt GotImageDimensions <|
             Browser.Dom.getElement "image-section"
         ]
     )
 
 
-fromUrl : Url -> String
+fromUrl : Url -> { dir : String, filename : String }
 fromUrl url =
-    Maybe.withDefault "" <|
+    Maybe.withDefault { dir = "", filename = "" } <|
         Url.Parser.parse
-            (Url.Parser.map
-                (Maybe.withDefault "")
-                (Url.Parser.query (Url.Parser.Query.string "path"))
+            (Url.Parser.query
+                (Url.Parser.Query.map2 (\a b -> { dir = Maybe.withDefault "" a, filename = Maybe.withDefault "" b })
+                    (Url.Parser.Query.string "dir")
+                    (Url.Parser.Query.string "filename")
+                )
             )
             url
 
@@ -153,8 +161,14 @@ update msg model =
             let
                 currentSettings =
                     toSettings model.image
+
+                { dir, filename } =
+                    fromUrl url
             in
-            ( { model | image = Ready { currentSettings | iPath = fromUrl url } }
+            ( { model
+                | image = Loading { currentSettings | iFilename = filename }
+                , dir = dir
+              }
             , Cmd.none
             )
 
@@ -168,7 +182,7 @@ update msg model =
             ( { model
                 | filmRollSettings =
                     Dict.fromList <|
-                        List.map (\s -> ( s.iPath, s )) settings
+                        List.map (\s -> ( s.iFilename, s )) settings
               }
             , Cmd.none
             )
@@ -250,7 +264,7 @@ update msg model =
         SaveSettings settings ->
             ( model
             , Cmd.map GotSaveImageSettings <|
-                Request.postImageSettings "assets" settings
+                Request.postImageSettings model.dir settings
             )
 
 
@@ -278,24 +292,30 @@ view model =
         [ main_ []
             [ viewImage model
             , viewSettings model
-            , viewFiles model.fileNames
+            , viewFiles model.dir model.fileNames
             ]
         ]
     }
 
 
-viewFiles : List String -> Html Msg
-viewFiles fileNames =
+viewFiles : String -> List String -> Html Msg
+viewFiles dir fileNames =
     section [ id "files" ]
         [ ul [] <|
-            List.map viewFile (List.sort fileNames)
+            List.map (viewFile dir) (List.sort fileNames)
         ]
 
 
-viewFile : String -> Html Msg
-viewFile fileName =
+viewFile : String -> String -> Html Msg
+viewFile dir fileName =
     li []
-        [ a [ href (Url.Builder.absolute [] [ Url.Builder.string "path" ("assets/" ++ fileName) ]) ]
+        [ a
+            [ href <|
+                Url.Builder.absolute []
+                    [ Url.Builder.string "filename" fileName
+                    , Url.Builder.string "dir" dir
+                    ]
+            ]
             [ text fileName ]
         ]
 
@@ -358,6 +378,7 @@ viewImage model =
                         Url.Builder.absolute [ "image" ]
                             [ toImageUrlParams (toSettings model.image)
                             , Url.Builder.int "preview-width" imageWidth
+                            , Url.Builder.string "dir" model.dir
                             ]
                     , on "load" (Decode.succeed OnImageLoad)
                     , on "click" <|

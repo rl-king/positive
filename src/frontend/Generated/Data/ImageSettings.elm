@@ -6,7 +6,7 @@ import Json.Encode
 
 
 type alias ImageSettings =
-    { iPath : String
+    { iFilename : String
     , iGamma : Float
     , iZone1 : Float
     , iZone5 : Float
@@ -19,7 +19,7 @@ type alias ImageSettings =
 encodeImageSettings : ImageSettings -> Json.Encode.Value
 encodeImageSettings a =
     Json.Encode.object
-        [ ( "iPath", Json.Encode.string a.iPath )
+        [ ( "iFilename", Json.Encode.string a.iFilename )
         , ( "iGamma", Json.Encode.float a.iGamma )
         , ( "iZone1", Json.Encode.float a.iZone1 )
         , ( "iZone5", Json.Encode.float a.iZone5 )
@@ -32,7 +32,7 @@ encodeImageSettings a =
 decodeImageSettings : Json.Decode.Decoder ImageSettings
 decodeImageSettings =
     Json.Decode.succeed ImageSettings
-        |> Json.Decode.Pipeline.required "iPath" Json.Decode.string
+        |> Json.Decode.Pipeline.required "iFilename" Json.Decode.string
         |> Json.Decode.Pipeline.required "iGamma" Json.Decode.float
         |> Json.Decode.Pipeline.required "iZone1" Json.Decode.float
         |> Json.Decode.Pipeline.required "iZone5" Json.Decode.float

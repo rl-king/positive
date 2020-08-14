@@ -27,11 +27,11 @@ newtype FilmRollSettings = FilmRollSettings
 
 init :: ImageSettings -> FilmRollSettings
 init imageSettings =
-  FilmRollSettings $ HashMap.insert (iPath imageSettings) imageSettings mempty
+  FilmRollSettings $ HashMap.insert (iFilename imageSettings) imageSettings mempty
 
 insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
 insert imageSettings =
-  FilmRollSettings . HashMap.insert (iPath imageSettings) imageSettings . unFilmRollSettings
+  FilmRollSettings . HashMap.insert (iFilename imageSettings) imageSettings . unFilmRollSettings
 
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
@@ -40,7 +40,7 @@ toList =
 -- IMAGESETTINGS
 
 data ImageSettings = ImageSettings
-  { iPath :: Text,
+  { iFilename :: Text,
     iGamma :: Double,
     iZone1 :: Double,
     iZone5 :: Double,

@@ -32,6 +32,15 @@ button {
     font-weight: 500;
     color: #fff;
     background: #666;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #555;
+}
+
+button:active {
+    background: #333;
 }
 
 a:hover {
