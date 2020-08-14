@@ -120,46 +120,50 @@ handleImage logger state dir previewWidth imageSettings = do
 
 handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler [ImageSettings]
 handleSaveSettings logger dir imageSettings = do
-  let path = Text.unpack dir </> "image-settings.json"
-  exists <- liftIO $ doesPathExist path
-  if exists
-    then do
-      result :: Either String FilmRollSettings <- liftIO $ Aeson.eitherDecodeFileStrict path
-      case result of
-        Left err -> do
-          logMsg logger $ Text.pack err
-          throwError err500
-        Right settings -> do
-          let newSettings = Settings.insert imageSettings settings
-          liftIO . ByteString.writeFile path $ Aeson.encode newSettings
-          logMsg logger "Updated settings"
-          pure $ Settings.toList newSettings
-    else do
-      logMsg logger "No settings file found, creating one now"
-      let newSettings = Settings.init imageSettings
+  settingsFile <- getSettingsFile logger dir
+  case settingsFile of
+    Left err -> do
+      logMsg logger $ Text.pack err
+      throwError err500
+    Right settings -> do
+      let newSettings = Settings.insert imageSettings settings
+          path = Text.unpack dir </> "image-settings.json"
       liftIO . ByteString.writeFile path $ Aeson.encode newSettings
-      logMsg logger $ "Wrote: " <> Text.pack path
+      logMsg logger "Updated settings"
       pure $ Settings.toList newSettings
 
 handleGetSettings :: TimedFastLogger -> Text -> Servant.Handler [ImageSettings]
 handleGetSettings logger dir = do
+  settingsFile <- getSettingsFile logger dir
+  case settingsFile of
+    Left err -> do
+      logMsg logger $ Text.pack err
+      throwError err500
+    Right settings ->
+      pure $ Settings.toList settings
+
+-- SETTINGS FILE
+
+getSettingsFile :: MonadIO m => TimedFastLogger -> Text -> m (Either String FilmRollSettings)
+getSettingsFile logger dir = do
   let path = Text.unpack dir </> "image-settings.json"
   exists <- liftIO $ doesPathExist path
-  if not exists
-    then throwError err404
+  if exists
+    then liftIO $ Aeson.eitherDecodeFileStrict path
     else do
-      result :: Either String FilmRollSettings <- liftIO $ Aeson.eitherDecodeFileStrict path
-      case result of
-        Left err -> do
-          logMsg logger $ Text.pack err
-          throwError err500
-        Right settings ->
-          pure $ Settings.toList settings
+      logMsg logger "No settings file found, creating one now"
+      filenames <- getAllPngs dir
+      let settings = Settings.fromList filenames
+      liftIO . ByteString.writeFile path $ Aeson.encode settings
+      logMsg logger $ "Wrote: " <> Text.pack path
+      pure (Right settings)
 
--- handleDirectory :: Text -> Servant.Handler [Text]
--- handleDirectory dir = do
---   files <- liftIO $ listDirectory (Text.unpack dir)
---   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
+getAllPngs :: MonadIO m => Text -> m [Text]
+getAllPngs dir = do
+  files <- liftIO $ listDirectory (Text.unpack dir)
+  pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
+
+-- IMAGE
 
 getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Int -> Text -> m (MonochromeImage HIP.VU)
 getImage logger state@(LoadedImage ref) previewWidth path = do

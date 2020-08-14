@@ -33,6 +33,12 @@ insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
 insert imageSettings =
   FilmRollSettings . HashMap.insert (iFilename imageSettings) imageSettings . unFilmRollSettings
 
+fromList :: [Text] -> FilmRollSettings
+fromList =
+  FilmRollSettings
+    . HashMap.fromList
+    . fmap (\x -> (x, ImageSettings x 0 0 2.2 0 0 0 0 0))
+
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
   HashMap.elems . unFilmRollSettings
