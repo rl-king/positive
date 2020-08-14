@@ -66,12 +66,7 @@ data SettingsApi route = SettingsApi
       route :- "image"
         :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> Get '[JSON] [ImageSettings],
-    saListDirectory ::
-      route :- "image"
-        :> "list"
-        :> QueryParam' '[Required, Strict] "dir" Text
-        :> Get '[JSON] [Text]
+        :> Get '[JSON] [ImageSettings]
   }
   deriving (Generic)
 
@@ -103,8 +98,7 @@ handlers logger state =
         genericServerT
           SettingsApi
             { saSaveSettings = handleSaveSettings logger,
-              saGetSettings = handleGetSettings logger,
-              saListDirectory = handleDirectory
+              saGetSettings = handleGetSettings logger
             }
     }
 
@@ -162,10 +156,10 @@ handleGetSettings logger dir = do
         Right settings ->
           pure $ Settings.toList settings
 
-handleDirectory :: Text -> Servant.Handler [Text]
-handleDirectory dir = do
-  files <- liftIO $ listDirectory (Text.unpack dir)
-  pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
+-- handleDirectory :: Text -> Servant.Handler [Text]
+-- handleDirectory dir = do
+--   files <- liftIO $ listDirectory (Text.unpack dir)
+--   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
 getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Int -> Text -> m (MonochromeImage HIP.VU)
 getImage logger state@(LoadedImage ref) previewWidth path = do

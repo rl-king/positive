@@ -14,7 +14,7 @@ import Html.Events exposing (..)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
-import List.Zipper as Zipper
+import List.Zipper as Zipper exposing (Zipper)
 import Task
 import Url exposing (Url)
 import Url.Builder
@@ -70,20 +70,18 @@ matchKey key_ msg =
 
 
 type alias Model =
-    { imageSettings : ImageSettings
-    , imageProcessingState : ImageProcessingState
-    , filmRollSettings : Dict String ImageSettings
+    { imageProcessingState : ImageProcessingState
+    , filmRoll : Maybe (Zipper ImageSettings)
     , key : Navigation.Key
-    , fileNames : List String
     , imageWidth : Maybe Int
-    , dir : String
+    , route : { dir : String, filename : String }
     }
 
 
 type ImageProcessingState
     = Ready
     | Loading
-    | Queued ImageSettings
+    | Queued (Maybe (Zipper ImageSettings))
 
 
 newSettings : String -> ImageSettings
@@ -94,25 +92,17 @@ newSettings filename =
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
-        { dir, filename } =
+        route =
             fromUrl url
     in
-    ( { imageSettings = ImageSettings filename 0 0 2.2 0 0 0 0 0
-      , imageProcessingState = Loading
-      , filmRollSettings = Dict.empty
+    ( { imageProcessingState = Loading
+      , filmRoll = Nothing
       , key = key
-      , fileNames = []
       , imageWidth = Nothing
-      , dir = dir
+      , route = route
       }
-    , Cmd.batch
-        [ Cmd.map GotDirectory <|
-            Request.getImageList dir
-        , Cmd.map GotFilmRollSettings <|
-            Request.getImageSettings dir
-        , Task.attempt GotImageDimensions <|
-            Browser.Dom.getElement "image-section"
-        ]
+    , Cmd.map GotFilmRollSettings <|
+        Request.getImageSettings route.dir
     )
 
 
@@ -140,7 +130,6 @@ type alias HttpResult a =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
-    | GotDirectory (HttpResult (List String))
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
@@ -168,45 +157,34 @@ update msg model =
 
         UrlChanged url ->
             let
-                settings =
-                    Maybe.withDefault (newSettings filename) <|
-                        Dict.get filename model.filmRollSettings
-
-                { dir, filename } =
+                route =
                     fromUrl url
             in
             ( { model
-                | imageSettings = settings
+                | filmRoll =
+                    Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == route.filename))
+                        model.filmRoll
                 , imageProcessingState = Loading
-                , dir = dir
+                , route = route
               }
             , Cmd.none
             )
 
-        GotDirectory (Ok fileNames) ->
-            ( { model | fileNames = fileNames }, Cmd.none )
-
-        GotDirectory (Err err) ->
-            ( model, Cmd.none )
-
         GotFilmRollSettings (Ok settings) ->
             ( { model
-                | filmRollSettings =
-                    Dict.fromList <|
-                        List.map (\s -> ( s.iFilename, s )) settings
+                | filmRoll =
+                    Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == model.route.filename)) <|
+                        Zipper.fromList settings
               }
-            , Cmd.none
+            , Task.attempt GotImageDimensions <|
+                Browser.Dom.getElement "image-section"
             )
 
         GotFilmRollSettings (Err err) ->
             ( model, Cmd.none )
 
         GotSaveImageSettings (Ok settings) ->
-            ( { model
-                | filmRollSettings =
-                    Dict.fromList <|
-                        List.map (\s -> ( s.iFilename, s )) settings
-              }
+            ( { model | filmRoll = Zipper.fromList settings }
             , Cmd.none
             )
 
@@ -252,12 +230,12 @@ update msg model =
                     ( { model | imageProcessingState = Ready }, Cmd.none )
 
                 Queued n ->
-                    ( { model | imageProcessingState = Loading, imageSettings = n }, Cmd.none )
+                    ( { model | imageProcessingState = Loading, filmRoll = n }, Cmd.none )
 
         SaveSettings settings ->
             ( model
             , Cmd.map GotSaveImageSettings <|
-                Request.postImageSettings model.dir settings
+                Request.postImageSettings model.route.dir settings
             )
 
         PreviousImage ->
@@ -269,15 +247,22 @@ update msg model =
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
+    let
+        mapCurrent =
+            Maybe.map (Zipper.mapCurrent f)
+    in
     case model.imageProcessingState of
         Ready ->
-            { model | imageProcessingState = Loading, imageSettings = f model.imageSettings }
+            { model
+                | imageProcessingState = Loading
+                , filmRoll = mapCurrent model.filmRoll
+            }
 
         Loading ->
-            { model | imageProcessingState = Queued (f model.imageSettings) }
+            { model | imageProcessingState = Queued (mapCurrent model.filmRoll) }
 
         Queued n ->
-            { model | imageProcessingState = Queued (f n) }
+            { model | imageProcessingState = Queued (mapCurrent n) }
 
 
 
@@ -286,51 +271,77 @@ updateSettings f model =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "Positive"
-    , body =
-        [ main_ []
-            [ viewImage model
-            , viewSettings model
-            , viewFiles model.dir model.fileNames
-            ]
-        ]
-    }
+    case model.filmRoll of
+        Nothing ->
+            { title = "Positive"
+            , body =
+                [ main_ []
+                    [ text "loading" ]
+                ]
+            }
+
+        Just filmRoll ->
+            { title = "Positive"
+            , body =
+                [ main_ []
+                    [ viewImage filmRoll model
+                    , viewSettings filmRoll model
+                    , viewFileBrowser model.route.dir filmRoll
+                    ]
+                ]
+            }
 
 
-viewFiles : String -> List String -> Html Msg
-viewFiles dir fileNames =
+
+-- FILE BROWSER
+
+
+viewFileBrowser : String -> Zipper ImageSettings -> Html Msg
+viewFileBrowser dir filmRoll =
     section [ id "files" ]
         [ ul [] <|
-            List.map (viewFile dir) (List.sort fileNames)
+            List.concat
+                [ List.map (viewFileLink "" dir) (Zipper.before filmRoll)
+                , [ viewFileLink "-current" dir (Zipper.current filmRoll) ]
+                , List.map (viewFileLink "" dir) (Zipper.after filmRoll)
+                ]
         ]
 
 
-viewFile : String -> String -> Html Msg
-viewFile dir fileName =
-    li []
+viewFileLink : String -> String -> ImageSettings -> Html Msg
+viewFileLink className dir imageSettings =
+    li [ class className ]
         [ a
             [ href <|
                 Url.Builder.absolute []
-                    [ Url.Builder.string "filename" fileName
+                    [ Url.Builder.string "filename" imageSettings.iFilename
                     , Url.Builder.string "dir" dir
                     ]
             ]
-            [ text fileName ]
+            [ text imageSettings.iFilename ]
         ]
 
 
-viewSettings : Model -> Html Msg
-viewSettings model =
+
+-- IMAGE SETTINGS
+
+
+viewSettings : Zipper ImageSettings -> Model -> Html Msg
+viewSettings filmRoll model =
+    let
+        settings =
+            Zipper.current filmRoll
+    in
     section [ id "image-settings" ]
         [ div []
             [ label []
                 [ text "gamma"
                 , text " "
-                , text (String.fromFloat model.imageSettings.iGamma)
+                , text (String.fromFloat settings.iGamma)
                 ]
             , input
                 [ type_ "range"
-                , value (String.fromInt (floor (model.imageSettings.iGamma * 100)))
+                , value (String.fromInt (floor (settings.iGamma * 100)))
                 , Attributes.min "0"
                 , Attributes.max "2000"
                 , on "input" <|
@@ -339,13 +350,13 @@ viewSettings model =
                 ]
                 []
             ]
-        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (model.imageSettings.iZone1 * 1000)
-        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (model.imageSettings.iZone5 * 1000)
-        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (model.imageSettings.iZone9 * 1000)
-        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (model.imageSettings.iBlackpoint * 100)
-        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (model.imageSettings.iWhitepoint * 100)
+        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.iZone1 * 1000)
+        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.iZone5 * 1000)
+        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.iZone9 * 1000)
+        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.iBlackpoint * 100)
+        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.iWhitepoint * 100)
         , button [ onClick Rotate ] [ text "Rotate" ]
-        , button [ onClick (SaveSettings model.imageSettings) ] [ text "Save" ]
+        , button [ onClick (SaveSettings settings) ] [ text "Save" ]
         ]
 
 
@@ -370,17 +381,17 @@ viewZoneSlider toMsg ( min, max ) title val =
         ]
 
 
-viewImage : Model -> Html Msg
-viewImage model =
+viewImage : Zipper ImageSettings -> Model -> Html Msg
+viewImage filmRoll model =
     section [ id "image-section" ]
         [ viewMaybe model.imageWidth <|
             \imageWidth ->
                 img
                     [ src <|
                         Url.Builder.absolute [ "image" ]
-                            [ toImageUrlParams model.imageSettings
+                            [ toImageUrlParams (Zipper.current filmRoll)
                             , Url.Builder.int "preview-width" imageWidth
-                            , Url.Builder.string "dir" model.dir
+                            , Url.Builder.string "dir" model.route.dir
                             ]
                     , on "load" (Decode.succeed OnImageLoad)
                     , style "user-select" "none"
@@ -391,22 +402,23 @@ viewImage model =
         ]
 
 
-viewZones : Model -> Html Msg
-viewZones model =
-    let
-        zone t i v =
-            v + (i * m t v)
 
-        m t v =
-            (1 - abs (v - t)) * (1 - abs (v - t))
-
-        vs =
-            List.map (\x -> toFloat x / 10) <| List.range 0 10
-    in
-    ul [] <|
-        List.map2 (\x i -> li [] [ text (String.left 5 (String.fromFloat (x - i))) ])
-            (List.map (zone 0.95 model.imageSettings.iZone9 << zone 0.5 model.imageSettings.iZone5 << zone 0.15 model.imageSettings.iZone1) vs)
-            vs
+-- viewZones : Model -> Html Msg
+-- viewZones model =
+--     let
+--         settings =
+--             Zipper.current model.filmRoll
+--         zone t i v =
+--             v + (i * m t v)
+--         m t v =
+--             (1 - abs (v - t)) * (1 - abs (v - t))
+--         vs =
+--             List.map (\x -> toFloat x / 10) <| List.range 0 10
+--     in
+--     ul [] <|
+--         List.map2 (\x i -> li [] [ text (String.left 5 (String.fromFloat (x - i))) ])
+--             (List.map (zone 0.95 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.15 settings.iZone1) vs)
+--             vs
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
