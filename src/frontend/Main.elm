@@ -174,7 +174,7 @@ update msg model =
             ( { model
                 | filmRoll =
                     Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == model.route.filename)) <|
-                        Zipper.fromList settings
+                        Zipper.fromList (List.sortBy .iFilename settings)
               }
             , Task.attempt GotImageDimensions <|
                 Browser.Dom.getElement "image-section"
@@ -184,7 +184,7 @@ update msg model =
             ( model, Cmd.none )
 
         GotSaveImageSettings (Ok settings) ->
-            ( { model | filmRoll = Zipper.fromList settings }
+            ( { model | filmRoll = Zipper.fromList (List.sortBy .iFilename settings) }
             , Cmd.none
             )
 
@@ -239,10 +239,28 @@ update msg model =
             )
 
         PreviousImage ->
-            ( model, Cmd.none )
+            let
+                filename =
+                    Maybe.map (\z -> Maybe.withDefault (Zipper.last z) (Zipper.previous z)) model.filmRoll
+                        |> Maybe.map (.iFilename << Zipper.current)
+                        |> Maybe.withDefault ""
+            in
+            ( model
+            , Navigation.pushUrl model.key <|
+                toUrl model.route.dir filename
+            )
 
         NextImage ->
-            ( model, Cmd.none )
+            let
+                filename =
+                    Maybe.map (\z -> Maybe.withDefault (Zipper.first z) (Zipper.next z)) model.filmRoll
+                        |> Maybe.map (.iFilename << Zipper.current)
+                        |> Maybe.withDefault ""
+            in
+            ( model
+            , Navigation.pushUrl model.key <|
+                toUrl model.route.dir filename
+            )
 
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
@@ -313,12 +331,17 @@ viewFileLink className dir imageSettings =
     li [ class className ]
         [ a
             [ href <|
-                Url.Builder.absolute []
-                    [ Url.Builder.string "filename" imageSettings.iFilename
-                    , Url.Builder.string "dir" dir
-                    ]
+                toUrl imageSettings.iFilename dir
             ]
             [ text imageSettings.iFilename ]
+        ]
+
+
+toUrl : String -> String -> String
+toUrl dir filename =
+    Url.Builder.absolute []
+        [ Url.Builder.string "filename" filename
+        , Url.Builder.string "dir" dir
         ]
 
 
