@@ -49,6 +49,8 @@ subscriptions model =
             matchKey "ArrowLeft" PreviousImage
         , Browser.Events.onKeyDown <|
             matchKey "ArrowRight" NextImage
+        , Browser.Events.onKeyDown <|
+            matchKey "r" Rotate
         ]
 
 
@@ -183,12 +185,7 @@ update msg model =
         GotFilmRollSettings (Err err) ->
             ( model, Cmd.none )
 
-        GotSaveImageSettings (Ok settings) ->
-            ( { model | filmRoll = Zipper.fromList (List.sortBy .iFilename settings) }
-            , Cmd.none
-            )
-
-        GotSaveImageSettings (Err _) ->
+        GotSaveImageSettings _ ->
             ( model, Cmd.none )
 
         GotImageDimensions result ->
@@ -413,7 +410,16 @@ viewZoneSlider toMsg ( min, max ) title val =
             , Attributes.max (String.fromInt max)
             , on "input" <|
                 Decode.map toMsg
-                    (Decode.at [ "target", "valueAsNumber" ] Decode.int)
+                    (Decode.at [ "target", "valueAsNumber" ] Decode.int
+                        |> Decode.andThen
+                            (\n ->
+                                if n == floor val then
+                                    Decode.fail "Is same as val"
+
+                                else
+                                    Decode.succeed n
+                            )
+                    )
             ]
             []
         ]
