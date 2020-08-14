@@ -277,7 +277,6 @@ view model =
     , body =
         [ main_ []
             [ viewImage model
-            , viewZoneDot model.drag
             , viewSettings model
             , viewFiles model.fileNames
             ]
@@ -287,8 +286,10 @@ view model =
 
 viewFiles : List String -> Html Msg
 viewFiles fileNames =
-    ul [] <|
-        List.map viewFile (List.sort fileNames)
+    section [ id "files" ]
+        [ ul [] <|
+            List.map viewFile (List.sort fileNames)
+        ]
 
 
 viewFile : String -> Html Msg
@@ -305,13 +306,8 @@ viewSettings model =
         settings =
             toSettings model.image
     in
-    section [ id "settings" ]
-        [ button [ onClick (SaveSettings settings) ] [ text "save" ]
-        , div []
-            [ label [] [ text "pos" ]
-            , p [] [ text (Debug.toString model.coordinateValue) ]
-            ]
-        , div []
+    section [ id "image-settings" ]
+        [ div []
             [ label [] [ text "gamma" ]
             , p [] [ text (String.fromFloat settings.iGamma) ]
             , input
@@ -322,7 +318,6 @@ viewSettings model =
                 , on "input" <|
                     Decode.map OnGammaChange
                         (Decode.at [ "target", "valueAsNumber" ] Decode.int)
-                , style "width" "16rem"
                 ]
                 []
             ]
@@ -331,6 +326,7 @@ viewSettings model =
         , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.iZone9 * 1000)
         , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.iBlackpoint * 100)
         , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.iWhitepoint * 100)
+        , button [ onClick (SaveSettings settings) ] [ text "save" ]
         ]
 
 
@@ -347,7 +343,6 @@ viewZoneSlider toMsg ( min, max ) title val =
             , on "input" <|
                 Decode.map toMsg
                     (Decode.at [ "target", "valueAsNumber" ] Decode.int)
-            , style "width" "16rem"
             ]
             []
         ]
@@ -374,7 +369,8 @@ viewImage model =
                     , style "user-select" "none"
                     ]
                     []
-        , viewZones model
+
+        -- , viewZones model
         ]
 
 
