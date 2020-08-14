@@ -53,8 +53,6 @@ type alias Model =
     { imageSettings : ImageSettings
     , imageProcessingState : ImageProcessingState
     , filmRollSettings : Dict String ImageSettings
-    , coordinateValue : Maybe Float
-    , drag : Maybe Drag
     , key : Navigation.Key
     , fileNames : List String
     , imageWidth : Maybe Int
@@ -66,18 +64,6 @@ type ImageProcessingState
     = Ready
     | Loading
     | Queued ImageSettings
-
-
-type alias Coordinate =
-    { x : Int
-    , y : Int
-    }
-
-
-type alias Drag =
-    { start : Coordinate
-    , current : Coordinate
-    }
 
 
 newSettings : String -> ImageSettings
@@ -94,8 +80,6 @@ init _ url key =
     ( { imageSettings = ImageSettings filename 0 0 2.2 0 0 0 0 0
       , imageProcessingState = Loading
       , filmRollSettings = Dict.empty
-      , coordinateValue = Nothing
-      , drag = Nothing
       , key = key
       , fileNames = []
       , imageWidth = Nothing
@@ -140,10 +124,6 @@ type Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
-    | DragStart Coordinate
-    | DragAt Coordinate
-    | DragEnd
-    | OnImageClick ( Int, Int )
     | Rotate
     | OnGammaChange Int
     | OnZone1Change Int
@@ -151,7 +131,6 @@ type Msg
     | OnZone9Change Int
     | OnBlackpointChange Int
     | OnWhitepointChange Int
-    | GotValueAtCoordinate (Result Http.Error Float)
     | OnImageLoad
     | SaveSettings ImageSettings
 
@@ -221,31 +200,6 @@ update msg model =
             , Cmd.none
             )
 
-        DragStart coordinates ->
-            ( { model | drag = Just (Drag coordinates coordinates) }, Cmd.none )
-
-        DragAt coordinates ->
-            case model.drag of
-                Just { start } ->
-                    ( { model | drag = Just (Drag start coordinates) }, Cmd.none )
-
-                Nothing ->
-                    ( model, Cmd.none )
-
-        DragEnd ->
-            ( { model | drag = Nothing }, Cmd.none )
-
-        OnImageClick ( x, y ) ->
-            ( model
-            , Http.post
-                { url =
-                    Url.Builder.absolute [ "image", "coordinate" ]
-                        [ toImageUrlParams model.imageSettings ]
-                , expect = Http.expectJson GotValueAtCoordinate Decode.float
-                , body = Http.jsonBody (Encode.list identity [ Encode.int x, Encode.int y ])
-                }
-            )
-
         Rotate ->
             ( updateSettings (\s -> { s | iRotate = s.iRotate + degrees -90 }) model, Cmd.none )
 
@@ -266,11 +220,6 @@ update msg model =
 
         OnWhitepointChange wp ->
             ( updateSettings (\s -> { s | iWhitepoint = toFloat wp / 100 }) model, Cmd.none )
-
-        GotValueAtCoordinate value ->
-            ( { model | coordinateValue = Result.toMaybe value }
-            , Cmd.none
-            )
 
         OnImageLoad ->
             case model.imageProcessingState of
@@ -406,12 +355,6 @@ viewImage model =
                             , Url.Builder.string "dir" model.dir
                             ]
                     , on "load" (Decode.succeed OnImageLoad)
-                    , on "click" <|
-                        Decode.map4 (\x y tx ty -> OnImageClick ( x - tx, y - ty ))
-                            (Decode.field "x" Decode.int)
-                            (Decode.field "y" Decode.int)
-                            (Decode.at [ "target", "x" ] Decode.int)
-                            (Decode.at [ "target", "y" ] Decode.int)
                     , style "user-select" "none"
                     ]
                     []
@@ -444,77 +387,6 @@ toImageUrlParams =
         << Base64.encode
         << Encode.encode 0
         << ImageSettings.encodeImageSettings
-
-
-viewZoneDot : Maybe Drag -> Html Msg
-viewZoneDot drag =
-    span
-        (style "background-color" "red"
-            :: style "width" "2rem"
-            :: style "height" "2rem"
-            :: style "display" "block"
-            :: style "border-radius" "1rem"
-            :: style "position" "absolute"
-            :: style "top" "0"
-            :: style "left" "0"
-            :: translateDot drag
-            :: onDrag drag
-        )
-        []
-
-
-translateDot : Maybe Drag -> Attribute msg
-translateDot drag =
-    case drag of
-        Nothing ->
-            style "transform" "translate(0,0)"
-
-        Just { current } ->
-            style "transform" <|
-                "translate("
-                    ++ String.fromInt (current.x - 16)
-                    ++ "px,"
-                    ++ String.fromInt (current.y - 16)
-                    ++ "px)"
-
-
-onDrag : Maybe Drag -> List (Attribute Msg)
-onDrag drag =
-    on "mousedown" (Decode.map DragStart decodeCoordinate)
-        :: on "mouseup" (Decode.succeed DragEnd)
-        -- :: on "mouseleave" (Decode.succeed DragEnd)
-        :: on "touchstart" (Decode.map DragStart decodeCoordinate)
-        :: on "touchend" (Decode.succeed DragEnd)
-        -- :: on "touchcancel" (Decode.succeed DragEnd)
-        :: moveEvent drag
-
-
-moveEvent : Maybe a -> List (Attribute Msg)
-moveEvent drag =
-    case drag of
-        Just _ ->
-            [ preventDefaultOn "mousemove" <|
-                Decode.map (\c -> ( DragAt c, True )) decodeCoordinate
-            , preventDefaultOn "touchmove" <|
-                Decode.map (\c -> ( DragAt c, True )) decodeCoordinate
-            ]
-
-        Nothing ->
-            []
-
-
-decodeCoordinate : Decode.Decoder Coordinate
-decodeCoordinate =
-    let
-        decoder =
-            Decode.map2 Coordinate
-                (Decode.field "pageX" (Decode.map floor Decode.float))
-                (Decode.field "pageY" (Decode.map floor Decode.float))
-    in
-    Decode.oneOf
-        [ decoder
-        , Decode.at [ "touches", "0" ] decoder
-        ]
 
 
 
