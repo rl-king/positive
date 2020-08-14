@@ -18,6 +18,7 @@ import qualified Data.ByteString.Lazy as ByteString
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
+import GHC.Float (int2Float)
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
@@ -46,6 +47,7 @@ data Api route = Api
 data ImageApi route = ImageApi
   { iaImage ::
       route :- "image"
+        :> QueryParam' '[Required, Strict] "preview-width" Int
         :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
         :> Get '[Image] ByteString,
     iaRaw :: route :- Raw
@@ -105,9 +107,9 @@ handlers logger state =
             }
     }
 
-handleImage :: TimedFastLogger -> LoadedImage -> ImageSettings -> Servant.Handler ByteString
-handleImage logger state imageSettings = do
-  image <- getImage logger state (iPath imageSettings)
+handleImage :: TimedFastLogger -> LoadedImage -> Int -> ImageSettings -> Servant.Handler ByteString
+handleImage logger state previewWidth imageSettings = do
+  image <- getImage logger state previewWidth (iPath imageSettings)
   logMsg logger "Processing image"
   start <- liftIO Time.getCurrentTime
   processed <- liftIO . evaluate $ processImage imageSettings image
@@ -160,24 +162,24 @@ handleDirectory dir = do
   files <- liftIO $ listDirectory (Text.unpack dir)
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
-getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Text -> m (MonochromeImage HIP.VU)
-getImage logger state@(LoadedImage ref) path = do
+getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Int -> Text -> m (MonochromeImage HIP.VU)
+getImage logger state@(LoadedImage ref) previewWidth path = do
   maybeImage <- liftIO $ tryTakeMVar ref
   logMsg logger $ "MVar: " <> tshow maybeImage
   case maybeImage of
     Nothing -> do
       logMsg logger "Reading image"
-      image <- liftIO $ resizeImage <$> readImageFromDisk (Text.unpack path)
+      image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
       logMsg logger "Read image"
       liftIO $ putMVar ref (path, image)
       logMsg logger "Updated MVar"
       pure image
-    Just loadedImage@(cachedPath, cachedImage')
-      | path == cachedPath -> do
+    Just loadedImage@(cachedPath, cachedImage)
+      | path == cachedPath && HIP.cols cachedImage == previewWidth -> do
         logMsg logger "From MVar image"
         liftIO $ putMVar ref loadedImage
-        pure cachedImage'
-      | otherwise -> liftIO $ getImage logger state path
+        pure cachedImage
+      | otherwise -> liftIO $ getImage logger state previewWidth path
 
 -- IMAGE
 
@@ -191,9 +193,11 @@ readImageFromDisk :: String -> IO (MonochromeImage HIP.VU)
 readImageFromDisk =
   HIP.readImageY HIP.VU
 
-resizeImage :: MonochromeImage HIP.VU -> MonochromeImage HIP.VU
-resizeImage =
-  HIP.resize HIP.Bilinear HIP.Edge (900, 600) . HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
+resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
+resizeImage previewWidth image =
+  let mul = int2Float (HIP.rows image) / int2Float (HIP.cols image)
+   in HIP.resize HIP.Bilinear HIP.Edge (round (int2Float previewWidth * mul), previewWidth) $
+        HIP.resize HIP.Bilinear HIP.Edge (1800, 1200) image
 
 processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 processImage is =

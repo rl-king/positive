@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Base64
 import Browser
+import Browser.Dom
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings exposing (ImageSettings)
@@ -12,6 +13,7 @@ import Html.Events exposing (..)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Task
 import Url exposing (Url)
 import Url.Builder
 import Url.Parser
@@ -54,6 +56,7 @@ type alias Model =
     , drag : Maybe Drag
     , key : Navigation.Key
     , fileNames : List String
+    , imageWidth : Maybe Int
     }
 
 
@@ -83,12 +86,15 @@ init _ url key =
       , drag = Nothing
       , key = key
       , fileNames = []
+      , imageWidth = Nothing
       }
     , Cmd.batch
         [ Cmd.map GotDirectory <|
             Request.getImageList "assets"
         , Cmd.map GotFilmRollSettings <|
             Request.getImageSettings "assets"
+        , Task.attempt GotImageDimensions <|
+            Browser.Dom.getElement "image-section"
         ]
     )
 
@@ -118,6 +124,7 @@ type Msg
     | GotDirectory (HttpResult (List String))
     | GotSaveImageSettings (HttpResult ())
     | GotFilmRollSettings (HttpResult (List ImageSettings))
+    | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | DragStart Coordinate
     | DragAt Coordinate
     | DragEnd
@@ -171,6 +178,15 @@ update msg model =
 
         GotSaveImageSettings _ ->
             ( model, Cmd.none )
+
+        GotImageDimensions result ->
+            ( { model
+                | imageWidth =
+                    Result.toMaybe <|
+                        Result.map (floor << .width << .element) result
+              }
+            , Cmd.none
+            )
 
         DragStart coordinates ->
             ( { model | drag = Just (Drag coordinates coordinates) }, Cmd.none )
@@ -340,18 +356,24 @@ viewZoneSlider toMsg ( min, max ) title val =
 viewImage : Model -> Html Msg
 viewImage model =
     section [ id "image-section" ]
-        [ img
-            [ src (Url.Builder.absolute [ "image" ] [ toImageUrlParams (toSettings model.image) ])
-            , on "load" (Decode.succeed OnImageLoad)
-            , on "click" <|
-                Decode.map4 (\x y tx ty -> OnImageClick ( x - tx, y - ty ))
-                    (Decode.field "x" Decode.int)
-                    (Decode.field "y" Decode.int)
-                    (Decode.at [ "target", "x" ] Decode.int)
-                    (Decode.at [ "target", "y" ] Decode.int)
-            , style "user-select" "none"
-            ]
-            []
+        [ viewMaybe model.imageWidth <|
+            \imageWidth ->
+                img
+                    [ src <|
+                        Url.Builder.absolute [ "image" ]
+                            [ toImageUrlParams (toSettings model.image)
+                            , Url.Builder.int "preview-width" imageWidth
+                            ]
+                    , on "load" (Decode.succeed OnImageLoad)
+                    , on "click" <|
+                        Decode.map4 (\x y tx ty -> OnImageClick ( x - tx, y - ty ))
+                            (Decode.field "x" Decode.int)
+                            (Decode.field "y" Decode.int)
+                            (Decode.at [ "target", "x" ] Decode.int)
+                            (Decode.at [ "target", "y" ] Decode.int)
+                    , style "user-select" "none"
+                    ]
+                    []
         , viewZones model
         ]
 
@@ -467,3 +489,17 @@ decodeCoordinate =
         [ decoder
         , Decode.at [ "touches", "0" ] decoder
         ]
+
+
+
+-- HELPERS
+
+
+viewMaybe : Maybe a -> (a -> Html msg) -> Html msg
+viewMaybe maybeA html1 =
+    case maybeA of
+        Just a ->
+            html1 a
+
+        Nothing ->
+            text ""
