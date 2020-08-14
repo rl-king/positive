@@ -3,6 +3,7 @@ module Main exposing (main)
 import Base64
 import Browser
 import Browser.Dom
+import Browser.Events
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings exposing (ImageSettings)
@@ -13,6 +14,7 @@ import Html.Events exposing (..)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
+import List.Zipper as Zipper
 import Task
 import Url exposing (Url)
 import Url.Builder
@@ -42,7 +44,25 @@ main =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    Sub.batch
+        [ Browser.Events.onKeyDown <|
+            matchKey "ArrowLeft" PreviousImage
+        , Browser.Events.onKeyDown <|
+            matchKey "ArrowRight" NextImage
+        ]
+
+
+matchKey : String -> msg -> Decode.Decoder msg
+matchKey key_ msg =
+    Decode.field "key" Decode.string
+        |> Decode.andThen
+            (\s ->
+                if key_ == s then
+                    Decode.succeed msg
+
+                else
+                    Decode.fail "Not an match"
+            )
 
 
 
@@ -133,6 +153,8 @@ type Msg
     | OnWhitepointChange Int
     | OnImageLoad
     | SaveSettings ImageSettings
+    | PreviousImage
+    | NextImage
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -237,6 +259,12 @@ update msg model =
             , Cmd.map GotSaveImageSettings <|
                 Request.postImageSettings model.dir settings
             )
+
+        PreviousImage ->
+            ( model, Cmd.none )
+
+        NextImage ->
+            ( model, Cmd.none )
 
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
