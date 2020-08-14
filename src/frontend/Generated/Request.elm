@@ -17,7 +17,7 @@ postImageSettings :
                     , body : String
                     }
                 )
-                ()
+                (List Generated.Data.ImageSettings.ImageSettings)
             )
 postImageSettings a b =
     Http.request
@@ -42,17 +42,16 @@ postImageSettings a b =
                             Err ( Http.BadStatus d.statusCode, Just { metadata = d, body = e } )
 
                         Http.GoodStatus_ d e ->
-                            if e == "" then
-                                Ok ()
-
-                            else
-                                Err
-                                    ( Http.BadBody "Expected the response body to be empty"
+                            Result.mapError
+                                (\f ->
+                                    ( Http.BadBody (Json.Decode.errorToString f)
                                     , Just
                                         { metadata = d
                                         , body = e
                                         }
                                     )
+                                )
+                                (Json.Decode.decodeString (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings) e)
                 )
         , timeout = Nothing
         , tracker = Nothing

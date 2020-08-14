@@ -50,7 +50,8 @@ subscriptions model =
 
 
 type alias Model =
-    { image : Image
+    { imageSettings : ImageSettings
+    , imageProcessingState : ImageProcessingState
     , filmRollSettings : Dict String ImageSettings
     , coordinateValue : Maybe Float
     , drag : Maybe Drag
@@ -61,10 +62,10 @@ type alias Model =
     }
 
 
-type Image
-    = Ready ImageSettings
-    | Loading ImageSettings
-    | Queued ImageSettings ImageSettings
+type ImageProcessingState
+    = Ready
+    | Loading
+    | Queued ImageSettings
 
 
 type alias Coordinate =
@@ -79,13 +80,19 @@ type alias Drag =
     }
 
 
+newSettings : String -> ImageSettings
+newSettings filename =
+    ImageSettings filename 0 0 2.2 0 0 0 0 0
+
+
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
         { dir, filename } =
             fromUrl url
     in
-    ( { image = Ready (ImageSettings filename 0 0 2.2 0 0 0 0 0)
+    ( { imageSettings = ImageSettings filename 0 0 2.2 0 0 0 0 0
+      , imageProcessingState = Loading
       , filmRollSettings = Dict.empty
       , coordinateValue = Nothing
       , drag = Nothing
@@ -130,7 +137,7 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | GotDirectory (HttpResult (List String))
-    | GotSaveImageSettings (HttpResult ())
+    | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | DragStart Coordinate
@@ -160,14 +167,16 @@ update msg model =
 
         UrlChanged url ->
             let
-                currentSettings =
-                    toSettings model.image
+                settings =
+                    Maybe.withDefault (newSettings filename) <|
+                        Dict.get filename model.filmRollSettings
 
                 { dir, filename } =
                     fromUrl url
             in
             ( { model
-                | image = Loading { currentSettings | iFilename = filename }
+                | imageSettings = settings
+                , imageProcessingState = Loading
                 , dir = dir
               }
             , Cmd.none
@@ -191,7 +200,16 @@ update msg model =
         GotFilmRollSettings (Err err) ->
             ( model, Cmd.none )
 
-        GotSaveImageSettings _ ->
+        GotSaveImageSettings (Ok settings) ->
+            ( { model
+                | filmRollSettings =
+                    Dict.fromList <|
+                        List.map (\s -> ( s.iFilename, s )) settings
+              }
+            , Cmd.none
+            )
+
+        GotSaveImageSettings (Err _) ->
             ( model, Cmd.none )
 
         GotImageDimensions result ->
@@ -222,14 +240,14 @@ update msg model =
             , Http.post
                 { url =
                     Url.Builder.absolute [ "image", "coordinate" ]
-                        [ toImageUrlParams (toSettings model.image) ]
+                        [ toImageUrlParams model.imageSettings ]
                 , expect = Http.expectJson GotValueAtCoordinate Decode.float
                 , body = Http.jsonBody (Encode.list identity [ Encode.int x, Encode.int y ])
                 }
             )
 
         Rotate ->
-            ( updateSettings (\s -> { s | iRotate = s.iRotate + degrees 90 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iRotate = s.iRotate + degrees -90 }) model, Cmd.none )
 
         OnGammaChange gamma ->
             ( updateSettings (\s -> { s | iGamma = toFloat gamma / 100 }) model, Cmd.none )
@@ -255,15 +273,15 @@ update msg model =
             )
 
         OnImageLoad ->
-            case model.image of
-                Ready _ ->
-                    ( model, Cmd.none )
+            case model.imageProcessingState of
+                Ready ->
+                    ( { model | imageProcessingState = Ready }, Cmd.none )
 
-                Loading s ->
-                    ( { model | image = Ready s }, Cmd.none )
+                Loading ->
+                    ( { model | imageProcessingState = Ready }, Cmd.none )
 
-                Queued _ n ->
-                    ( { model | image = Ready n }, Cmd.none )
+                Queued n ->
+                    ( { model | imageProcessingState = Loading, imageSettings = n }, Cmd.none )
 
         SaveSettings settings ->
             ( model
@@ -274,15 +292,15 @@ update msg model =
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
-    case model.image of
-        Ready s ->
-            { model | image = Loading (f s) }
+    case model.imageProcessingState of
+        Ready ->
+            { model | imageProcessingState = Loading, imageSettings = f model.imageSettings }
 
-        Loading s ->
-            { model | image = Queued s (f s) }
+        Loading ->
+            { model | imageProcessingState = Queued (f model.imageSettings) }
 
-        Queued s n ->
-            { model | image = Queued s (f n) }
+        Queued n ->
+            { model | imageProcessingState = Queued (f n) }
 
 
 
@@ -326,17 +344,16 @@ viewFile dir fileName =
 
 viewSettings : Model -> Html Msg
 viewSettings model =
-    let
-        settings =
-            toSettings model.image
-    in
     section [ id "image-settings" ]
         [ div []
-            [ label [] [ text "gamma" ]
-            , p [] [ text (String.fromFloat settings.iGamma) ]
+            [ label []
+                [ text "gamma"
+                , text " "
+                , text (String.fromFloat model.imageSettings.iGamma)
+                ]
             , input
                 [ type_ "range"
-                , value (String.fromInt (floor (settings.iGamma * 100)))
+                , value (String.fromInt (floor (model.imageSettings.iGamma * 100)))
                 , Attributes.min "0"
                 , Attributes.max "2000"
                 , on "input" <|
@@ -345,21 +362,24 @@ viewSettings model =
                 ]
                 []
             ]
-        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.iZone1 * 1000)
-        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.iZone5 * 1000)
-        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.iZone9 * 1000)
-        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.iBlackpoint * 100)
-        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.iWhitepoint * 100)
+        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (model.imageSettings.iZone1 * 1000)
+        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (model.imageSettings.iZone5 * 1000)
+        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (model.imageSettings.iZone9 * 1000)
+        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (model.imageSettings.iBlackpoint * 100)
+        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (model.imageSettings.iWhitepoint * 100)
         , button [ onClick Rotate ] [ text "Rotate" ]
-        , button [ onClick (SaveSettings settings) ] [ text "Save" ]
+        , button [ onClick (SaveSettings model.imageSettings) ] [ text "Save" ]
         ]
 
 
 viewZoneSlider : (Int -> Msg) -> ( Int, Int ) -> String -> Float -> Html Msg
 viewZoneSlider toMsg ( min, max ) title val =
     div []
-        [ label [] [ text title ]
-        , p [] [ text (String.fromFloat val) ]
+        [ label []
+            [ text title
+            , text " "
+            , text (String.fromFloat val)
+            ]
         , input
             [ type_ "range"
             , value (String.fromInt (floor val))
@@ -375,17 +395,13 @@ viewZoneSlider toMsg ( min, max ) title val =
 
 viewImage : Model -> Html Msg
 viewImage model =
-    let
-        imageSettings =
-            toSettings model.image
-    in
     section [ id "image-section" ]
         [ viewMaybe model.imageWidth <|
             \imageWidth ->
                 img
                     [ src <|
                         Url.Builder.absolute [ "image" ]
-                            [ toImageUrlParams imageSettings
+                            [ toImageUrlParams model.imageSettings
                             , Url.Builder.int "preview-width" imageWidth
                             , Url.Builder.string "dir" model.dir
                             ]
@@ -397,10 +413,6 @@ viewImage model =
                             (Decode.at [ "target", "x" ] Decode.int)
                             (Decode.at [ "target", "y" ] Decode.int)
                     , style "user-select" "none"
-                    , style "transform" <|
-                        "rotate("
-                            ++ String.fromFloat imageSettings.iRotate
-                            ++ "rad)"
                     ]
                     []
 
@@ -411,9 +423,6 @@ viewImage model =
 viewZones : Model -> Html Msg
 viewZones model =
     let
-        settings =
-            toSettings model.image
-
         zone t i v =
             v + (i * m t v)
 
@@ -425,21 +434,8 @@ viewZones model =
     in
     ul [] <|
         List.map2 (\x i -> li [] [ text (String.left 5 (String.fromFloat (x - i))) ])
-            (List.map (zone 0.95 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.15 settings.iZone1) vs)
+            (List.map (zone 0.95 model.imageSettings.iZone9 << zone 0.5 model.imageSettings.iZone5 << zone 0.15 model.imageSettings.iZone1) vs)
             vs
-
-
-toSettings : Image -> ImageSettings
-toSettings image =
-    case image of
-        Ready s ->
-            s
-
-        Loading s ->
-            s
-
-        Queued s _ ->
-            s
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter

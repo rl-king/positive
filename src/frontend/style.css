@@ -76,5 +76,8 @@ input {
 }
 
 img {
-    object-fit: contain;
+    width: auto;
+    max-width: 100%;
+    max-height: 85vh;
+    display: block;
 }

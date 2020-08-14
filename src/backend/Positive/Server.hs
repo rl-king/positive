@@ -61,7 +61,7 @@ data SettingsApi route = SettingsApi
         :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent,
+        :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image"
         :> "settings"
@@ -124,7 +124,7 @@ handleImage logger state dir previewWidth imageSettings = do
   logMsg logger $ "Encoded in: " <> tshow (Time.diffUTCTime encodeDone startEncode)
   pure image2
 
-handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler NoContent
+handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler [ImageSettings]
 handleSaveSettings logger dir imageSettings = do
   let path = Text.unpack dir </> "image-settings.json"
   exists <- liftIO $ doesPathExist path
@@ -136,14 +136,16 @@ handleSaveSettings logger dir imageSettings = do
           logMsg logger $ Text.pack err
           throwError err500
         Right settings -> do
-          liftIO . ByteString.writeFile path . Aeson.encode $ Settings.insert imageSettings settings
+          let newSettings = Settings.insert imageSettings settings
+          liftIO . ByteString.writeFile path $ Aeson.encode newSettings
           logMsg logger "Updated settings"
-          pure NoContent
+          pure $ Settings.toList newSettings
     else do
       logMsg logger "No settings file found, creating one now"
-      liftIO . ByteString.writeFile path . Aeson.encode $ Settings.init imageSettings
+      let newSettings = Settings.init imageSettings
+      liftIO . ByteString.writeFile path $ Aeson.encode newSettings
       logMsg logger $ "Wrote: " <> Text.pack path
-      pure NoContent
+      pure $ Settings.toList newSettings
 
 handleGetSettings :: TimedFastLogger -> Text -> Servant.Handler [ImageSettings]
 handleGetSettings logger dir = do
@@ -203,15 +205,18 @@ resizeImage previewWidth image =
         HIP.resize HIP.Bilinear HIP.Edge (1800, 1200) image
 
 processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
-processImage is =
-  HIP.map $
-    whitepoint (iWhitepoint is)
-      . blackpoint (iBlackpoint is)
-      . zone 0.95 (iZone9 is)
-      . zone 0.5 (iZone5 is)
-      . zone 0.15 (iZone1 is)
-      . gamma (iGamma is)
-      . invert
+processImage is image =
+  HIP.rotate HIP.Bilinear (HIP.Fill 0) (iRotate is) $
+    HIP.map
+      ( whitepoint (iWhitepoint is)
+          . blackpoint (iBlackpoint is)
+          . zone 0.95 (iZone9 is)
+          . zone 0.5 (iZone5 is)
+          . zone 0.15 (iZone1 is)
+          . gamma (iGamma is)
+          . invert
+      )
+      image
 
 -- FILTERS
 
