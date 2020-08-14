@@ -10,13 +10,14 @@
 module Positive.Server where
 
 import Control.Concurrent.MVar
-import Control.Exception.Safe (tryIO)
+import Control.Exception (evaluate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
@@ -43,7 +44,10 @@ data Api route = Api
   deriving (Generic)
 
 data ImageApi route = ImageApi
-  { iaImage :: route :- "image" :> QueryParam' '[Required, Strict] "image-settings" ImageSettings :> Get '[Image] ByteString,
+  { iaImage ::
+      route :- "image"
+        :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
+        :> Get '[Image] ByteString,
     iaRaw :: route :- Raw
   }
   deriving (Generic)
@@ -105,10 +109,15 @@ handleImage :: TimedFastLogger -> LoadedImage -> ImageSettings -> Servant.Handle
 handleImage logger state imageSettings = do
   image <- getImage logger state (iPath imageSettings)
   logMsg logger "Processing image"
-  pure
-    . HIP.encode HIP.PNG []
-    . HIP.exchange HIP.VS
-    $ processImage imageSettings image
+  start <- liftIO Time.getCurrentTime
+  processed <- liftIO . evaluate $ processImage imageSettings image
+  processDone <- liftIO Time.getCurrentTime
+  logMsg logger $ "processed in: " <> tshow (Time.diffUTCTime processDone start)
+  startEncode <- liftIO Time.getCurrentTime
+  image2 <- liftIO . evaluate . HIP.encode HIP.JPG [] $ HIP.exchange HIP.VS processed
+  encodeDone <- liftIO Time.getCurrentTime
+  logMsg logger $ "Encoded in: " <> tshow (Time.diffUTCTime encodeDone startEncode)
+  pure image2
 
 handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler NoContent
 handleSaveSettings logger dir imageSettings = do
@@ -151,21 +160,23 @@ handleDirectory dir = do
   files <- liftIO $ listDirectory (Text.unpack dir)
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
-getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Text -> m (MonochromeImage HIP.RPU)
+getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Text -> m (MonochromeImage HIP.VU)
 getImage logger state@(LoadedImage ref) path = do
-  maybeImage <- liftIO $ tryReadMVar ref
+  maybeImage <- liftIO $ tryTakeMVar ref
+  logMsg logger $ "MVar: " <> tshow maybeImage
   case maybeImage of
     Nothing -> do
       logMsg logger "Reading image"
       image <- liftIO $ resizeImage <$> readImageFromDisk (Text.unpack path)
       logMsg logger "Read image"
-      liftIO $ putMVar ref (path, HIP.exchange HIP.VU image)
+      liftIO $ putMVar ref (path, image)
       logMsg logger "Updated MVar"
       pure image
-    Just (cachedPath, cachedImage')
+    Just loadedImage@(cachedPath, cachedImage')
       | path == cachedPath -> do
         logMsg logger "From MVar image"
-        pure (HIP.exchange HIP.RPU cachedImage')
+        liftIO $ putMVar ref loadedImage
+        pure cachedImage'
       | otherwise -> liftIO $ getImage logger state path
 
 -- IMAGE
@@ -176,15 +187,15 @@ type MonochromeImage arr =
 type MonochromePixel =
   HIP.Pixel HIP.Y Double
 
-readImageFromDisk :: String -> IO (MonochromeImage HIP.RPU)
+readImageFromDisk :: String -> IO (MonochromeImage HIP.VU)
 readImageFromDisk =
-  HIP.readImageY HIP.RPU
+  HIP.readImageY HIP.VU
 
-resizeImage :: MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
+resizeImage :: MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 resizeImage =
   HIP.resize HIP.Bilinear HIP.Edge (900, 600) . HIP.resize HIP.Bilinear HIP.Edge (1800, 1200)
 
-processImage :: ImageSettings -> MonochromeImage HIP.RPU -> MonochromeImage HIP.RPU
+processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 processImage is =
   HIP.map $
     whitepoint (iWhitepoint is)
@@ -229,7 +240,7 @@ data Image
 
 instance Accept Image where
   contentType _ =
-    "image" Media.// "png"
+    "image" Media.// "jpg"
 
 instance MimeRender Image ByteString where
   mimeRender _ = id

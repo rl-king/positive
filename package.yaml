@@ -38,6 +38,7 @@ dependencies:
   - servant-server
   - servant-to-elm
   - text
+  - time
   - wai
   - warp
   - unordered-containers
