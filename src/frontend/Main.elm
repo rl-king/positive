@@ -302,12 +302,27 @@ view model =
             { title = "Positive"
             , body =
                 [ main_ []
-                    [ viewImage filmRoll model
+                    [ viewLoading model.imageProcessingState
+                    , viewImage filmRoll model
                     , viewSettings filmRoll model
                     , viewFileBrowser model.route.dir filmRoll
                     ]
                 ]
             }
+
+
+
+-- LOADING
+
+
+viewLoading : ImageProcessingState -> Html msg
+viewLoading state =
+    case state of
+        Ready ->
+            text ""
+
+        _ ->
+            div [ class "loading-spinner" ] []
 
 
 
