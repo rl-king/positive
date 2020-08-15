@@ -32,6 +32,7 @@ dependencies:
   - hip
   - http-media
   - http-types
+  - mtl
   - process
   - safe-exceptions
   - servant

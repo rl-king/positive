@@ -43,7 +43,7 @@ codeGen logger = do
         Pretty.modules $
           Simplification.simplifyDefinition
             <$> jsonDefinitions <> endpointDefinitions
-  logMsg logger "Removing src/frontend/Generated before generating code"
+  logMsg_ logger "Removing src/frontend/Generated before generating code"
   Directory.removeDirectoryRecursive "src/frontend/Generated"
   for_ (HashMap.toList modules) $ \(modulePath, contents) -> do
     (filename, location) <-
@@ -58,7 +58,7 @@ codeGen logger = do
           Directory.createDirectoryIfMissing True p
           pure (Text.unpack $ moduleName <> ".elm", p)
     writeFile (location </> filename) (show contents)
-    logMsg logger $ "Wrote elm file: " <> Text.pack (location </> filename)
+    logMsg_ logger $ "Wrote elm file: " <> Text.pack (location </> filename)
   runElmFormat logger
 
 runElmFormat :: TimedFastLogger -> IO ()
@@ -67,5 +67,5 @@ runElmFormat logger = do
   result <- Process.withCreateProcess (Process.proc "elm-format" args) $
     \_ _ _ handler -> Process.waitForProcess handler
   case result of
-    System.Exit.ExitSuccess -> logMsg logger "Formatted generated code with elm-format"
-    _ -> logMsg logger $ "Something went wrong trying to format the generated Elm code: " <> tshow result
+    System.Exit.ExitSuccess -> logMsg_ logger "Formatted generated code with elm-format"
+    _ -> logMsg_ logger $ "Something went wrong trying to format the generated Elm code: " <> tshow result

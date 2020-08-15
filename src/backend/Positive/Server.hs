@@ -12,6 +12,7 @@ module Positive.Server where
 import Control.Concurrent.MVar
 import Control.Exception (evaluate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
@@ -31,10 +32,15 @@ import System.FilePath.Posix ((</>))
 import qualified System.FilePath.Posix as Path
 import System.Log.FastLogger (TimedFastLogger, toLogStr)
 
--- STATE
+-- POSITIVE
 
-newtype LoadedImage
-  = LoadedImage (MVar (Text, MonochromeImage HIP.VU))
+type PositiveM =
+  ReaderT Env Handler
+
+data Env = Env
+  { eLoadedImage :: MVar (Text, MonochromeImage HIP.VU),
+    eLogger :: TimedFastLogger
+  }
 
 -- API
 
@@ -77,86 +83,88 @@ server logger =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
-            (logMsg logger ("listening on port " <> tshow @Int 8080))
+            (logMsg_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
+      nt ref =
+        flip runReaderT (Env ref logger)
    in do
         ref <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
-        runSettings settings (genericServeT id (handlers logger (LoadedImage ref)))
+        runSettings settings (genericServeT (nt ref) handlers)
 
 -- HANDLERS
 
-handlers :: TimedFastLogger -> LoadedImage -> Api (AsServerT Handler)
-handlers logger state =
+handlers :: Api (AsServerT PositiveM)
+handlers =
   Api
     { aImageApi =
         genericServerT
           ImageApi
-            { iaImage = handleImage logger state,
+            { iaImage = handleImage,
               iaRaw = serveDirectoryFileServer "./"
             },
       aSettingsApi =
         genericServerT
           SettingsApi
-            { saSaveSettings = handleSaveSettings logger,
-              saGetSettings = handleGetSettings logger
+            { saSaveSettings = handleSaveSettings,
+              saGetSettings = handleGetSettings
             }
     }
 
-handleImage :: TimedFastLogger -> LoadedImage -> Text -> Int -> ImageSettings -> Servant.Handler ByteString
-handleImage logger state dir previewWidth imageSettings = do
+handleImage :: Text -> Int -> ImageSettings -> PositiveM ByteString
+handleImage dir previewWidth imageSettings = do
   (image, onDone) <-
-    getImage logger state previewWidth $
+    getImage previewWidth $
       Text.pack (Text.unpack dir </> Text.unpack (iFilename imageSettings))
-  logMsg logger "Processing image"
+  logMsg "Processing image"
   start <- liftIO Time.getCurrentTime
   processed <- liftIO . evaluate $ processImage imageSettings image
   processDone <- liftIO Time.getCurrentTime
-  logMsg logger $ "processed in: " <> tshow (Time.diffUTCTime processDone start)
+  logMsg $ "processed in: " <> tshow (Time.diffUTCTime processDone start)
   startEncode <- liftIO Time.getCurrentTime
   image2 <- liftIO . evaluate . HIP.encode HIP.JPG [] $ HIP.exchange HIP.VS processed
   encodeDone <- liftIO Time.getCurrentTime
-  logMsg logger $ "Encoded in: " <> tshow (Time.diffUTCTime encodeDone startEncode)
+  logMsg $ "Encoded in: " <> tshow (Time.diffUTCTime encodeDone startEncode)
   liftIO onDone
   pure image2
 
-handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler [ImageSettings]
-handleSaveSettings logger dir imageSettings = do
-  settingsFile <- getSettingsFile logger dir
+handleSaveSettings :: Text -> ImageSettings -> PositiveM [ImageSettings]
+handleSaveSettings dir imageSettings = do
+  settingsFile <- getSettingsFile dir
   case settingsFile of
     Left err -> do
-      logMsg logger $ Text.pack err
+      logMsg $ Text.pack err
       throwError err500
     Right settings -> do
       let newSettings = Settings.insert imageSettings settings
           path = Text.unpack dir </> "image-settings.json"
       liftIO . ByteString.writeFile path $ Aeson.encode newSettings
-      logMsg logger "Updated settings"
+      logMsg "Updated settings"
       pure $ Settings.toList newSettings
 
-handleGetSettings :: TimedFastLogger -> Text -> Servant.Handler [ImageSettings]
-handleGetSettings logger dir = do
-  settingsFile <- getSettingsFile logger dir
+handleGetSettings :: Text -> PositiveM [ImageSettings]
+handleGetSettings dir = do
+  settingsFile <- getSettingsFile dir
   case settingsFile of
     Left err -> do
-      logMsg logger $ Text.pack err
+      logMsg $ Text.pack err
       throwError err500
     Right settings ->
       pure $ Settings.toList settings
 
 -- SETTINGS FILE
 
-getSettingsFile :: MonadIO m => TimedFastLogger -> Text -> m (Either String FilmRollSettings)
-getSettingsFile logger dir = do
+getSettingsFile :: Text -> PositiveM (Either String FilmRollSettings)
+getSettingsFile dir = do
   let path = Text.unpack dir </> "image-settings.json"
   exists <- liftIO $ doesPathExist path
   if exists
     then liftIO $ Aeson.eitherDecodeFileStrict path
     else do
-      logMsg logger "No settings file found, creating one now"
+      logMsg "No settings file found, creating one now"
       filenames <- getAllPngs dir
       let settings = Settings.fromList filenames
       liftIO . ByteString.writeFile path $ Aeson.encode settings
-      logMsg logger $ "Wrote: " <> Text.pack path
+      logMsg $ "Wrote: " <> Text.pack path
       pure (Right settings)
 
 getAllPngs :: MonadIO m => Text -> m [Text]
@@ -166,24 +174,19 @@ getAllPngs dir = do
 
 -- IMAGE
 
-getImage ::
-  MonadIO m =>
-  TimedFastLogger ->
-  LoadedImage ->
-  Int ->
-  Text ->
-  m (MonochromeImage HIP.VU, IO ())
-getImage logger (LoadedImage ref) previewWidth path = do
-  mvar@(loadedPath, loadedImage) <- liftIO $ takeMVar ref
-  logMsg logger $ "MVar: " <> tshow mvar
+getImage :: Int -> Text -> PositiveM (MonochromeImage HIP.VU, IO ())
+getImage previewWidth path = do
+  Env ref _ <- ask
+  currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar ref
+  logMsg $ "MVar: " <> tshow currentlyLoaded
   if path == loadedPath && HIP.cols loadedImage == previewWidth
     then do
-      logMsg logger "Loaded image"
-      pure (loadedImage, putMVar ref mvar)
+      logMsg "Loaded image"
+      pure (loadedImage, putMVar ref currentlyLoaded)
     else do
-      logMsg logger "Reading image"
+      logMsg "Reading image"
       image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
-      logMsg logger "Read image"
+      logMsg "Read image"
       pure (image, putMVar ref (path, image))
 
 -- IMAGE
@@ -210,18 +213,17 @@ processImage is image =
       cropWidth = floor $ int2Double (HIP.cols image - snd cropOffset) * (icWidth (iCrop is) / 100)
       cropHeight = floor $ int2Double cropWidth * mul
       mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
-   in HIP.rotate HIP.Bilinear (HIP.Fill 0) (iRotate is)
-        . HIP.crop cropOffset (cropHeight, cropWidth)
-        $ HIP.map
-          ( whitepoint (iWhitepoint is)
-              . blackpoint (iBlackpoint is)
-              . zone 0.95 (iZone9 is)
-              . zone 0.5 (iZone5 is)
-              . zone 0.15 (iZone1 is)
-              . gamma (iGamma is)
-              . invert
-          )
-          image
+   in HIP.map
+        ( whitepoint (iWhitepoint is)
+            . blackpoint (iBlackpoint is)
+            . zone 0.95 (iZone9 is)
+            . zone 0.5 (iZone5 is)
+            . zone 0.15 (iZone1 is)
+            . gamma (iGamma is)
+            . invert
+        )
+        . HIP.rotate HIP.Bilinear (HIP.Fill 0) (iRotate is)
+        $ HIP.crop cropOffset (cropHeight, cropWidth) image
 
 -- FILTERS
 
@@ -264,9 +266,14 @@ instance MimeRender Image ByteString where
 
 -- LOG
 
-logMsg :: MonadIO m => TimedFastLogger -> Text -> m ()
-logMsg logger msg =
+logMsg :: Text -> PositiveM ()
+logMsg msg = do
+  Env _ logger <- ask
   liftIO $ logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
+
+logMsg_ :: TimedFastLogger -> Text -> IO ()
+logMsg_ logger msg =
+  logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
 
 tshow :: Show a => a -> Text
 tshow =
