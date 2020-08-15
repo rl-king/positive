@@ -66,7 +66,7 @@ data SettingsApi route = SettingsApi
       route :- "image"
         :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] ImageSettings
+        :> ReqBody '[JSON] [ImageSettings]
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image"
@@ -120,15 +120,16 @@ handleImage dir previewWidth imageSettings = do
   liftIO onDone
   pure encoded
 
-handleSaveSettings :: Text -> ImageSettings -> PositiveM [ImageSettings]
+handleSaveSettings :: Text -> [ImageSettings] -> PositiveM [ImageSettings]
 handleSaveSettings dir imageSettings = do
+  -- Maybe remove this, we could just write?
   settingsFile <- getSettingsFile dir
   case settingsFile of
     Left err -> do
       logMsg $ Text.pack err
       throwError err500
-    Right settings -> do
-      let newSettings = Settings.insert imageSettings settings
+    Right _ -> do
+      let newSettings = Settings.fromList imageSettings
           path = Text.unpack dir </> "image-settings.json"
       liftIO . ByteString.writeFile path $ Aeson.encode newSettings
       logMsg "Updated settings"
@@ -155,7 +156,7 @@ getSettingsFile dir = do
     else do
       logMsg "No settings file found, creating one now"
       filenames <- getAllPngs dir
-      let settings = Settings.fromList filenames
+      let settings = Settings.fromFilenames filenames
       liftIO . ByteString.writeFile path $ Aeson.encode settings
       logMsg $ "Wrote: " <> Text.pack path
       pure (Right settings)

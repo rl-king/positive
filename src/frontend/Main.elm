@@ -122,7 +122,7 @@ type Scale
 type SaveStatus
     = Idle
     | SavedAt Time.Posix
-    | SaveAfter Int ImageSettings
+    | SaveAfter Int (Zipper ImageSettings)
     | Error Http.Error
 
 
@@ -184,7 +184,7 @@ type Msg
     | OnBlackpointChange Float
     | OnWhitepointChange Float
     | OnImageLoad
-    | SaveSettings ImageSettings
+    | SaveSettings (Zipper ImageSettings)
     | CycleScale Scale
     | Reset
     | CopySettings ImageSettings
@@ -221,10 +221,10 @@ update msg model =
 
         AttemptSave currentTime ->
             case model.saveStatus of
-                SaveAfter 0 settings ->
+                SaveAfter 0 filmRoll ->
                     ( model
                     , Cmd.map GotSaveImageSettings <|
-                        Request.postImageSettings model.route.dir settings
+                        Request.postImageSettings model.route.dir (Zipper.toList filmRoll)
                     )
 
                 SaveAfter t settings ->
@@ -304,10 +304,10 @@ update msg model =
                     else
                         ( { model | imageProcessingState = Loading, filmRoll = n }, Cmd.none )
 
-        SaveSettings settings ->
+        SaveSettings filmRoll ->
             ( model
             , Cmd.map GotSaveImageSettings <|
-                Request.postImageSettings model.route.dir settings
+                Request.postImageSettings model.route.dir (Zipper.toList filmRoll)
             )
 
         CycleScale scale ->
@@ -520,7 +520,7 @@ viewSettings filmRoll model =
                         [ text "Scale "
                         , text (scaleToString scale)
                         ]
-            , button [ onClick (SaveSettings settings) ] [ text "Save" ]
+            , button [ onClick (SaveSettings filmRoll) ] [ text "Save" ]
             , button [ onClick Reset ] [ text "Reset" ]
             , button [ onClick PreviousImage ] [ text "<" ]
             , button [ onClick NextImage ] [ text ">" ]

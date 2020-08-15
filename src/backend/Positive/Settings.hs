@@ -33,8 +33,12 @@ insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
 insert imageSettings =
   FilmRollSettings . HashMap.insert (iFilename imageSettings) imageSettings . unFilmRollSettings
 
-fromList :: [Text] -> FilmRollSettings
+fromList :: [ImageSettings] -> FilmRollSettings
 fromList =
+  FilmRollSettings . HashMap.fromList . fmap (\is -> (iFilename is, is))
+
+fromFilenames :: [Text] -> FilmRollSettings
+fromFilenames =
   FilmRollSettings
     . HashMap.fromList
     . fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 0))

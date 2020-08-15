@@ -3,11 +3,12 @@ module Generated.Request exposing (getImageSettings, postImageSettings)
 import Generated.Data.ImageSettings
 import Http
 import Json.Decode
+import Json.Encode
 
 
 postImageSettings :
     String
-    -> Generated.Data.ImageSettings.ImageSettings
+    -> List Generated.Data.ImageSettings.ImageSettings
     ->
         Cmd
             (Result
@@ -24,7 +25,7 @@ postImageSettings a b =
         { method = "POST"
         , headers = []
         , url = "/image/settings?dir=" ++ a
-        , body = Http.jsonBody (Generated.Data.ImageSettings.encodeImageSettings b)
+        , body = Http.jsonBody (Json.Encode.list Generated.Data.ImageSettings.encodeImageSettings b)
         , expect =
             Http.expectStringResponse identity
                 (\c ->
