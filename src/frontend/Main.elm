@@ -76,7 +76,7 @@ type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe (Zipper ImageSettings)
     , key : Navigation.Key
-    , imageWidth : Maybe Int
+    , imageWidth : Maybe ( Int, Scale )
     , route : { dir : String, filename : String }
     }
 
@@ -85,6 +85,11 @@ type ImageProcessingState
     = Ready
     | Loading
     | Queued (Maybe (Zipper ImageSettings))
+
+
+type Scale
+    = Half
+    | Contain
 
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -142,6 +147,7 @@ type Msg
     | OnWhitepointChange Float
     | OnImageLoad
     | SaveSettings ImageSettings
+    | CycleScale Scale
     | PreviousImage
     | NextImage
 
@@ -190,7 +196,7 @@ update msg model =
             ( { model
                 | imageWidth =
                     Result.toMaybe <|
-                        Result.map (floor << .width << .element) result
+                        Result.map (\v -> ( floor v.element.width, Contain )) result
               }
             , Cmd.none
             )
@@ -231,6 +237,25 @@ update msg model =
             ( model
             , Cmd.map GotSaveImageSettings <|
                 Request.postImageSettings model.route.dir settings
+            )
+
+        CycleScale scale ->
+            let
+                newScale =
+                    case scale of
+                        Contain ->
+                            Half
+
+                        Half ->
+                            Contain
+            in
+            ( { model
+                | imageWidth =
+                    Maybe.map (Tuple.mapSecond (always newScale))
+                        model.imageWidth
+                , imageProcessingState = Loading
+              }
+            , Cmd.none
             )
 
         PreviousImage ->
@@ -371,8 +396,24 @@ viewSettings filmRoll model =
             , viewRangeInput OnWhitepointChange ( -10, 10 ) "Whitepoint" settings.iWhitepoint
             , button [ onClick Rotate ] [ text "Rotate" ]
             , button [ onClick (SaveSettings settings) ] [ text "Save" ]
+            , viewMaybe model.imageWidth <|
+                \( _, scale ) ->
+                    button [ onClick (CycleScale scale) ]
+                        [ text "Scale "
+                        , text (scaleToString scale)
+                        ]
             ]
         ]
+
+
+scaleToString : Scale -> String
+scaleToString scale =
+    case scale of
+        Half ->
+            "Half"
+
+        Contain ->
+            "Contain"
 
 
 viewRangeInput : (Float -> Msg) -> ( Int, Int ) -> String -> Float -> Html Msg
@@ -403,8 +444,17 @@ viewRangeInput toMsg ( min, max ) title val =
 
 viewImage : Zipper ImageSettings -> Model -> Html Msg
 viewImage filmRoll model =
+    let
+        applyScale ( width, scale ) =
+            case scale of
+                Half ->
+                    floor (toFloat width * 0.5)
+
+                Contain ->
+                    width
+    in
     section [ id "image-section" ]
-        [ viewMaybe model.imageWidth <|
+        [ viewMaybe (Maybe.map applyScale model.imageWidth) <|
             \imageWidth ->
                 img
                     [ on "load" (Decode.succeed OnImageLoad)
