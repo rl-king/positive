@@ -211,14 +211,15 @@ processImage is image =
       cropHeight = floor $ int2Double cropWidth * mul
       mul = int2Double h / int2Double w
    in HIP.map
-        ( whitepoint (iWhitepoint is)
-            . blackpoint (iBlackpoint is)
-            . zone 0.95 (iZone9 is)
+        ( zone 0.95 (iZone9 is)
             . zone 0.5 (iZone5 is)
             . zone 0.15 (iZone1 is)
             . gamma (iGamma is)
+            . whitepoint (iWhitepoint is)
+            . blackpoint (iBlackpoint is)
             . invert
         )
+        . HIP.normalize
         . HIP.rotate HIP.Bilinear (HIP.Fill 0) (iRotate is)
         $ HIP.crop cropOffset (cropHeight, cropWidth) image
 
@@ -231,12 +232,12 @@ invert =
 
 blackpoint :: Double -> MonochromePixel -> MonochromePixel
 blackpoint x =
-  fmap (\p -> p + ((1 - p) * x))
+  fmap (\p -> p - ((1 - p) * x))
 {-# INLINE blackpoint #-}
 
 whitepoint :: Double -> MonochromePixel -> MonochromePixel
 whitepoint x =
-  fmap (\p -> p - (x * p))
+  fmap (\p -> p + ((1 - p) * x))
 {-# INLINE whitepoint #-}
 
 gamma :: Double -> MonochromePixel -> MonochromePixel

@@ -429,8 +429,8 @@ viewSettings filmRoll model =
             , viewRangeInput OnZone1Change 0.01 ( -1, 1 ) "Zone I" settings.iZone1
             , viewRangeInput OnZone5Change 0.01 ( -1, 1 ) "Zone V" settings.iZone5
             , viewRangeInput OnZone9Change 0.01 ( -1, 1 ) "Zone IX" settings.iZone9
-            , viewRangeInput OnBlackpointChange 0.1 ( -10, 10 ) "Blackpoint" settings.iBlackpoint
-            , viewRangeInput OnWhitepointChange 0.1 ( -10, 10 ) "Whitepoint" settings.iWhitepoint
+            , viewRangeInput OnBlackpointChange 0.01 ( 0, 1 ) "Blackpoint" settings.iBlackpoint
+            , viewRangeInput OnWhitepointChange 0.01 ( 0, 1 ) "Whitepoint" settings.iWhitepoint
             , viewImageCropMode settings model.imageCropMode
             , button [ onClick Rotate ] [ text "Rotate" ]
             , viewMaybe model.imageWidth <|
