@@ -518,6 +518,10 @@ viewImage filmRoll model =
 
                 Contain ->
                     width
+
+        currentCrop =
+            .iCrop <|
+                Zipper.current filmRoll
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper" ]
@@ -540,11 +544,14 @@ viewImage filmRoll model =
                         [ class "image-crop-overlay"
                         , style "transform" <|
                             interpolate "translate({0}px, {1}px)"
-                                [ String.fromInt imageCrop.icLeft
-                                , String.fromInt imageCrop.icTop
+                                [ String.fromInt (imageCrop.icLeft - currentCrop.icLeft)
+                                , String.fromInt (imageCrop.icTop - currentCrop.icTop)
                                 ]
                         , style "width" <|
-                            interpolate "{0}%" [ String.fromFloat imageCrop.icWidth ]
+                            interpolate "{0}%"
+                                [ String.fromFloat
+                                    (100 + imageCrop.icWidth - currentCrop.icWidth)
+                                ]
                         ]
                         []
             ]
