@@ -38,6 +38,7 @@ codeGen logger = do
           Servant.To.Elm.elmEndpoints @(ToServantApi SettingsApi)
       jsonDefinitions =
         Elm.jsonDefinitions @ImageSettings
+          <> Elm.jsonDefinitions @ImageCrop
       modules =
         Pretty.modules $
           Simplification.simplifyDefinition

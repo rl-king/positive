@@ -6,7 +6,11 @@ import Browser.Dom
 import Browser.Events
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
-import Generated.Data.ImageSettings as ImageSettings exposing (ImageSettings)
+import Generated.Data.ImageSettings as ImageSettings
+    exposing
+        ( ImageCrop
+        , ImageSettings
+        )
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
@@ -16,6 +20,7 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
+import String.Interpolate exposing (interpolate)
 import Task
 import Url exposing (Url)
 import Url.Builder
@@ -77,6 +82,7 @@ type alias Model =
     , filmRoll : Maybe (Zipper ImageSettings)
     , key : Navigation.Key
     , imageWidth : Maybe ( Int, Scale )
+    , imageCropMode : Maybe ImageCrop
     , route : { dir : String, filename : String }
     }
 
@@ -102,6 +108,7 @@ init _ url key =
       , filmRoll = Nothing
       , key = key
       , imageWidth = Nothing
+      , imageCropMode = Nothing
       , route = route
       }
     , Cmd.map GotFilmRollSettings <|
@@ -149,6 +156,7 @@ type Msg
     | SaveSettings ImageSettings
     | CycleScale Scale
     | Reset
+    | UpdateImageCropMode (Maybe ImageCrop)
     | PreviousImage
     | NextImage
 
@@ -266,7 +274,7 @@ update msg model =
         Reset ->
             let
                 reSettings current =
-                    ImageSettings current.iFilename 0 0 2.2 0 0 0 0 0
+                    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 0 0 0 0 0
             in
             ( { model
                 | filmRoll =
@@ -276,6 +284,9 @@ update msg model =
               }
             , Cmd.none
             )
+
+        UpdateImageCropMode mode ->
+            ( { model | imageCropMode = mode }, Cmd.none )
 
         PreviousImage ->
             let
@@ -413,6 +424,7 @@ viewSettings filmRoll model =
             , viewRangeInput OnZone9Change ( -1, 1 ) "Zone IX" settings.iZone9
             , viewRangeInput OnBlackpointChange ( -10, 10 ) "Blackpoint" settings.iBlackpoint
             , viewRangeInput OnWhitepointChange ( -10, 10 ) "Whitepoint" settings.iWhitepoint
+            , viewImageCropMode settings model.imageCropMode
             , button [ onClick Rotate ] [ text "Rotate" ]
             , viewMaybe model.imageWidth <|
                 \( _, scale ) ->
@@ -424,6 +436,36 @@ viewSettings filmRoll model =
             , button [ onClick Reset ] [ text "Reset" ]
             ]
         ]
+
+
+viewImageCropMode : ImageSettings -> Maybe ImageCrop -> Html Msg
+viewImageCropMode current imageCropMode =
+    let
+        onTopChange imageCrop v =
+            UpdateImageCropMode (Just { imageCrop | icTop = floor v })
+
+        onLeftChange imageCrop v =
+            UpdateImageCropMode (Just { imageCrop | icLeft = floor v })
+
+        onWidthChange imageCrop v =
+            UpdateImageCropMode (Just { imageCrop | icWidth = v })
+    in
+    div [] <|
+        case imageCropMode of
+            Nothing ->
+                [ button
+                    [ onClick (UpdateImageCropMode (Just current.iCrop))
+                    ]
+                    [ text "Crop" ]
+                ]
+
+            Just imageCrop ->
+                [ viewRangeInput (onTopChange imageCrop) ( 0, 100 ) "Top" (toFloat imageCrop.icTop)
+                , viewRangeInput (onLeftChange imageCrop) ( 0, 100 ) "Left" (toFloat imageCrop.icLeft)
+                , viewRangeInput (onWidthChange imageCrop) ( 0, 100 ) "Width" imageCrop.icWidth
+                , button [ onClick (UpdateImageCropMode Nothing) ]
+                    [ text "Cancel" ]
+                ]
 
 
 scaleToString : Scale -> String
@@ -474,19 +516,34 @@ viewImage filmRoll model =
                     width
     in
     section [ id "image-section" ]
-        [ viewMaybe (Maybe.map applyScale model.imageWidth) <|
-            \imageWidth ->
-                img
-                    [ on "load" (Decode.succeed OnImageLoad)
-                    , style "user-select" "none"
-                    , src <|
-                        Url.Builder.absolute [ "image" ]
-                            [ toImageUrlParams (Zipper.current filmRoll)
-                            , Url.Builder.int "preview-width" imageWidth
-                            , Url.Builder.string "dir" model.route.dir
-                            ]
-                    ]
-                    []
+        [ div [ class "image-wrapper" ]
+            [ viewMaybe (Maybe.map applyScale model.imageWidth) <|
+                \imageWidth ->
+                    img
+                        [ on "load" (Decode.succeed OnImageLoad)
+                        , style "user-select" "none"
+                        , src <|
+                            Url.Builder.absolute [ "image" ]
+                                [ toImageUrlParams (Zipper.current filmRoll)
+                                , Url.Builder.int "preview-width" imageWidth
+                                , Url.Builder.string "dir" model.route.dir
+                                ]
+                        ]
+                        []
+            , viewMaybe model.imageCropMode <|
+                \imageCrop ->
+                    div
+                        [ class "image-crop-overlay"
+                        , style "transform" <|
+                            interpolate "translate({0}px, {1}px)"
+                                [ String.fromInt imageCrop.icLeft
+                                , String.fromInt imageCrop.icTop
+                                ]
+                        , style "width" <|
+                            interpolate "{0}%" [ String.fromFloat imageCrop.icWidth ]
+                        ]
+                        []
+            ]
         , viewZones filmRoll model
         ]
 

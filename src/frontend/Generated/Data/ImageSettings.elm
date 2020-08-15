@@ -1,4 +1,4 @@
-module Generated.Data.ImageSettings exposing (ImageSettings, decodeImageSettings, encodeImageSettings)
+module Generated.Data.ImageSettings exposing (ImageCrop, ImageSettings, decodeImageCrop, decodeImageSettings, encodeImageCrop, encodeImageSettings)
 
 import Json.Decode
 import Json.Decode.Pipeline
@@ -8,7 +8,7 @@ import Json.Encode
 type alias ImageSettings =
     { iFilename : String
     , iRotate : Float
-    , iCrop : Int
+    , iCrop : ImageCrop
     , iGamma : Float
     , iZone1 : Float
     , iZone5 : Float
@@ -23,7 +23,7 @@ encodeImageSettings a =
     Json.Encode.object
         [ ( "iFilename", Json.Encode.string a.iFilename )
         , ( "iRotate", Json.Encode.float a.iRotate )
-        , ( "iCrop", Json.Encode.int a.iCrop )
+        , ( "iCrop", encodeImageCrop a.iCrop )
         , ( "iGamma", Json.Encode.float a.iGamma )
         , ( "iZone1", Json.Encode.float a.iZone1 )
         , ( "iZone5", Json.Encode.float a.iZone5 )
@@ -38,10 +38,31 @@ decodeImageSettings =
     Json.Decode.succeed ImageSettings
         |> Json.Decode.Pipeline.required "iFilename" Json.Decode.string
         |> Json.Decode.Pipeline.required "iRotate" Json.Decode.float
-        |> Json.Decode.Pipeline.required "iCrop" Json.Decode.int
+        |> Json.Decode.Pipeline.required "iCrop" decodeImageCrop
         |> Json.Decode.Pipeline.required "iGamma" Json.Decode.float
         |> Json.Decode.Pipeline.required "iZone1" Json.Decode.float
         |> Json.Decode.Pipeline.required "iZone5" Json.Decode.float
         |> Json.Decode.Pipeline.required "iZone9" Json.Decode.float
         |> Json.Decode.Pipeline.required "iBlackpoint" Json.Decode.float
         |> Json.Decode.Pipeline.required "iWhitepoint" Json.Decode.float
+
+
+type alias ImageCrop =
+    { icTop : Int, icLeft : Int, icWidth : Float }
+
+
+encodeImageCrop : ImageCrop -> Json.Encode.Value
+encodeImageCrop a =
+    Json.Encode.object
+        [ ( "icTop", Json.Encode.int a.icTop )
+        , ( "icLeft", Json.Encode.int a.icLeft )
+        , ( "icWidth", Json.Encode.float a.icWidth )
+        ]
+
+
+decodeImageCrop : Json.Decode.Decoder ImageCrop
+decodeImageCrop =
+    Json.Decode.succeed ImageCrop
+        |> Json.Decode.Pipeline.required "icTop" Json.Decode.int
+        |> Json.Decode.Pipeline.required "icLeft" Json.Decode.int
+        |> Json.Decode.Pipeline.required "icWidth" Json.Decode.float

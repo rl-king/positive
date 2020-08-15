@@ -37,7 +37,7 @@ fromList :: [Text] -> FilmRollSettings
 fromList =
   FilmRollSettings
     . HashMap.fromList
-    . fmap (\x -> (x, ImageSettings x 0 0 2.2 0 0 0 0 0))
+    . fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 0))
 
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
@@ -48,7 +48,7 @@ toList =
 data ImageSettings = ImageSettings
   { iFilename :: Text,
     iRotate :: Double,
-    iCrop :: Int,
+    iCrop :: ImageCrop,
     iGamma :: Double,
     iZone1 :: Double,
     iZone5 :: Double,
@@ -57,10 +57,6 @@ data ImageSettings = ImageSettings
     iWhitepoint :: Double
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
-
--- instance ToHttpApiData ImageSettings where
---   toUrlPiece = toUrlPiece . unrefine . unImageWidth
---   toQueryParam = toQueryParam . unrefine . unImageWidth
 
 instance FromHttpApiData ImageSettings where
   parseUrlPiece piece =
@@ -93,3 +89,42 @@ instance Elm.HasElmEncoder Aeson.Value ImageSettings where
         Elm.defaultOptions
         Aeson.defaultOptions
         "Generated.Data.ImageSettings.encodeImageSettings"
+
+-- CROP
+
+data ImageCrop = ImageCrop
+  { icTop :: Int,
+    icLeft :: Int,
+    icWidth :: Double
+  }
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+noCrop :: ImageCrop
+noCrop =
+  ImageCrop 0 0 100
+
+instance Elm.HasElmType ImageCrop where
+  elmDefinition =
+    Just $
+      Elm.deriveElmTypeDefinition
+        @ImageCrop
+        Elm.defaultOptions
+        "Generated.Data.ImageSettings.ImageCrop"
+
+instance Elm.HasElmDecoder Aeson.Value ImageCrop where
+  elmDecoderDefinition =
+    Just $
+      Elm.deriveElmJSONDecoder
+        @ImageCrop
+        Elm.defaultOptions
+        Aeson.defaultOptions
+        "Generated.Data.ImageSettings.decodeImageCrop"
+
+instance Elm.HasElmEncoder Aeson.Value ImageCrop where
+  elmEncoderDefinition =
+    Just $
+      Elm.deriveElmJSONEncoder
+        @ImageCrop
+        Elm.defaultOptions
+        Aeson.defaultOptions
+        "Generated.Data.ImageSettings.encodeImageCrop"
