@@ -157,6 +157,7 @@ type Msg
     | CycleScale Scale
     | Reset
     | UpdateImageCropMode (Maybe ImageCrop)
+    | ApplyCrop ImageCrop
     | PreviousImage
     | NextImage
 
@@ -287,6 +288,12 @@ update msg model =
 
         UpdateImageCropMode mode ->
             ( { model | imageCropMode = mode }, Cmd.none )
+
+        ApplyCrop imageCrop ->
+            ( updateSettings (\s -> { s | iCrop = imageCrop })
+                { model | imageCropMode = Nothing }
+            , Cmd.none
+            )
 
         PreviousImage ->
             let
@@ -453,18 +460,15 @@ viewImageCropMode current imageCropMode =
     div [] <|
         case imageCropMode of
             Nothing ->
-                [ button
-                    [ onClick (UpdateImageCropMode (Just current.iCrop))
-                    ]
-                    [ text "Crop" ]
+                [ button [ onClick (UpdateImageCropMode (Just current.iCrop)) ] [ text "Crop" ]
                 ]
 
             Just imageCrop ->
                 [ viewRangeInput (onTopChange imageCrop) ( 0, 100 ) "Top" (toFloat imageCrop.icTop)
                 , viewRangeInput (onLeftChange imageCrop) ( 0, 100 ) "Left" (toFloat imageCrop.icLeft)
                 , viewRangeInput (onWidthChange imageCrop) ( 0, 100 ) "Width" imageCrop.icWidth
-                , button [ onClick (UpdateImageCropMode Nothing) ]
-                    [ text "Cancel" ]
+                , button [ onClick (UpdateImageCropMode Nothing) ] [ text "Cancel" ]
+                , button [ onClick (ApplyCrop imageCrop) ] [ text "Apply" ]
                 ]
 
 

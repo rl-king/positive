@@ -18,7 +18,7 @@ import qualified Data.ByteString.Lazy as ByteString
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
-import GHC.Float (int2Float)
+import GHC.Float (int2Double, int2Double)
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
@@ -198,23 +198,28 @@ readImageFromDisk =
 
 resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 resizeImage previewWidth image =
-  let mul = int2Float (HIP.rows image) / int2Float (HIP.cols image)
-   in HIP.resize HIP.Bilinear HIP.Edge (round (int2Float previewWidth * mul), previewWidth) $
+  let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
+   in HIP.resize HIP.Bilinear HIP.Edge (round (int2Double previewWidth * mul), previewWidth) $
         HIP.resize HIP.Bilinear HIP.Edge (1800, 1200) image
 
 processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 processImage is image =
-  HIP.rotate HIP.Bilinear (HIP.Fill 0) (iRotate is) $
-    HIP.map
-      ( whitepoint (iWhitepoint is)
-          . blackpoint (iBlackpoint is)
-          . zone 0.95 (iZone9 is)
-          . zone 0.5 (iZone5 is)
-          . zone 0.15 (iZone1 is)
-          . gamma (iGamma is)
-          . invert
-      )
-      image
+  let cropOffset = (icTop (iCrop is), icLeft (iCrop is))
+      cropWidth = floor $ int2Double (HIP.cols image - snd cropOffset) * (icWidth (iCrop is) / 100)
+      cropHeight = floor $ int2Double cropWidth * mul
+      mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
+   in HIP.rotate HIP.Bilinear (HIP.Fill 0) (iRotate is)
+        . HIP.crop cropOffset (cropHeight, cropWidth)
+        $ HIP.map
+          ( whitepoint (iWhitepoint is)
+              . blackpoint (iBlackpoint is)
+              . zone 0.95 (iZone9 is)
+              . zone 0.5 (iZone5 is)
+              . zone 0.15 (iZone1 is)
+              . gamma (iGamma is)
+              . invert
+          )
+          image
 
 -- FILTERS
 
