@@ -11,6 +11,7 @@ import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (..)
+import Html.Keyed
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -416,28 +417,53 @@ viewImage filmRoll model =
                             ]
                     ]
                     []
-
-        -- , viewZones model
+        , viewZones filmRoll model
         ]
 
 
 
--- viewZones : Model -> Html Msg
--- viewZones model =
---     let
---         settings =
---             Zipper.current model.filmRoll
---         zone t i v =
---             v + (i * m t v)
---         m t v =
---             (1 - abs (v - t)) * (1 - abs (v - t))
---         vs =
---             List.map (\x -> toFloat x / 10) <| List.range 0 10
---     in
---     ul [] <|
---         List.map2 (\x i -> li [] [ text (String.left 5 (String.fromFloat (x - i))) ])
---             (List.map (zone 0.95 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.15 settings.iZone1) vs)
---             vs
+-- ZONES
+
+
+viewZones : Zipper ImageSettings -> Model -> Html Msg
+viewZones filmRoll model =
+    let
+        settings =
+            Zipper.current filmRoll
+
+        zone t i v =
+            v + (i * m t v)
+
+        m t v =
+            (1 - abs (v - t)) * (1 - abs (v - t))
+
+        vs =
+            List.map (\x -> toFloat x / 10) <| List.range 1 10
+
+        apply =
+            zone 0.95 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.15 settings.iZone1
+    in
+    Html.Keyed.ul [ class "zones" ] <|
+        List.map2 viewZoneBar (List.map apply vs) vs
+
+
+viewZoneBar : Float -> Float -> ( String, Html msg )
+viewZoneBar value zone =
+    let
+        height v =
+            style "height" (String.fromFloat (1 + 2 * v) ++ "rem")
+
+        background v =
+            style "background-color" ("hsl(0, 0%," ++ String.fromFloat (v * 100) ++ "%)")
+    in
+    ( String.fromFloat value
+    , li [ height (value - zone), background zone ]
+        []
+    )
+
+
+
+-- HELPERS
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
@@ -446,10 +472,6 @@ toImageUrlParams =
         << Base64.encode
         << Encode.encode 0
         << ImageSettings.encodeImageSettings
-
-
-
--- HELPERS
 
 
 viewIf : Bool -> (() -> Html msg) -> Html msg

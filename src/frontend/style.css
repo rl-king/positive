@@ -37,9 +37,6 @@ main {
     align-items: flex-start;
 }
 
-#files {
-}
-
 a {
     text-decoration: none;
     color: #fff;
@@ -69,10 +66,13 @@ a:hover {
     text-decoration: underline;
 }
 
+#files {
+    column-count: 6;
+}
+
 ul {
     padding: 0;
     list-style: none;
-    column-count: 6;
 }
 
 li {
@@ -99,8 +99,25 @@ input {
     height: 100vh;
     margin: 2rem;
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: center;
+}
+
+.zones {
+    width: 100%;
+    height: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+.zones li {
+    width: 3rem;
+    display: flex;
+    justify-content: center;
+    font-size: .875rem;
+    transform: translateY(-50%);
+    transform-origin: center center;
 }
 
 img {
