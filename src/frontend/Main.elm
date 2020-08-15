@@ -425,12 +425,12 @@ viewSettings filmRoll model =
     in
     section [ id "image-settings" ]
         [ div []
-            [ viewRangeInput OnGammaChange ( 0, 10 ) "Gamma" settings.iGamma
-            , viewRangeInput OnZone1Change ( -1, 1 ) "Zone I" settings.iZone1
-            , viewRangeInput OnZone5Change ( -1, 1 ) "Zone V" settings.iZone5
-            , viewRangeInput OnZone9Change ( -1, 1 ) "Zone IX" settings.iZone9
-            , viewRangeInput OnBlackpointChange ( -10, 10 ) "Blackpoint" settings.iBlackpoint
-            , viewRangeInput OnWhitepointChange ( -10, 10 ) "Whitepoint" settings.iWhitepoint
+            [ viewRangeInput OnGammaChange 0.1 ( 0, 10 ) "Gamma" settings.iGamma
+            , viewRangeInput OnZone1Change 0.01 ( -1, 1 ) "Zone I" settings.iZone1
+            , viewRangeInput OnZone5Change 0.01 ( -1, 1 ) "Zone V" settings.iZone5
+            , viewRangeInput OnZone9Change 0.01 ( -1, 1 ) "Zone IX" settings.iZone9
+            , viewRangeInput OnBlackpointChange 0.1 ( -10, 10 ) "Blackpoint" settings.iBlackpoint
+            , viewRangeInput OnWhitepointChange 0.1 ( -10, 10 ) "Whitepoint" settings.iWhitepoint
             , viewImageCropMode settings model.imageCropMode
             , button [ onClick Rotate ] [ text "Rotate" ]
             , viewMaybe model.imageWidth <|
@@ -464,9 +464,9 @@ viewImageCropMode current imageCropMode =
                 ]
 
             Just imageCrop ->
-                [ viewRangeInput (onTopChange imageCrop) ( 0, 100 ) "Top" (toFloat imageCrop.icTop)
-                , viewRangeInput (onLeftChange imageCrop) ( 0, 100 ) "Left" (toFloat imageCrop.icLeft)
-                , viewRangeInput (onWidthChange imageCrop) ( 0, 100 ) "Width" imageCrop.icWidth
+                [ viewRangeInput (onTopChange imageCrop) 0.1 ( 0, 100 ) "Top" (toFloat imageCrop.icTop)
+                , viewRangeInput (onLeftChange imageCrop) 0.1 ( 0, 100 ) "Left" (toFloat imageCrop.icLeft)
+                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 0, 100 ) "Width" imageCrop.icWidth
                 , button [ onClick (UpdateImageCropMode Nothing) ] [ text "Cancel" ]
                 , button [ onClick (ApplyCrop imageCrop) ] [ text "Apply" ]
                 ]
@@ -482,14 +482,14 @@ scaleToString scale =
             "Contain"
 
 
-viewRangeInput : (Float -> Msg) -> ( Int, Int ) -> String -> Float -> Html Msg
-viewRangeInput toMsg ( min, max ) title val =
+viewRangeInput : (Float -> Msg) -> Float -> ( Int, Int ) -> String -> Float -> Html Msg
+viewRangeInput toMsg stepSize ( min, max ) title val =
     div []
         [ label [] [ text title, text " ", text (String.fromFloat val) ]
         , input
             [ type_ "range"
             , value (String.fromFloat val)
-            , step "0.1"
+            , step (String.fromFloat stepSize)
             , Attributes.min (String.fromInt min)
             , Attributes.max (String.fromInt max)
             , on "input" <|
