@@ -57,6 +57,13 @@ subscriptions model =
             matchKey "ArrowRight" NextImage
         , Browser.Events.onKeyDown <|
             matchKey "r" Rotate
+        , Maybe.withDefault Sub.none <|
+            Maybe.map
+                (always <|
+                    Browser.Events.onKeyDown <|
+                        matchKey "Escape" (UpdateImageCropMode Nothing)
+                )
+                model.imageCropMode
         ]
 
 
@@ -460,6 +467,8 @@ viewSettings filmRoll model =
                         ]
             , button [ onClick (SaveSettings settings) ] [ text "Save" ]
             , button [ onClick Reset ] [ text "Reset" ]
+            , button [ onClick PreviousImage ] [ text "<" ]
+            , button [ onClick NextImage ] [ text ">" ]
             ]
         ]
 
@@ -486,7 +495,7 @@ viewImageCropMode current imageCropMode =
             div [ class "crop-settings" ] <|
                 [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5 ) "Top" imageCrop.icTop
                 , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5 ) "Left" imageCrop.icLeft
-                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 95, 100 ) "Width" imageCrop.icWidth
+                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 85, 100 ) "Width" imageCrop.icWidth
                 , button [ onClick (UpdateImageCropMode Nothing) ] [ text "Cancel" ]
                 , button [ onClick (ApplyCrop imageCrop) ] [ text "Apply" ]
                 ]
