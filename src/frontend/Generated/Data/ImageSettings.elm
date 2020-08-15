@@ -48,14 +48,14 @@ decodeImageSettings =
 
 
 type alias ImageCrop =
-    { icTop : Int, icLeft : Int, icWidth : Float }
+    { icTop : Float, icLeft : Float, icWidth : Float }
 
 
 encodeImageCrop : ImageCrop -> Json.Encode.Value
 encodeImageCrop a =
     Json.Encode.object
-        [ ( "icTop", Json.Encode.int a.icTop )
-        , ( "icLeft", Json.Encode.int a.icLeft )
+        [ ( "icTop", Json.Encode.float a.icTop )
+        , ( "icLeft", Json.Encode.float a.icLeft )
         , ( "icWidth", Json.Encode.float a.icWidth )
         ]
 
@@ -63,6 +63,6 @@ encodeImageCrop a =
 decodeImageCrop : Json.Decode.Decoder ImageCrop
 decodeImageCrop =
     Json.Decode.succeed ImageCrop
-        |> Json.Decode.Pipeline.required "icTop" Json.Decode.int
-        |> Json.Decode.Pipeline.required "icLeft" Json.Decode.int
+        |> Json.Decode.Pipeline.required "icTop" Json.Decode.float
+        |> Json.Decode.Pipeline.required "icLeft" Json.Decode.float
         |> Json.Decode.Pipeline.required "icWidth" Json.Decode.float

@@ -93,8 +93,8 @@ instance Elm.HasElmEncoder Aeson.Value ImageSettings where
 -- CROP
 
 data ImageCrop = ImageCrop
-  { icTop :: Int,
-    icLeft :: Int,
+  { icTop :: Double,
+    icLeft :: Double,
     icWidth :: Double
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)

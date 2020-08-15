@@ -115,17 +115,10 @@ handleImage dir previewWidth imageSettings = do
   (image, onDone) <-
     getImage previewWidth $
       Text.pack (Text.unpack dir </> Text.unpack (iFilename imageSettings))
-  logMsg "Processing image"
-  start <- liftIO Time.getCurrentTime
-  processed <- liftIO . evaluate $ processImage imageSettings image
-  processDone <- liftIO Time.getCurrentTime
-  logMsg $ "processed in: " <> tshow (Time.diffUTCTime processDone start)
-  startEncode <- liftIO Time.getCurrentTime
-  image2 <- liftIO . evaluate . HIP.encode HIP.JPG [] $ HIP.exchange HIP.VS processed
-  encodeDone <- liftIO Time.getCurrentTime
-  logMsg $ "Encoded in: " <> tshow (Time.diffUTCTime encodeDone startEncode)
+  processed <- timed "Apply settings" $ processImage imageSettings image
+  encoded <- timed "Encode JPG" $ HIP.encode HIP.JPG [] $ HIP.exchange HIP.VS processed
   liftIO onDone
-  pure image2
+  pure encoded
 
 handleSaveSettings :: Text -> ImageSettings -> PositiveM [ImageSettings]
 handleSaveSettings dir imageSettings = do
@@ -209,10 +202,14 @@ resizeImage previewWidth image =
 
 processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 processImage is image =
-  let cropOffset = (icTop (iCrop is), icLeft (iCrop is))
-      cropWidth = floor $ int2Double (HIP.cols image - snd cropOffset) * (icWidth (iCrop is) / 100)
+  let (h, w) = HIP.dims image
+      cropOffset =
+        ( floor $ int2Double h / 100 * icTop (iCrop is),
+          floor $ int2Double w / 100 * icLeft (iCrop is)
+        )
+      cropWidth = floor $ int2Double (w - snd cropOffset) * (icWidth (iCrop is) / 100)
       cropHeight = floor $ int2Double cropWidth * mul
-      mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
+      mul = int2Double h / int2Double w
    in HIP.map
         ( whitepoint (iWhitepoint is)
             . blackpoint (iBlackpoint is)
@@ -278,3 +275,14 @@ logMsg_ logger msg =
 tshow :: Show a => a -> Text
 tshow =
   Text.pack . show
+
+-- PROFILE
+
+timed :: Text -> a -> PositiveM a
+timed name action = do
+  logMsg $ name <> " - started"
+  start <- liftIO Time.getCurrentTime
+  a <- liftIO $ evaluate action
+  done <- liftIO Time.getCurrentTime
+  logMsg $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
+  pure a

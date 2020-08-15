@@ -449,24 +449,25 @@ viewImageCropMode : ImageSettings -> Maybe ImageCrop -> Html Msg
 viewImageCropMode current imageCropMode =
     let
         onTopChange imageCrop v =
-            UpdateImageCropMode (Just { imageCrop | icTop = floor v })
+            UpdateImageCropMode (Just { imageCrop | icTop = v })
 
         onLeftChange imageCrop v =
-            UpdateImageCropMode (Just { imageCrop | icLeft = floor v })
+            UpdateImageCropMode (Just { imageCrop | icLeft = v })
 
         onWidthChange imageCrop v =
             UpdateImageCropMode (Just { imageCrop | icWidth = v })
     in
-    div [] <|
-        case imageCropMode of
-            Nothing ->
+    case imageCropMode of
+        Nothing ->
+            span [] <|
                 [ button [ onClick (UpdateImageCropMode (Just current.iCrop)) ] [ text "Crop" ]
                 ]
 
-            Just imageCrop ->
-                [ viewRangeInput (onTopChange imageCrop) 0.1 ( 0, 100 ) "Top" (toFloat imageCrop.icTop)
-                , viewRangeInput (onLeftChange imageCrop) 0.1 ( 0, 100 ) "Left" (toFloat imageCrop.icLeft)
-                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 0, 100 ) "Width" imageCrop.icWidth
+        Just imageCrop ->
+            div [ class "crop-settings" ] <|
+                [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5 ) "Top" imageCrop.icTop
+                , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5 ) "Left" imageCrop.icLeft
+                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 95, 100 ) "Width" imageCrop.icWidth
                 , button [ onClick (UpdateImageCropMode Nothing) ] [ text "Cancel" ]
                 , button [ onClick (ApplyCrop imageCrop) ] [ text "Apply" ]
                 ]
@@ -522,6 +523,11 @@ viewImage filmRoll model =
         currentCrop =
             .iCrop <|
                 Zipper.current filmRoll
+
+        ifCropping settings =
+            Maybe.withDefault settings <|
+                Maybe.map (\_ -> { settings | iRotate = 0, iCrop = ImageCrop 0 0 100 })
+                    model.imageCropMode
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper" ]
@@ -532,7 +538,7 @@ viewImage filmRoll model =
                         , style "user-select" "none"
                         , src <|
                             Url.Builder.absolute [ "image" ]
-                                [ toImageUrlParams (Zipper.current filmRoll)
+                                [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
                                 , Url.Builder.int "preview-width" imageWidth
                                 , Url.Builder.string "dir" model.route.dir
                                 ]
@@ -543,14 +549,13 @@ viewImage filmRoll model =
                     div
                         [ class "image-crop-overlay"
                         , style "transform" <|
-                            interpolate "translate({0}px, {1}px)"
-                                [ String.fromInt (imageCrop.icLeft - currentCrop.icLeft)
-                                , String.fromInt (imageCrop.icTop - currentCrop.icTop)
+                            interpolate "translate({0}%, {1}%)"
+                                [ String.fromFloat imageCrop.icLeft
+                                , String.fromFloat imageCrop.icTop
                                 ]
                         , style "width" <|
                             interpolate "{0}%"
-                                [ String.fromFloat
-                                    (100 + imageCrop.icWidth - currentCrop.icWidth)
+                                [ String.fromFloat imageCrop.icWidth
                                 ]
                         ]
                         []
