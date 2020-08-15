@@ -483,9 +483,9 @@ viewSettings filmRoll model =
     section [ id "image-settings" ]
         [ div []
             [ viewRangeInput OnGammaChange 0.1 ( 0, 10 ) "Gamma" settings.iGamma
-            , viewRangeInput OnZone1Change 0.01 ( -1, 1 ) "Zone I" settings.iZone1
-            , viewRangeInput OnZone5Change 0.01 ( -1, 1 ) "Zone V" settings.iZone5
-            , viewRangeInput OnZone9Change 0.01 ( -1, 1 ) "Zone IX" settings.iZone9
+            , viewRangeInput OnZone1Change 0.01 ( -0.5, 0.5 ) "Zone I" settings.iZone1
+            , viewRangeInput OnZone5Change 0.01 ( -0.5, 0.5 ) "Zone V" settings.iZone5
+            , viewRangeInput OnZone9Change 0.01 ( -0.5, 0.5 ) "Zone IX" settings.iZone9
             , viewRangeInput OnBlackpointChange 0.01 ( 0, 1 ) "Blackpoint" settings.iBlackpoint
             , viewRangeInput OnWhitepointChange 0.01 ( 0, 1 ) "Whitepoint" settings.iWhitepoint
             , viewImageCropMode settings model.imageCropMode
@@ -493,26 +493,28 @@ viewSettings filmRoll model =
             , button [ onClick (CopySettings settings) ] [ text "Copy settings" ]
             , viewMaybe model.clipboard <|
                 \clipboard ->
-                    button
-                        [ onClick <|
-                            PasteSettings { clipboard | iFilename = settings.iFilename }
-                        ]
-                        [ text <|
-                            interpolate "Paste settings from: {0}" [ clipboard.iFilename ]
-                        ]
-            , viewMaybe model.clipboard <|
-                \clipboard ->
-                    button
-                        [ onClick <|
-                            PasteSettings
-                                { clipboard
-                                    | iFilename = settings.iFilename
-                                    , iRotate = settings.iRotate
-                                }
-                        ]
-                        [ text <|
-                            interpolate "Paste settings from: {0} without rotate"
-                                [ clipboard.iFilename ]
+                    div []
+                        [ text "Paste: "
+                        , button
+                            [ onClick <|
+                                PasteSettings { clipboard | iFilename = settings.iFilename }
+                            ]
+                            [ text "All" ]
+                        , button
+                            [ onClick <|
+                                PasteSettings
+                                    { clipboard
+                                        | iFilename = settings.iFilename
+                                        , iRotate = settings.iRotate
+                                        , iCrop = settings.iCrop
+                                    }
+                            ]
+                            [ text "Tone" ]
+                        , button
+                            [ onClick <|
+                                PasteSettings { settings | iCrop = clipboard.iCrop }
+                            ]
+                            [ text "Crop" ]
                         ]
             , viewMaybe model.imageWidth <|
                 \( _, scale ) ->
@@ -566,7 +568,7 @@ scaleToString scale =
             "Contain"
 
 
-viewRangeInput : (Float -> Msg) -> Float -> ( Int, Int ) -> String -> Float -> Html Msg
+viewRangeInput : (Float -> Msg) -> Float -> ( Float, Float ) -> String -> Float -> Html Msg
 viewRangeInput toMsg stepSize ( min, max ) title val =
     div []
         [ label [] [ text title, text " ", text (String.fromFloat val) ]
@@ -574,8 +576,8 @@ viewRangeInput toMsg stepSize ( min, max ) title val =
             [ type_ "range"
             , value (String.fromFloat val)
             , step (String.fromFloat stepSize)
-            , Attributes.min (String.fromInt min)
-            , Attributes.max (String.fromInt max)
+            , Attributes.min (String.fromFloat min)
+            , Attributes.max (String.fromFloat max)
             , on "input" <|
                 (Decode.at [ "target", "valueAsNumber" ] Decode.float
                     |> Decode.andThen
