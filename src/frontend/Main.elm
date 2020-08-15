@@ -83,6 +83,7 @@ type alias Model =
     , key : Navigation.Key
     , imageWidth : Maybe ( Int, Scale )
     , imageCropMode : Maybe ImageCrop
+    , clipboard : Maybe ImageSettings
     , route : { dir : String, filename : String }
     }
 
@@ -109,6 +110,7 @@ init _ url key =
       , key = key
       , imageWidth = Nothing
       , imageCropMode = Nothing
+      , clipboard = Nothing
       , route = route
       }
     , Cmd.map GotFilmRollSettings <|
@@ -156,6 +158,8 @@ type Msg
     | SaveSettings ImageSettings
     | CycleScale Scale
     | Reset
+    | CopySettings ImageSettings
+    | PasteSettings ImageSettings
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
     | PreviousImage
@@ -231,6 +235,14 @@ update msg model =
 
         OnWhitepointChange wp ->
             ( updateSettings (\s -> { s | iWhitepoint = wp }) model, Cmd.none )
+
+        CopySettings settings ->
+            ( { model | clipboard = Just settings }, Cmd.none )
+
+        PasteSettings settings ->
+            ( updateSettings (\s -> { settings | iFilename = s.iFilename }) model
+            , Cmd.none
+            )
 
         OnImageLoad ->
             case model.imageProcessingState of
@@ -433,6 +445,13 @@ viewSettings filmRoll model =
             , viewRangeInput OnWhitepointChange 0.01 ( 0, 1 ) "Whitepoint" settings.iWhitepoint
             , viewImageCropMode settings model.imageCropMode
             , button [ onClick Rotate ] [ text "Rotate" ]
+            , button [ onClick (CopySettings settings) ] [ text "Copy settings" ]
+            , viewMaybe model.clipboard <|
+                \clipboard ->
+                    button [ onClick (PasteSettings clipboard) ]
+                        [ text <|
+                            interpolate "Paste settings from: {0}" [ clipboard.iFilename ]
+                        ]
             , viewMaybe model.imageWidth <|
                 \( _, scale ) ->
                     button [ onClick (CycleScale scale) ]
