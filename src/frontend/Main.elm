@@ -148,6 +148,7 @@ type Msg
     | OnImageLoad
     | SaveSettings ImageSettings
     | CycleScale Scale
+    | Reset
     | PreviousImage
     | NextImage
 
@@ -231,7 +232,11 @@ update msg model =
                     ( { model | imageProcessingState = Ready }, Cmd.none )
 
                 Queued n ->
-                    ( { model | imageProcessingState = Loading, filmRoll = n }, Cmd.none )
+                    if n == model.filmRoll then
+                        ( { model | imageProcessingState = Ready }, Cmd.none )
+
+                    else
+                        ( { model | imageProcessingState = Loading, filmRoll = n }, Cmd.none )
 
         SaveSettings settings ->
             ( model
@@ -254,6 +259,20 @@ update msg model =
                     Maybe.map (Tuple.mapSecond (always newScale))
                         model.imageWidth
                 , imageProcessingState = Loading
+              }
+            , Cmd.none
+            )
+
+        Reset ->
+            let
+                reSettings current =
+                    ImageSettings current.iFilename 0 0 2.2 0 0 0 0 0
+            in
+            ( { model
+                | filmRoll =
+                    Maybe.map
+                        (Zipper.mapCurrent reSettings)
+                        model.filmRoll
               }
             , Cmd.none
             )
@@ -395,13 +414,14 @@ viewSettings filmRoll model =
             , viewRangeInput OnBlackpointChange ( -10, 10 ) "Blackpoint" settings.iBlackpoint
             , viewRangeInput OnWhitepointChange ( -10, 10 ) "Whitepoint" settings.iWhitepoint
             , button [ onClick Rotate ] [ text "Rotate" ]
-            , button [ onClick (SaveSettings settings) ] [ text "Save" ]
             , viewMaybe model.imageWidth <|
                 \( _, scale ) ->
                     button [ onClick (CycleScale scale) ]
                         [ text "Scale "
                         , text (scaleToString scale)
                         ]
+            , button [ onClick (SaveSettings settings) ] [ text "Save" ]
+            , button [ onClick Reset ] [ text "Reset" ]
             ]
         ]
 
