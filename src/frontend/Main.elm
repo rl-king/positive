@@ -22,6 +22,7 @@ import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
 import String.Interpolate exposing (interpolate)
 import Task
+import Time
 import Url exposing (Url)
 import Url.Builder
 import Url.Parser
@@ -64,7 +65,18 @@ subscriptions model =
                         matchKey "Escape" (UpdateImageCropMode Nothing)
                 )
                 model.imageCropMode
+        , saveSubscription model.saveStatus
         ]
+
+
+saveSubscription : SaveStatus -> Sub Msg
+saveSubscription saveStatus =
+    case saveStatus of
+        SaveAfter _ _ ->
+            Time.every 1000 AttemptSave
+
+        _ ->
+            Sub.none
 
 
 matchKey : String -> msg -> Decode.Decoder msg
@@ -92,6 +104,7 @@ type alias Model =
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : { dir : String, filename : String }
+    , saveStatus : SaveStatus
     }
 
 
@@ -104,6 +117,13 @@ type ImageProcessingState
 type Scale
     = Half
     | Contain
+
+
+type SaveStatus
+    = Idle
+    | SavedAt Time.Posix
+    | SaveAfter Int ImageSettings
+    | Error Http.Error
 
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -119,6 +139,7 @@ init _ url key =
       , imageCropMode = Nothing
       , clipboard = Nothing
       , route = route
+      , saveStatus = Idle
       }
     , Cmd.map GotFilmRollSettings <|
         Request.getImageSettings route.dir
@@ -151,6 +172,7 @@ type alias HttpResult a =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
+    | AttemptSave Time.Posix
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
@@ -196,6 +218,22 @@ update msg model =
               }
             , Cmd.none
             )
+
+        AttemptSave currentTime ->
+            case model.saveStatus of
+                SaveAfter 0 settings ->
+                    ( model
+                    , Cmd.map GotSaveImageSettings <|
+                        Request.postImageSettings model.route.dir settings
+                    )
+
+                SaveAfter t settings ->
+                    ( { model | saveStatus = SaveAfter (t - 1) settings }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
 
         GotFilmRollSettings (Ok settings) ->
             ( { model
@@ -247,7 +285,7 @@ update msg model =
             ( { model | clipboard = Just settings }, Cmd.none )
 
         PasteSettings settings ->
-            ( updateSettings (\s -> { settings | iFilename = s.iFilename }) model
+            ( updateSettings (\_ -> settings) model
             , Cmd.none
             )
 
@@ -455,9 +493,26 @@ viewSettings filmRoll model =
             , button [ onClick (CopySettings settings) ] [ text "Copy settings" ]
             , viewMaybe model.clipboard <|
                 \clipboard ->
-                    button [ onClick (PasteSettings clipboard) ]
+                    button
+                        [ onClick <|
+                            PasteSettings { clipboard | iFilename = settings.iFilename }
+                        ]
                         [ text <|
                             interpolate "Paste settings from: {0}" [ clipboard.iFilename ]
+                        ]
+            , viewMaybe model.clipboard <|
+                \clipboard ->
+                    button
+                        [ onClick <|
+                            PasteSettings
+                                { clipboard
+                                    | iFilename = settings.iFilename
+                                    , iRotate = settings.iRotate
+                                }
+                        ]
+                        [ text <|
+                            interpolate "Paste settings from: {0} without rotate"
+                                [ clipboard.iFilename ]
                         ]
             , viewMaybe model.imageWidth <|
                 \( _, scale ) ->
