@@ -80,7 +80,7 @@ server logger =
             (logMsg logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
    in do
-        ref <- newEmptyMVar
+        ref <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         runSettings settings (genericServeT id (handlers logger (LoadedImage ref)))
 
 -- HANDLERS
@@ -104,7 +104,7 @@ handlers logger state =
 
 handleImage :: TimedFastLogger -> LoadedImage -> Text -> Int -> ImageSettings -> Servant.Handler ByteString
 handleImage logger state dir previewWidth imageSettings = do
-  image <-
+  (image, onDone) <-
     getImage logger state previewWidth $
       Text.pack (Text.unpack dir </> Text.unpack (iFilename imageSettings))
   logMsg logger "Processing image"
@@ -116,6 +116,7 @@ handleImage logger state dir previewWidth imageSettings = do
   image2 <- liftIO . evaluate . HIP.encode HIP.JPG [] $ HIP.exchange HIP.VS processed
   encodeDone <- liftIO Time.getCurrentTime
   logMsg logger $ "Encoded in: " <> tshow (Time.diffUTCTime encodeDone startEncode)
+  liftIO onDone
   pure image2
 
 handleSaveSettings :: TimedFastLogger -> Text -> ImageSettings -> Servant.Handler [ImageSettings]
@@ -165,24 +166,25 @@ getAllPngs dir = do
 
 -- IMAGE
 
-getImage :: MonadIO m => TimedFastLogger -> LoadedImage -> Int -> Text -> m (MonochromeImage HIP.VU)
-getImage logger state@(LoadedImage ref) previewWidth path = do
-  maybeImage <- liftIO $ tryTakeMVar ref
-  logMsg logger $ "MVar: " <> tshow maybeImage
-  case maybeImage of
-    Nothing -> do
+getImage ::
+  MonadIO m =>
+  TimedFastLogger ->
+  LoadedImage ->
+  Int ->
+  Text ->
+  m (MonochromeImage HIP.VU, IO ())
+getImage logger (LoadedImage ref) previewWidth path = do
+  mvar@(loadedPath, loadedImage) <- liftIO $ takeMVar ref
+  logMsg logger $ "MVar: " <> tshow mvar
+  if path == loadedPath && HIP.cols loadedImage == previewWidth
+    then do
+      logMsg logger "Loaded image"
+      pure (loadedImage, putMVar ref mvar)
+    else do
       logMsg logger "Reading image"
       image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
       logMsg logger "Read image"
-      liftIO $ putMVar ref (path, image)
-      logMsg logger "Updated MVar"
-      pure image
-    Just loadedImage@(cachedPath, cachedImage)
-      | path == cachedPath && HIP.cols cachedImage == previewWidth -> do
-        logMsg logger "From MVar image"
-        liftIO $ putMVar ref loadedImage
-        pure cachedImage
-      | otherwise -> liftIO $ getImage logger state previewWidth path
+      pure (image, putMVar ref (path, image))
 
 -- IMAGE
 
