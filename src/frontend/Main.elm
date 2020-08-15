@@ -55,11 +55,11 @@ subscriptions model =
 
 
 matchKey : String -> msg -> Decode.Decoder msg
-matchKey key_ msg =
+matchKey key msg =
     Decode.field "key" Decode.string
         |> Decode.andThen
             (\s ->
-                if key_ == s then
+                if key == s then
                     Decode.succeed msg
 
                 else
@@ -86,11 +86,6 @@ type ImageProcessingState
     | Queued (Maybe (Zipper ImageSettings))
 
 
-newSettings : String -> ImageSettings
-newSettings filename =
-    ImageSettings filename 0 0 2.2 0 0 0 0 0
-
-
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
@@ -110,15 +105,17 @@ init _ url key =
 
 fromUrl : Url -> { dir : String, filename : String }
 fromUrl url =
+    -- FIXME: Don't default
     Maybe.withDefault { dir = "", filename = "" } <|
-        Url.Parser.parse
-            (Url.Parser.query
-                (Url.Parser.Query.map2 (\a b -> { dir = Maybe.withDefault "" a, filename = Maybe.withDefault "" b })
-                    (Url.Parser.Query.string "dir")
-                    (Url.Parser.Query.string "filename")
+        Maybe.andThen identity <|
+            Url.Parser.parse
+                (Url.Parser.query
+                    (Url.Parser.Query.map2 (Maybe.map2 (\a b -> { dir = a, filename = b }))
+                        (Url.Parser.Query.string "dir")
+                        (Url.Parser.Query.string "filename")
+                    )
                 )
-            )
-            url
+                url
 
 
 
@@ -136,12 +133,12 @@ type Msg
     | GotFilmRollSettings (HttpResult (List ImageSettings))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
-    | OnGammaChange Int
-    | OnZone1Change Int
-    | OnZone5Change Int
-    | OnZone9Change Int
-    | OnBlackpointChange Int
-    | OnWhitepointChange Int
+    | OnGammaChange Float
+    | OnZone1Change Float
+    | OnZone5Change Float
+    | OnZone9Change Float
+    | OnBlackpointChange Float
+    | OnWhitepointChange Float
     | OnImageLoad
     | SaveSettings ImageSettings
     | PreviousImage
@@ -201,22 +198,22 @@ update msg model =
             ( updateSettings (\s -> { s | iRotate = s.iRotate + degrees -90 }) model, Cmd.none )
 
         OnGammaChange gamma ->
-            ( updateSettings (\s -> { s | iGamma = toFloat gamma / 100 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iGamma = gamma }) model, Cmd.none )
 
         OnZone1Change zone ->
-            ( updateSettings (\s -> { s | iZone1 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iZone1 = zone }) model, Cmd.none )
 
         OnZone5Change zone ->
-            ( updateSettings (\s -> { s | iZone5 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iZone5 = zone }) model, Cmd.none )
 
         OnZone9Change zone ->
-            ( updateSettings (\s -> { s | iZone9 = toFloat zone / 1000 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iZone9 = zone }) model, Cmd.none )
 
         OnBlackpointChange bp ->
-            ( updateSettings (\s -> { s | iBlackpoint = toFloat bp / 100 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iBlackpoint = bp }) model, Cmd.none )
 
         OnWhitepointChange wp ->
-            ( updateSettings (\s -> { s | iWhitepoint = toFloat wp / 100 }) model, Cmd.none )
+            ( updateSettings (\s -> { s | iWhitepoint = wp }) model, Cmd.none )
 
         OnImageLoad ->
             case model.imageProcessingState of
@@ -240,6 +237,7 @@ update msg model =
                 filename =
                     Maybe.map (\z -> Maybe.withDefault (Zipper.last z) (Zipper.previous z)) model.filmRoll
                         |> Maybe.map (.iFilename << Zipper.current)
+                        -- FIXME: Don't default
                         |> Maybe.withDefault ""
             in
             ( model
@@ -252,6 +250,7 @@ update msg model =
                 filename =
                     Maybe.map (\z -> Maybe.withDefault (Zipper.first z) (Zipper.next z)) model.filmRoll
                         |> Maybe.map (.iFilename << Zipper.current)
+                        -- FIXME: Don't default
                         |> Maybe.withDefault ""
             in
             ( model
@@ -289,14 +288,11 @@ view model =
     case model.filmRoll of
         Nothing ->
             { title = "Positive"
-            , body =
-                [ main_ []
-                    [ text "loading" ]
-                ]
+            , body = [ main_ [] [ div [ class "loading-spinner" ] [] ] ]
             }
 
         Just filmRoll ->
-            { title = "Positive"
+            { title = model.route.filename ++ " | Positive"
             , body =
                 [ main_ []
                     [ viewLoading model.imageProcessingState
@@ -314,11 +310,8 @@ view model =
 
 viewLoading : ImageProcessingState -> Html msg
 viewLoading state =
-    case state of
-        Ready ->
-            text ""
-
-        _ ->
+    viewIf (state /= Ready) <|
+        \_ ->
             div [ class "loading-spinner" ] []
 
 
@@ -343,7 +336,7 @@ viewFileLink className dir imageSettings =
     li [ class className ]
         [ a
             [ href <|
-                toUrl imageSettings.iFilename dir
+                toUrl dir imageSettings.iFilename
             ]
             [ text imageSettings.iFilename ]
         ]
@@ -369,57 +362,39 @@ viewSettings filmRoll model =
     in
     section [ id "image-settings" ]
         [ div []
-            [ label []
-                [ text "gamma"
-                , text " "
-                , text (String.fromFloat settings.iGamma)
-                ]
-            , input
-                [ type_ "range"
-                , value (String.fromInt (floor (settings.iGamma * 100)))
-                , Attributes.min "0"
-                , Attributes.max "2000"
-                , on "input" <|
-                    Decode.map OnGammaChange
-                        (Decode.at [ "target", "valueAsNumber" ] Decode.int)
-                ]
-                []
+            [ viewRangeInput OnGammaChange ( 0, 10 ) "Gamma" settings.iGamma
+            , viewRangeInput OnZone1Change ( -1, 1 ) "Zone I" settings.iZone1
+            , viewRangeInput OnZone5Change ( -1, 1 ) "Zone V" settings.iZone5
+            , viewRangeInput OnZone9Change ( -1, 1 ) "Zone IX" settings.iZone9
+            , viewRangeInput OnBlackpointChange ( -10, 10 ) "Blackpoint" settings.iBlackpoint
+            , viewRangeInput OnWhitepointChange ( -10, 10 ) "Whitepoint" settings.iWhitepoint
+            , button [ onClick Rotate ] [ text "Rotate" ]
+            , button [ onClick (SaveSettings settings) ] [ text "Save" ]
             ]
-        , viewZoneSlider OnZone1Change ( -100, 100 ) "Zone I" (settings.iZone1 * 1000)
-        , viewZoneSlider OnZone5Change ( -100, 100 ) "Zone V" (settings.iZone5 * 1000)
-        , viewZoneSlider OnZone9Change ( -100, 100 ) "Zone IX" (settings.iZone9 * 1000)
-        , viewZoneSlider OnBlackpointChange ( -100, 100 ) "Blackpoint" (settings.iBlackpoint * 100)
-        , viewZoneSlider OnWhitepointChange ( -100, 100 ) "Whitepoint" (settings.iWhitepoint * 100)
-        , button [ onClick Rotate ] [ text "Rotate" ]
-        , button [ onClick (SaveSettings settings) ] [ text "Save" ]
         ]
 
 
-viewZoneSlider : (Int -> Msg) -> ( Int, Int ) -> String -> Float -> Html Msg
-viewZoneSlider toMsg ( min, max ) title val =
+viewRangeInput : (Float -> Msg) -> ( Int, Int ) -> String -> Float -> Html Msg
+viewRangeInput toMsg ( min, max ) title val =
     div []
-        [ label []
-            [ text title
-            , text " "
-            , text (String.fromFloat val)
-            ]
+        [ label [] [ text title, text " ", text (String.fromFloat val) ]
         , input
             [ type_ "range"
-            , value (String.fromInt (floor val))
+            , value (String.fromFloat val)
+            , step "0.1"
             , Attributes.min (String.fromInt min)
             , Attributes.max (String.fromInt max)
             , on "input" <|
-                Decode.map toMsg
-                    (Decode.at [ "target", "valueAsNumber" ] Decode.int
-                        |> Decode.andThen
-                            (\n ->
-                                if n == floor val then
-                                    Decode.fail "Is same as val"
+                (Decode.at [ "target", "valueAsNumber" ] Decode.float
+                    |> Decode.andThen
+                        (\n ->
+                            if n == val then
+                                Decode.fail "Is same as val"
 
-                                else
-                                    Decode.succeed n
-                            )
-                    )
+                            else
+                                Decode.succeed (toMsg n)
+                        )
+                )
             ]
             []
         ]
@@ -431,14 +406,14 @@ viewImage filmRoll model =
         [ viewMaybe model.imageWidth <|
             \imageWidth ->
                 img
-                    [ src <|
+                    [ on "load" (Decode.succeed OnImageLoad)
+                    , style "user-select" "none"
+                    , src <|
                         Url.Builder.absolute [ "image" ]
                             [ toImageUrlParams (Zipper.current filmRoll)
                             , Url.Builder.int "preview-width" imageWidth
                             , Url.Builder.string "dir" model.route.dir
                             ]
-                    , on "load" (Decode.succeed OnImageLoad)
-                    , style "user-select" "none"
                     ]
                     []
 
@@ -477,11 +452,20 @@ toImageUrlParams =
 -- HELPERS
 
 
+viewIf : Bool -> (() -> Html msg) -> Html msg
+viewIf pred html =
+    if pred then
+        html ()
+
+    else
+        text ""
+
+
 viewMaybe : Maybe a -> (a -> Html msg) -> Html msg
-viewMaybe maybeA html1 =
-    case maybeA of
+viewMaybe maybe html =
+    case maybe of
         Just a ->
-            html1 a
+            html a
 
         Nothing ->
             text ""

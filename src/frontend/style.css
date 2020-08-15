@@ -47,7 +47,9 @@ a {
 
 button {
     padding: .5rem 1rem;
+    margin-right: .5rem;
     border: none;
+    border-radius: 2px;
     font-size: 1.25rem;
     font-weight: 500;
     color: #fff;
@@ -74,7 +76,13 @@ ul {
 }
 
 li {
+    padding: .125rem .5rem;
     margin: 0 1rem .5rem 0;
+}
+
+li.-current {
+    border-radius: 2px;
+    background-color: #555;
 }
 
 input {
@@ -105,7 +113,7 @@ img {
 .loading-spinner {
     width: 2rem;
     height: 2rem;
-    position: absolute;
+    position: fixed;
     top: 1rem;
     left: 1rem;
     border: 3px solid rgba(255,255,255,0);
