@@ -21,6 +21,7 @@ import Data.Foldable (for_)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
+import qualified Data.Vector.Unboxed as Vector
 import GHC.Float (int2Double)
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
@@ -75,6 +76,14 @@ data SettingsApi route = SettingsApi
         :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
         :> Get '[JSON] [ImageSettings],
+    saGetSettingsHistogram ::
+      route :- "image"
+        :> "settings"
+        :> "histogram"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> QueryParam' '[Required, Strict] "preview-width" Int
+        :> ReqBody '[JSON] ImageSettings
+        :> Post '[JSON] [Int],
     saGeneratePreviews ::
       route :- "image"
         :> "settings"
@@ -115,6 +124,7 @@ handlers =
           SettingsApi
             { saSaveSettings = handleSaveSettings,
               saGetSettings = handleGetSettings,
+              saGetSettingsHistogram = handleGetSettingsHistogram,
               saGeneratePreviews = (NoContent <$) . generatePreviews
             }
     }
@@ -153,6 +163,18 @@ handleGetSettings dir = do
       throwError err500
     Right settings ->
       pure $ Settings.toList settings
+
+-- HISTOGRAM
+
+handleGetSettingsHistogram :: Text -> Int -> ImageSettings -> PositiveM [Int]
+handleGetSettingsHistogram dir previewWidth imageSettings = do
+  (image, onDone) <-
+    getImage previewWidth $
+      Text.pack (Text.unpack dir </> Text.unpack (iFilename imageSettings))
+  liftIO onDone
+  pure . Vector.toList . HIP.hBins . head
+    . HIP.getHistograms
+    $ processImage imageSettings image
 
 -- SETTINGS FILE
 

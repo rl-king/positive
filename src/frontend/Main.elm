@@ -109,6 +109,7 @@ type alias Model =
     , route : { dir : String, filename : String }
     , saveStatus : SaveStatus
     , scrollTo : ScrollTo.State
+    , histogram : List Int
     }
 
 
@@ -149,6 +150,7 @@ init _ url key =
       , route = route
       , saveStatus = Idle
       , scrollTo = ScrollTo.init
+      , histogram = []
       }
     , Cmd.map GotFilmRollSettings <|
         Request.getImageSettings route.dir
@@ -186,10 +188,11 @@ type Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
     | GotGeneratePreviews (HttpResult ())
+    | GotHistogram (HttpResult (List Int))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
     | OnImageSettingsChange ImageSettings
-    | OnImageLoad
+    | OnImageLoad ImageSettings Int
     | SaveSettings FilmRoll
     | CycleScale Scale
     | GeneratePreviews
@@ -262,6 +265,9 @@ update msg model =
         GotFilmRollSettings (Err err) ->
             ( model, Cmd.none )
 
+        GotHistogram result ->
+            ( { model | histogram = Result.withDefault [] result }, Cmd.none )
+
         GotSaveImageSettings _ ->
             ( model, Cmd.none )
 
@@ -286,17 +292,22 @@ update msg model =
         CopySettings settings ->
             ( { model | clipboard = Just settings }, Cmd.none )
 
-        OnImageLoad ->
+        OnImageLoad settings previewWidth ->
+            let
+                getHistogram =
+                    Cmd.map GotHistogram <|
+                        Request.postImageSettingsHistogram model.route.dir previewWidth settings
+            in
             case model.imageProcessingState of
                 Ready ->
                     ( { model | imageProcessingState = Ready }, Cmd.none )
 
                 Loading ->
-                    ( { model | imageProcessingState = Ready }, Cmd.none )
+                    ( { model | imageProcessingState = Ready }, getHistogram )
 
                 Queued n ->
                     if n == model.filmRoll then
-                        ( { model | imageProcessingState = Ready }, Cmd.none )
+                        ( { model | imageProcessingState = Ready }, getHistogram )
 
                     else
                         ( { model | imageProcessingState = Loading, filmRoll = n }, Cmd.none )
@@ -482,7 +493,9 @@ viewSettings filmRoll model =
             Zipper.current filmRoll
     in
     section [ id "image-settings" ]
-        [ viewSettingsGroup <|
+        [ viewSettingsGroup
+            [ viewHistogram model.histogram ]
+        , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ viewRangeInput (\v -> { settings | iGamma = v }) 0.1 ( 0, 10 ) "Gamma" settings.iGamma
                 , viewRangeInput (\v -> { settings | iZone1 = v }) 0.01 ( -0.5, 0.5 ) "Zone I" settings.iZone1
@@ -633,7 +646,7 @@ viewImage filmRoll model =
             [ viewMaybe (Maybe.map applyScale model.imageWidth) <|
                 \imageWidth ->
                     img
-                        [ on "load" (Decode.succeed OnImageLoad)
+                        [ on "load" (Decode.succeed (OnImageLoad (Zipper.current filmRoll) imageWidth))
                         , style "user-select" "none"
                         , src <|
                             Url.Builder.absolute [ "image" ]
@@ -661,6 +674,23 @@ viewImage filmRoll model =
             ]
         , viewZones filmRoll model
         ]
+
+
+viewHistogram : List Int -> Html msg
+viewHistogram =
+    Html.Keyed.node "div" [ class "histogram" ] << List.indexedMap viewHistogramBar
+
+
+viewHistogramBar : Int -> Int -> ( String, Html msg )
+viewHistogramBar index v =
+    ( String.fromInt index
+    , span
+        [ class "histogram-bar"
+        , style "height" <|
+            interpolate "{0}px" [ String.fromFloat (toFloat v / 400) ]
+        ]
+        []
+    )
 
 
 

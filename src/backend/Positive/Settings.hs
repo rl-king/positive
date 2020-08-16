@@ -132,3 +132,37 @@ instance Elm.HasElmEncoder Aeson.Value ImageCrop where
         Elm.defaultOptions
         Aeson.defaultOptions
         "Generated.Data.ImageSettings.encodeImageCrop"
+
+-- CROP
+
+data Zone = Zone
+  { zValue :: Double,
+    zZone :: Int
+  }
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+instance Elm.HasElmType Zone where
+  elmDefinition =
+    Just $
+      Elm.deriveElmTypeDefinition
+        @Zone
+        Elm.defaultOptions
+        "Generated.Data.ImageSettings.Zone"
+
+instance Elm.HasElmDecoder Aeson.Value Zone where
+  elmDecoderDefinition =
+    Just $
+      Elm.deriveElmJSONDecoder
+        @Zone
+        Elm.defaultOptions
+        Aeson.defaultOptions
+        "Generated.Data.ImageSettings.decodeZone"
+
+instance Elm.HasElmEncoder Aeson.Value Zone where
+  elmEncoderDefinition =
+    Just $
+      Elm.deriveElmJSONEncoder
+        @Zone
+        Elm.defaultOptions
+        Aeson.defaultOptions
+        "Generated.Data.ImageSettings.encodeZone"

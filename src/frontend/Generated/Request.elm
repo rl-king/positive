@@ -1,4 +1,4 @@
-module Generated.Request exposing (getImageSettings, postImageSettings, postImageSettingsPreviews)
+module Generated.Request exposing (getImageSettings, postImageSettings, postImageSettingsHistogram, postImageSettingsPreviews)
 
 import Generated.Data.ImageSettings
 import Http
@@ -105,6 +105,66 @@ getImageSettings a =
                                     )
                                 )
                                 (Json.Decode.decodeString (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings) d)
+                )
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+postImageSettingsHistogram :
+    String
+    -> Int
+    -> Generated.Data.ImageSettings.ImageSettings
+    ->
+        Cmd
+            (Result
+                ( Http.Error
+                , Maybe
+                    { metadata : Http.Metadata
+                    , body : String
+                    }
+                )
+                (List Int)
+            )
+postImageSettingsHistogram a b c =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url =
+            String.concat
+                [ "/image/settings/histogram?dir="
+                , a
+                , "&preview-width="
+                , String.fromInt b
+                ]
+        , body = Http.jsonBody (Generated.Data.ImageSettings.encodeImageSettings c)
+        , expect =
+            Http.expectStringResponse identity
+                (\d ->
+                    case d of
+                        Http.BadUrl_ e ->
+                            Err ( Http.BadUrl e, Nothing )
+
+                        Http.Timeout_ ->
+                            Err ( Http.Timeout, Nothing )
+
+                        Http.NetworkError_ ->
+                            Err ( Http.NetworkError, Nothing )
+
+                        Http.BadStatus_ e f ->
+                            Err ( Http.BadStatus e.statusCode, Just { metadata = e, body = f } )
+
+                        Http.GoodStatus_ e f ->
+                            Result.mapError
+                                (\g ->
+                                    ( Http.BadBody (Json.Decode.errorToString g)
+                                    , Just
+                                        { metadata = e
+                                        , body = f
+                                        }
+                                    )
+                                )
+                                (Json.Decode.decodeString (Json.Decode.list Json.Decode.int) f)
                 )
         , timeout = Nothing
         , tracker = Nothing
