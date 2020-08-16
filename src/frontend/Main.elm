@@ -20,6 +20,7 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
+import ScrollTo
 import String.Interpolate exposing (interpolate)
 import Task
 import Time
@@ -52,7 +53,9 @@ main =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Browser.Events.onKeyDown <|
+        [ Sub.map ScrollToMsg <|
+            ScrollTo.subscriptions model.scrollTo
+        , Browser.Events.onKeyDown <|
             matchKey "ArrowLeft" PreviousImage
         , Browser.Events.onKeyDown <|
             matchKey "ArrowRight" NextImage
@@ -105,6 +108,7 @@ type alias Model =
     , clipboard : Maybe ImageSettings
     , route : { dir : String, filename : String }
     , saveStatus : SaveStatus
+    , scrollTo : ScrollTo.State
     }
 
 
@@ -144,6 +148,7 @@ init _ url key =
       , clipboard = Nothing
       , route = route
       , saveStatus = Idle
+      , scrollTo = ScrollTo.init
       }
     , Cmd.map GotFilmRollSettings <|
         Request.getImageSettings route.dir
@@ -176,6 +181,7 @@ type alias HttpResult a =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
+    | ScrollToMsg ScrollTo.Msg
     | AttemptSave Time.Posix
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
@@ -215,7 +221,16 @@ update msg model =
                 , imageProcessingState = Loading
                 , route = route
               }
-            , Cmd.none
+            , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+            )
+
+        ScrollToMsg scrollToMsg ->
+            let
+                ( scrollToModel, scrollToCmds ) =
+                    ScrollTo.update scrollToMsg model.scrollTo
+            in
+            ( { model | scrollTo = scrollToModel }
+            , Cmd.map ScrollToMsg scrollToCmds
             )
 
         AttemptSave currentTime ->
