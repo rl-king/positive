@@ -9,6 +9,7 @@
 
 module Positive.Server where
 
+import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar
 import Control.Exception (evaluate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -16,6 +17,7 @@ import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
+import Data.Foldable (for_)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
@@ -72,7 +74,13 @@ data SettingsApi route = SettingsApi
       route :- "image"
         :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> Get '[JSON] [ImageSettings]
+        :> Get '[JSON] [ImageSettings],
+    saGeneratePreviews ::
+      route :- "image"
+        :> "settings"
+        :> "previews"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)
 
@@ -106,7 +114,8 @@ handlers =
         genericServerT
           SettingsApi
             { saSaveSettings = handleSaveSettings,
-              saGetSettings = handleGetSettings
+              saGetSettings = handleGetSettings,
+              saGeneratePreviews = (NoContent <$) . generatePreviews
             }
     }
 
@@ -282,3 +291,19 @@ timed name action = do
   done <- liftIO Time.getCurrentTime
   logMsg $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a
+
+-- GENERATE PREVIEWS
+
+generatePreviews :: Text -> PositiveM ()
+generatePreviews dir = do
+  filmRollSettings <- getSettingsFile dir
+  case filmRollSettings of
+    Left _ -> pure ()
+    Right (FilmRollSettings files) ->
+      (() <$) . liftIO . forkIO . for_ files $
+        \settings -> do
+          let input = Text.unpack dir </> Text.unpack (iFilename settings)
+          let output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+          ByteString.writeFile output
+            =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 350
+            <$> readImageFromDisk input

@@ -98,7 +98,7 @@ matchKey key msg =
 
 type alias Model =
     { imageProcessingState : ImageProcessingState
-    , filmRoll : Maybe (Zipper ImageSettings)
+    , filmRoll : Maybe FilmRoll
     , key : Navigation.Key
     , imageWidth : Maybe ( Int, Scale )
     , imageCropMode : Maybe ImageCrop
@@ -108,10 +108,14 @@ type alias Model =
     }
 
 
+type alias FilmRoll =
+    Zipper ImageSettings
+
+
 type ImageProcessingState
     = Ready
     | Loading
-    | Queued (Maybe (Zipper ImageSettings))
+    | Queued (Maybe FilmRoll)
 
 
 type Scale
@@ -122,7 +126,7 @@ type Scale
 type SaveStatus
     = Idle
     | SavedAt Time.Posix
-    | SaveAfter Int (Zipper ImageSettings)
+    | SaveAfter Int FilmRoll
     | Error Http.Error
 
 
@@ -175,13 +179,14 @@ type Msg
     | AttemptSave Time.Posix
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
+    | GotGeneratePreviews (HttpResult ())
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
     | OnImageSettingsChange ImageSettings
     | OnImageLoad
-    | SaveSettings (Zipper ImageSettings)
+    | SaveSettings FilmRoll
     | CycleScale Scale
-    | Reset
+    | GeneratePreviews
     | CopySettings ImageSettings
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
@@ -245,6 +250,9 @@ update msg model =
         GotSaveImageSettings _ ->
             ( model, Cmd.none )
 
+        GotGeneratePreviews _ ->
+            ( model, Cmd.none )
+
         GotImageDimensions result ->
             ( { model
                 | imageWidth =
@@ -303,18 +311,10 @@ update msg model =
             , Cmd.none
             )
 
-        Reset ->
-            let
-                reSettings current =
-                    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 0 0 0 0 1
-            in
-            ( { model
-                | filmRoll =
-                    Maybe.map
-                        (Zipper.mapCurrent reSettings)
-                        model.filmRoll
-              }
-            , Cmd.none
+        GeneratePreviews ->
+            ( model
+            , Cmd.map GotGeneratePreviews <|
+                Request.postImageSettingsPreviews model.route.dir
             )
 
         UpdateImageCropMode mode ->
@@ -413,7 +413,7 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFileBrowser : String -> Zipper ImageSettings -> Html Msg
+viewFileBrowser : String -> FilmRoll -> Html Msg
 viewFileBrowser dir filmRoll =
     section [ id "files" ]
         [ ul [] <|
@@ -427,12 +427,24 @@ viewFileBrowser dir filmRoll =
 
 viewFileLink : String -> String -> ImageSettings -> Html Msg
 viewFileLink className dir imageSettings =
+    let
+        previewExtension x =
+            String.dropRight 3 x ++ "jpg"
+    in
     li [ class className ]
         [ a
             [ href <|
                 toUrl dir imageSettings.iFilename
             ]
-            [ text imageSettings.iFilename ]
+            [ img
+                [ src <|
+                    Url.Builder.absolute
+                        [ dir, "previews", previewExtension imageSettings.iFilename ]
+                        []
+                ]
+                []
+            , text imageSettings.iFilename
+            ]
         ]
 
 
@@ -448,7 +460,7 @@ toUrl dir filename =
 -- IMAGE SETTINGS
 
 
-viewSettings : Zipper ImageSettings -> Model -> Html Msg
+viewSettings : FilmRoll -> Model -> Html Msg
 viewSettings filmRoll model =
     let
         settings =
@@ -493,8 +505,12 @@ viewSettings filmRoll model =
         --             ]
         , viewSettingsGroup
             [ button [ onClick (SaveSettings filmRoll) ] [ text "Save" ]
-            , button [ onClick Reset ]
-                [ text "Reset" ]
+            , button [ onClick (OnImageSettingsChange (resetAll settings)) ] [ text "Reset" ]
+            , button [ onClick (OnImageSettingsChange (resetTone settings)) ] [ text "Reset tone" ]
+            ]
+        , viewSettingsGroup
+            [ button [ onClick GeneratePreviews ] [ text "Generate raw" ]
+            , button [ onClick GeneratePreviews ] [ text "Generate previews" ]
             ]
         , viewSettingsGroup
             [ button [ onClick PreviousImage ] [ text "<" ]
@@ -577,7 +593,7 @@ viewRangeInput toMsg stepSize ( min, max ) title val =
         ]
 
 
-viewImage : Zipper ImageSettings -> Model -> Html Msg
+viewImage : FilmRoll -> Model -> Html Msg
 viewImage filmRoll model =
     let
         applyScale ( width, scale ) =
@@ -636,7 +652,7 @@ viewImage filmRoll model =
 -- ZONES
 
 
-viewZones : Zipper ImageSettings -> Model -> Html Msg
+viewZones : FilmRoll -> Model -> Html Msg
 viewZones filmRoll model =
     let
         settings =
@@ -675,6 +691,16 @@ viewZoneBar value zone =
 
 
 -- HELPERS
+
+
+resetAll : ImageSettings -> ImageSettings
+resetAll current =
+    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 0 0 0 0 1
+
+
+resetTone : ImageSettings -> ImageSettings
+resetTone current =
+    ImageSettings current.iFilename current.iRotate current.iCrop 2.2 0 0 0 0 1
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
