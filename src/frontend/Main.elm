@@ -570,8 +570,8 @@ scaleToString scale =
 
 viewRangeInput : (Float -> Msg) -> Float -> ( Float, Float ) -> String -> Float -> Html Msg
 viewRangeInput toMsg stepSize ( min, max ) title val =
-    div []
-        [ label [] [ text title, text " ", text (String.fromFloat val) ]
+    div [ class "range-slider" ]
+        [ label [] [ span [] [ text title ], span [] [ text (String.fromFloat val) ] ]
         , input
             [ type_ "range"
             , value (String.fromFloat val)

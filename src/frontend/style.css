@@ -14,6 +14,10 @@
     }
 }
 
+:root {
+    --mono: sf mono, monospace;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -87,6 +91,47 @@ li.-current {
 
 input {
     width: 100%;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 2px;
+    opacity: 0.9;
+    background: #444;
+    outline: none;
+    transition: opacity .15s;
+}
+
+input[type="range"]:hover {
+    opacity: 1;
+}
+
+input[type="range"]::-webkit-slider-thumb,
+input[type="range"]::-moz-range-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: .25rem;
+    height: 1.5rem;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    cursor: pointer;
+}
+
+.range-slider {
+    margin-bottom: 1rem;
+}
+
+.range-slider label {
+    display: flex;
+    justify-content: space-between;
+}
+
+.range-slider label span:last-child {
+    font-family: var(--mono);
+    color: #999;
 }
 
 #image-settings {
