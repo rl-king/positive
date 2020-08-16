@@ -19,7 +19,7 @@ import qualified Data.ByteString.Lazy as ByteString
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
-import GHC.Float (int2Double, int2Double)
+import GHC.Float (int2Double)
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
@@ -216,8 +216,7 @@ processImage is image =
             . zone 0.5 (iZone5 is)
             . zone 0.15 (iZone1 is)
             . gamma (iGamma is)
-            . whitepoint (iWhitepoint is)
-            . blackpoint (iBlackpoint is)
+            . compress (iBlackpoint is) (iWhitepoint is)
             . invert
         )
         . HIP.normalize
@@ -231,15 +230,10 @@ invert =
   fmap (1 -)
 {-# INLINE invert #-}
 
-blackpoint :: Double -> MonochromePixel -> MonochromePixel
-blackpoint x =
-  fmap (\p -> p - ((1 - p) * x))
-{-# INLINE blackpoint #-}
-
-whitepoint :: Double -> MonochromePixel -> MonochromePixel
-whitepoint x =
-  fmap (\p -> p + ((1 - p) * x))
-{-# INLINE whitepoint #-}
+compress :: Double -> Double -> MonochromePixel -> MonochromePixel
+compress s l =
+  fmap (\p -> min 1 . max 0 $ (p - s) / (l - s))
+{-# INLINE compress #-}
 
 gamma :: Double -> MonochromePixel -> MonochromePixel
 gamma x =

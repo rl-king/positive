@@ -41,7 +41,7 @@ fromFilenames :: [Text] -> FilmRollSettings
 fromFilenames =
   FilmRollSettings
     . HashMap.fromList
-    . fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 0))
+    . fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 1))
 
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
