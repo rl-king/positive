@@ -84,6 +84,13 @@ data SettingsApi route = SettingsApi
         :> QueryParam' '[Required, Strict] "preview-width" Int
         :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
+    saGenerateHighRes ::
+      route :- "image"
+        :> "settings"
+        :> "highres"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> ReqBody '[JSON] ImageSettings
+        :> PostNoContent '[JSON] NoContent,
     saGeneratePreviews ::
       route :- "image"
         :> "settings"
@@ -125,7 +132,8 @@ handlers =
             { saSaveSettings = handleSaveSettings,
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
-              saGeneratePreviews = (NoContent <$) . generatePreviews
+              saGenerateHighRes = handleGenerateHighRes,
+              saGeneratePreviews = handleGeneratePreviews
             }
     }
 
@@ -163,6 +171,39 @@ handleGetSettings dir = do
       throwError err500
     Right settings ->
       pure $ Settings.toList settings
+
+-- GENERATE PREVIEWS
+
+handleGeneratePreviews :: Text -> PositiveM NoContent
+handleGeneratePreviews dir = do
+  filmRollSettings <- getSettingsFile dir
+  Env _ logger <- ask
+  case filmRollSettings of
+    Left _ -> pure NoContent
+    Right (FilmRollSettings files) ->
+      (NoContent <$) . liftIO . forkIO . for_ files $
+        \settings -> do
+          let input = Text.unpack dir </> Text.unpack (iFilename settings)
+              output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+          logMsg_ logger $ "Generating preview for: " <> Text.pack input
+          ByteString.writeFile output
+            =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 350
+            <$> readImageFromDisk input
+
+-- GENERATE PREVIEWS
+
+handleGenerateHighRes :: Text -> ImageSettings -> PositiveM NoContent
+handleGenerateHighRes dir settings =
+  let input = Text.unpack dir </> Text.unpack (iFilename settings)
+      output = Text.unpack dir </> "highres" </> Text.unpack (iFilename settings)
+   in do
+        logMsg $ "Generating highres version of: " <> Text.pack input
+        image <-
+          liftIO $
+            HIP.encode HIP.PNG [] . HIP.exchange HIP.VS . processImage settings
+              <$> readImageFromDisk input
+        liftIO $ ByteString.writeFile output image
+        pure NoContent
 
 -- HISTOGRAM
 
@@ -313,19 +354,3 @@ timed name action = do
   done <- liftIO Time.getCurrentTime
   logMsg $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a
-
--- GENERATE PREVIEWS
-
-generatePreviews :: Text -> PositiveM ()
-generatePreviews dir = do
-  filmRollSettings <- getSettingsFile dir
-  case filmRollSettings of
-    Left _ -> pure ()
-    Right (FilmRollSettings files) ->
-      (() <$) . liftIO . forkIO . for_ files $
-        \settings -> do
-          let input = Text.unpack dir </> Text.unpack (iFilename settings)
-          let output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-          ByteString.writeFile output
-            =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 350
-            <$> readImageFromDisk input

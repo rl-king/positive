@@ -187,6 +187,7 @@ type Msg
     | AttemptSave Time.Posix
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult (List ImageSettings))
+    | GotGenerateHighres (HttpResult ())
     | GotGeneratePreviews (HttpResult ())
     | GotHistogram (HttpResult (List Int))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
@@ -195,6 +196,7 @@ type Msg
     | OnImageLoad ImageSettings Int
     | SaveSettings FilmRoll
     | CycleScale Scale
+    | GenerateHighres ImageSettings
     | GeneratePreviews
     | CopySettings ImageSettings
     | UpdateImageCropMode (Maybe ImageCrop)
@@ -271,6 +273,9 @@ update msg model =
         GotSaveImageSettings _ ->
             ( model, Cmd.none )
 
+        GotGenerateHighres _ ->
+            ( model, Cmd.none )
+
         GotGeneratePreviews _ ->
             ( model, Cmd.none )
 
@@ -335,6 +340,12 @@ update msg model =
                 , imageProcessingState = Loading
               }
             , Cmd.none
+            )
+
+        GenerateHighres settings ->
+            ( model
+            , Cmd.map GotGenerateHighres <|
+                Request.postImageSettingsHighres model.route.dir settings
             )
 
         GeneratePreviews ->
@@ -537,7 +548,7 @@ viewSettings filmRoll model =
             , button [ onClick (OnImageSettingsChange (resetTone settings)) ] [ text "Reset tone" ]
             ]
         , viewSettingsGroup
-            [ button [ onClick GeneratePreviews ] [ text "Generate raw" ]
+            [ button [ onClick (GenerateHighres settings) ] [ text "Generate highres" ]
             , button [ onClick GeneratePreviews ] [ text "Generate previews" ]
             ]
         , viewSettingsGroup

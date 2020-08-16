@@ -192,6 +192,11 @@ input[type="range"]::-moz-range-thumb {
     background-color: #333;
 }
 
+.crop-settings input[type="range"] {
+    border-top: 2px solid #555;
+    background-color: #333;
+}
+
 .crop-settings button {
     margin: .5rem 0 0;
     font-size: 1rem;
@@ -232,7 +237,7 @@ input[type="range"]::-moz-range-thumb {
 .histogram {
     width: 100%;
     height: 8rem;
-    padding: 1rem;
+    margin-bottom: 2rem;
     display: flex;
     transform: scaleY(-1);
 }
