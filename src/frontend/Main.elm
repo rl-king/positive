@@ -332,7 +332,7 @@ update msg model =
         Reset ->
             let
                 reSettings current =
-                    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 0 0 0 0 0
+                    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 0 0 0 0 1
             in
             ( { model
                 | filmRoll =
@@ -486,48 +486,56 @@ viewSettings filmRoll model =
             , viewRangeInput OnZone1Change 0.01 ( -0.5, 0.5 ) "Zone I" settings.iZone1
             , viewRangeInput OnZone5Change 0.01 ( -0.5, 0.5 ) "Zone V" settings.iZone5
             , viewRangeInput OnZone9Change 0.01 ( -0.5, 0.5 ) "Zone IX" settings.iZone9
-            , viewRangeInput OnBlackpointChange 0.01 ( 0, 1 ) "Blackpoint" settings.iBlackpoint
-            , viewRangeInput OnWhitepointChange 0.01 ( 0, 1 ) "Whitepoint" settings.iWhitepoint
-            , viewImageCropMode settings model.imageCropMode
-            , button [ onClick Rotate ] [ text "Rotate" ]
-            , button [ onClick (CopySettings settings) ] [ text "Copy settings" ]
-            , viewMaybe model.clipboard <|
-                \clipboard ->
-                    div []
-                        [ text "Paste: "
-                        , button
-                            [ onClick <|
-                                PasteSettings { clipboard | iFilename = settings.iFilename }
+            , viewRangeInput OnBlackpointChange 0.01 ( 0, 0.5 ) "Blackpoint" settings.iBlackpoint
+            , viewRangeInput OnWhitepointChange 0.01 ( 0.5, 1 ) "Whitepoint" settings.iWhitepoint
+            , viewSettingsGroup
+                [ viewImageCropMode settings model.imageCropMode
+                , button [ onClick Rotate ] [ text "Rotate" ]
+                ]
+            , viewSettingsGroup
+                [ button [ onClick (CopySettings settings) ] [ text "Copy settings" ]
+                , viewMaybe model.clipboard <|
+                    \clipboard ->
+                        div [ class "image-settings-paste" ]
+                            [ label [] [ text "Paste settings" ]
+                            , viewClipboardButton "All" { clipboard | iFilename = settings.iFilename }
+                            , viewClipboardButton "Tone"
+                                { clipboard
+                                    | iFilename = settings.iFilename
+                                    , iRotate = settings.iRotate
+                                    , iCrop = settings.iCrop
+                                }
+                            , viewClipboardButton "Crop" { settings | iCrop = clipboard.iCrop }
                             ]
-                            [ text "All" ]
-                        , button
-                            [ onClick <|
-                                PasteSettings
-                                    { clipboard
-                                        | iFilename = settings.iFilename
-                                        , iRotate = settings.iRotate
-                                        , iCrop = settings.iCrop
-                                    }
-                            ]
-                            [ text "Tone" ]
-                        , button
-                            [ onClick <|
-                                PasteSettings { settings | iCrop = clipboard.iCrop }
-                            ]
-                            [ text "Crop" ]
-                        ]
-            , viewMaybe model.imageWidth <|
-                \( _, scale ) ->
-                    button [ onClick (CycleScale scale) ]
-                        [ text "Scale "
-                        , text (scaleToString scale)
-                        ]
-            , button [ onClick (SaveSettings filmRoll) ] [ text "Save" ]
-            , button [ onClick Reset ] [ text "Reset" ]
-            , button [ onClick PreviousImage ] [ text "<" ]
-            , button [ onClick NextImage ] [ text ">" ]
+                ]
+
+            -- , viewMaybe model.imageWidth <|
+            --     \( _, scale ) ->
+            --         button [ onClick (CycleScale scale) ]
+            --             [ text "Scale "
+            --             , text (scaleToString scale)
+            --             ]
+            , viewSettingsGroup
+                [ button [ onClick (SaveSettings filmRoll) ] [ text "Save" ]
+                , button [ onClick Reset ]
+                    [ text "Reset" ]
+                ]
+            , viewSettingsGroup
+                [ button [ onClick PreviousImage ] [ text "<" ]
+                , button [ onClick NextImage ] [ text ">" ]
+                ]
             ]
         ]
+
+
+viewSettingsGroup : List (Html Msg) -> Html Msg
+viewSettingsGroup =
+    div [ class "image-settings-group" ]
+
+
+viewClipboardButton : String -> ImageSettings -> Html Msg
+viewClipboardButton title settings =
+    button [ onClick (PasteSettings settings) ] [ text title ]
 
 
 viewImageCropMode : ImageSettings -> Maybe ImageCrop -> Html Msg
