@@ -106,7 +106,7 @@ type alias Model =
     , imageWidth : Maybe ( Int, Scale )
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
-    , route : { dir : String, filename : String }
+    , route : { filename : String }
     , saveStatus : SaveStatus
     , scrollTo : ScrollTo.State
     , histogram : List Int
@@ -152,20 +152,18 @@ init _ url key =
       , scrollTo = ScrollTo.init
       , histogram = []
       }
-    , Cmd.map GotFilmRollSettings <|
-        Request.getImageSettings route.dir
+    , Cmd.map GotFilmRollSettings Request.getImageSettings
     )
 
 
-fromUrl : Url -> { dir : String, filename : String }
+fromUrl : Url -> { filename : String }
 fromUrl url =
     -- FIXME: Don't default
-    Maybe.withDefault { dir = "", filename = "" } <|
+    Maybe.withDefault { filename = "" } <|
         Maybe.andThen identity <|
             Url.Parser.parse
                 (Url.Parser.query
-                    (Url.Parser.Query.map2 (Maybe.map2 (\a b -> { dir = a, filename = b }))
-                        (Url.Parser.Query.string "dir")
+                    (Url.Parser.Query.map (Maybe.map (\a -> { filename = a }))
                         (Url.Parser.Query.string "filename")
                     )
                 )
@@ -243,7 +241,7 @@ update msg model =
                 SaveAfter 0 filmRoll ->
                     ( model
                     , Cmd.map GotSaveImageSettings <|
-                        Request.postImageSettings model.route.dir (Zipper.toList filmRoll)
+                        Request.postImageSettings (Zipper.toList filmRoll)
                     )
 
                 SaveAfter t settings ->
@@ -301,7 +299,7 @@ update msg model =
             let
                 getHistogram =
                     Cmd.map GotHistogram <|
-                        Request.postImageSettingsHistogram model.route.dir previewWidth settings
+                        Request.postImageSettingsHistogram previewWidth settings
             in
             case model.imageProcessingState of
                 Ready ->
@@ -320,7 +318,7 @@ update msg model =
         SaveSettings filmRoll ->
             ( model
             , Cmd.map GotSaveImageSettings <|
-                Request.postImageSettings model.route.dir (Zipper.toList filmRoll)
+                Request.postImageSettings (Zipper.toList filmRoll)
             )
 
         CycleScale scale ->
@@ -345,13 +343,12 @@ update msg model =
         GenerateHighres settings ->
             ( model
             , Cmd.map GotGenerateHighres <|
-                Request.postImageSettingsHighres model.route.dir settings
+                Request.postImageSettingsHighres settings
             )
 
         GeneratePreviews ->
             ( model
-            , Cmd.map GotGeneratePreviews <|
-                Request.postImageSettingsPreviews model.route.dir
+            , Cmd.map GotGeneratePreviews Request.postImageSettingsPreviews
             )
 
         UpdateImageCropMode mode ->
@@ -373,7 +370,7 @@ update msg model =
             in
             ( model
             , Navigation.pushUrl model.key <|
-                toUrl model.route.dir filename
+                toUrl filename
             )
 
         NextImage ->
@@ -386,7 +383,7 @@ update msg model =
             in
             ( model
             , Navigation.pushUrl model.key <|
-                toUrl model.route.dir filename
+                toUrl filename
             )
 
 
@@ -429,7 +426,9 @@ view model =
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
                     , viewSettings filmRoll model
-                    , viewFileBrowser model.route.dir filmRoll
+
+                    -- FIXME don't hardcode dir
+                    , viewFileBrowser "assets" filmRoll
                     ]
                 ]
             }
@@ -471,7 +470,7 @@ viewFileLink className dir imageSettings =
     li [ class className ]
         [ a
             [ href <|
-                toUrl dir imageSettings.iFilename
+                toUrl imageSettings.iFilename
             ]
             [ img
                 [ src <|
@@ -485,12 +484,9 @@ viewFileLink className dir imageSettings =
         ]
 
 
-toUrl : String -> String -> String
-toUrl dir filename =
-    Url.Builder.absolute []
-        [ Url.Builder.string "filename" filename
-        , Url.Builder.string "dir" dir
-        ]
+toUrl : String -> String
+toUrl filename =
+    Url.Builder.absolute [] [ Url.Builder.string "filename" filename ]
 
 
 
@@ -663,7 +659,6 @@ viewImage filmRoll model =
                             Url.Builder.absolute [ "image" ]
                                 [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
                                 , Url.Builder.int "preview-width" imageWidth
-                                , Url.Builder.string "dir" model.route.dir
                                 ]
                         ]
                         []

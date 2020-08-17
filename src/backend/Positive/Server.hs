@@ -14,7 +14,7 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar
 import Control.Exception (evaluate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (ReaderT, ask, runReaderT)
+import Control.Monad.Reader (ReaderT, ask, asks, runReaderT)
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
@@ -58,7 +58,6 @@ data Api route = Api
 data ImageApi route = ImageApi
   { iaImage ::
       route :- "image"
-        :> QueryParam' '[Required, Strict] "dir" Text
         :> QueryParam' '[Required, Strict] "preview-width" Int
         :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
         :> Get '[Image] ByteString,
@@ -70,19 +69,16 @@ data SettingsApi route = SettingsApi
   { saSaveSettings ::
       route :- "image"
         :> "settings"
-        :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] [ImageSettings]
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image"
         :> "settings"
-        :> QueryParam' '[Required, Strict] "dir" Text
         :> Get '[JSON] [ImageSettings],
     saGetSettingsHistogram ::
       route :- "image"
         :> "settings"
         :> "histogram"
-        :> QueryParam' '[Required, Strict] "dir" Text
         :> QueryParam' '[Required, Strict] "preview-width" Int
         :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
@@ -90,14 +86,12 @@ data SettingsApi route = SettingsApi
       route :- "image"
         :> "settings"
         :> "highres"
-        :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     saGeneratePreviews ::
       route :- "image"
         :> "settings"
         :> "previews"
-        :> QueryParam' '[Required, Strict] "dir" Text
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)
@@ -139,34 +133,36 @@ handlers =
             }
     }
 
-handleImage :: Text -> Int -> ImageSettings -> PositiveM ByteString
-handleImage dir previewWidth imageSettings = do
+handleImage :: Int -> ImageSettings -> PositiveM ByteString
+handleImage previewWidth imageSettings = do
+  dir <- workingDirectory
   (image, onDone) <-
     getImage previewWidth $
-      Text.pack (Text.unpack dir </> Text.unpack (iFilename imageSettings))
+      Text.pack (dir </> Text.unpack (iFilename imageSettings))
   processed <- timed "Apply settings" $ processImage imageSettings image
   encoded <- timed "Encode JPG" $ HIP.encode HIP.JPG [] $ HIP.exchange HIP.VS processed
   liftIO onDone
   pure encoded
 
-handleSaveSettings :: Text -> [ImageSettings] -> PositiveM [ImageSettings]
-handleSaveSettings dir imageSettings = do
+handleSaveSettings :: [ImageSettings] -> PositiveM [ImageSettings]
+handleSaveSettings imageSettings = do
   -- Maybe remove this, we could just write?
-  settingsFile <- getSettingsFile dir
+  settingsFile <- getSettingsFile
   case settingsFile of
     Left err -> do
       logMsg $ Text.pack err
       throwError err500
     Right _ -> do
+      dir <- workingDirectory
       let newSettings = Settings.fromList imageSettings
-          path = Text.unpack dir </> "image-settings.json"
+          path = dir </> "image-settings.json"
       liftIO . ByteString.writeFile path $ Aeson.encode newSettings
       logMsg "Updated settings"
       pure $ Settings.toList newSettings
 
-handleGetSettings :: Text -> PositiveM [ImageSettings]
-handleGetSettings dir = do
-  settingsFile <- getSettingsFile dir
+handleGetSettings :: PositiveM [ImageSettings]
+handleGetSettings = do
+  settingsFile <- getSettingsFile
   case settingsFile of
     Left err -> do
       logMsg $ Text.pack err
@@ -176,17 +172,18 @@ handleGetSettings dir = do
 
 -- GENERATE PREVIEWS
 
-handleGeneratePreviews :: Text -> PositiveM NoContent
-handleGeneratePreviews dir = do
-  filmRollSettings <- getSettingsFile dir
+handleGeneratePreviews :: PositiveM NoContent
+handleGeneratePreviews = do
+  dir <- workingDirectory
+  filmRollSettings <- getSettingsFile
   Env {eLogger} <- ask
   case filmRollSettings of
     Left _ -> pure NoContent
     Right (FilmRollSettings files) ->
       (NoContent <$) . liftIO . forkIO . for_ files $
         \settings -> do
-          let input = Text.unpack dir </> Text.unpack (iFilename settings)
-              output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+          let input = dir </> Text.unpack (iFilename settings)
+              output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
           logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
           ByteString.writeFile output
             =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 350
@@ -194,26 +191,27 @@ handleGeneratePreviews dir = do
 
 -- GENERATE PREVIEWS
 
-handleGenerateHighRes :: Text -> ImageSettings -> PositiveM NoContent
-handleGenerateHighRes dir settings =
-  let input = Text.unpack dir </> Text.unpack (iFilename settings)
-      output = Text.unpack dir </> "highres" </> Text.unpack (iFilename settings)
-   in do
-        logMsg $ "Generating highres version of: " <> Text.pack input
-        image <-
-          liftIO $
-            HIP.encode HIP.PNG [] . HIP.exchange HIP.VS . processImage settings
-              <$> readImageFromDisk input
-        liftIO $ ByteString.writeFile output image
-        pure NoContent
+handleGenerateHighRes :: ImageSettings -> PositiveM NoContent
+handleGenerateHighRes settings = do
+  dir <- workingDirectory
+  let input = dir </> Text.unpack (iFilename settings)
+      output = dir </> "highres" </> Text.unpack (iFilename settings)
+  logMsg $ "Generating highres version of: " <> Text.pack input
+  image <-
+    liftIO $
+      HIP.encode HIP.PNG [] . HIP.exchange HIP.VS . processImage settings
+        <$> readImageFromDisk input
+  liftIO $ ByteString.writeFile output image
+  pure NoContent
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Text -> Int -> ImageSettings -> PositiveM [Int]
-handleGetSettingsHistogram dir previewWidth imageSettings = do
+handleGetSettingsHistogram :: Int -> ImageSettings -> PositiveM [Int]
+handleGetSettingsHistogram previewWidth imageSettings = do
+  dir <- workingDirectory
   (image, onDone) <-
     getImage previewWidth $
-      Text.pack (Text.unpack dir </> Text.unpack (iFilename imageSettings))
+      Text.pack (dir </> Text.unpack (iFilename imageSettings))
   liftIO onDone
   pure . Vector.toList . HIP.hBins . head
     . HIP.getHistograms
@@ -221,9 +219,10 @@ handleGetSettingsHistogram dir previewWidth imageSettings = do
 
 -- SETTINGS FILE
 
-getSettingsFile :: Text -> PositiveM (Either String FilmRollSettings)
-getSettingsFile dir = do
-  let path = Text.unpack dir </> "image-settings.json"
+getSettingsFile :: PositiveM (Either String FilmRollSettings)
+getSettingsFile = do
+  dir <- workingDirectory
+  let path = dir </> "image-settings.json"
   exists <- liftIO $ doesPathExist path
   if exists
     then liftIO $ Aeson.eitherDecodeFileStrict path
@@ -235,9 +234,9 @@ getSettingsFile dir = do
       logMsg $ "Wrote: " <> Text.pack path
       pure (Right settings)
 
-getAllPngs :: MonadIO m => Text -> m [Text]
+getAllPngs :: MonadIO m => FilePath -> m [Text]
 getAllPngs dir = do
-  files <- liftIO $ listDirectory (Text.unpack dir)
+  files <- liftIO $ listDirectory (dir)
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
 -- IMAGE
@@ -356,3 +355,9 @@ timed name action = do
   done <- liftIO Time.getCurrentTime
   logMsg $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a
+
+-- HELPERS
+
+workingDirectory :: PositiveM FilePath
+workingDirectory =
+  asks (toFilePath . eDir)

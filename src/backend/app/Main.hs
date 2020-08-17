@@ -1,6 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
@@ -18,8 +17,9 @@ main = do
   timeCache <- FastLogger.newTimeCache FastLogger.simpleTimeFormat
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
-      Flags {fDir, fCodeGen} <- parseArgs
+      flags@Flags {fDir, fCodeGen} <- parseArgs
       when fCodeGen (codeGen logger)
+      logMsg_ logger (tshow flags)
       server logger fDir
 
 -- FLAGS
@@ -44,8 +44,7 @@ parser =
 parseDir :: Parser Dir
 parseDir =
   Dir
-    <$> option
-      auto
+    <$> strOption
       ( long "dir"
           <> short 'd'
           <> showDefault

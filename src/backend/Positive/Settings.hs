@@ -135,5 +135,5 @@ instance Elm.HasElmEncoder Aeson.Value ImageCrop where
 
 -- DIR
 
-newtype Dir = Dir {unDir :: Text}
+newtype Dir = Dir {toFilePath :: FilePath}
   deriving (Show, Eq)
