@@ -43,7 +43,7 @@ type PositiveM =
 
 data Env = Env
   { eImageMVar :: MVar (Text, MonochromeImage HIP.VU),
-    eDir :: Dir,
+    eDir :: WorkingDirectory,
     eLogger :: TimedFastLogger
   }
 
@@ -67,38 +67,30 @@ data ImageApi route = ImageApi
 
 data SettingsApi route = SettingsApi
   { saSaveSettings ::
-      route :- "image"
-        :> "settings"
+      route :- "image" :> "settings"
         :> ReqBody '[JSON] [ImageSettings]
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
-      route :- "image"
-        :> "settings"
-        :> Get '[JSON] [ImageSettings],
+      route :- "image" :> "settings"
+        :> Get '[JSON] ([ImageSettings], WorkingDirectory),
     saGetSettingsHistogram ::
-      route :- "image"
-        :> "settings"
-        :> "histogram"
+      route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "preview-width" Int
         :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
     saGenerateHighRes ::
-      route :- "image"
-        :> "settings"
-        :> "highres"
+      route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     saGeneratePreviews ::
-      route :- "image"
-        :> "settings"
-        :> "previews"
+      route :- "image" :> "settings" :> "previews"
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)
 
 -- SERVER
 
-server :: TimedFastLogger -> Dir -> IO ()
+server :: TimedFastLogger -> WorkingDirectory -> IO ()
 server logger dir =
   let settings =
         setPort 8080 $
@@ -160,15 +152,16 @@ handleSaveSettings imageSettings = do
       logMsg "Updated settings"
       pure $ Settings.toList newSettings
 
-handleGetSettings :: PositiveM [ImageSettings]
+handleGetSettings :: PositiveM ([ImageSettings], WorkingDirectory)
 handleGetSettings = do
   settingsFile <- getSettingsFile
   case settingsFile of
     Left err -> do
       logMsg $ Text.pack err
       throwError err500
-    Right settings ->
-      pure $ Settings.toList settings
+    Right settings -> do
+      env <- ask
+      pure $ (Settings.toList settings, eDir env)
 
 -- GENERATE PREVIEWS
 
@@ -360,4 +353,4 @@ timed name action = do
 
 workingDirectory :: PositiveM FilePath
 workingDirectory =
-  asks (toFilePath . eDir)
+  asks (Text.unpack . unWorkingDirectory . eDir)

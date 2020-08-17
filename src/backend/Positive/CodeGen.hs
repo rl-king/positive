@@ -32,6 +32,7 @@ codeGen logger = do
       jsonDefinitions =
         Elm.jsonDefinitions @ImageSettings
           <> Elm.jsonDefinitions @ImageCrop
+          <> Elm.jsonDefinitions @WorkingDirectory
       modules =
         Pretty.modules $
           Simplification.simplifyDefinition

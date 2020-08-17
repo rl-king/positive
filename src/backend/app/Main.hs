@@ -25,7 +25,7 @@ main = do
 -- FLAGS
 
 data Flags = Flags
-  { fDir :: !Dir,
+  { fDir :: !WorkingDirectory,
     fCodeGen :: !Bool
   }
   deriving (Show, Eq)
@@ -41,9 +41,9 @@ parser =
     <$> parseDir
     <*> flag False True (long "codegen")
 
-parseDir :: Parser Dir
+parseDir :: Parser WorkingDirectory
 parseDir =
-  Dir
+  WorkingDirectory
     <$> strOption
       ( long "dir"
           <> short 'd'

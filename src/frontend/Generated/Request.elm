@@ -67,7 +67,7 @@ getImageSettings :
                 , body : String
                 }
             )
-            (List Generated.Data.ImageSettings.ImageSettings)
+            ( List Generated.Data.ImageSettings.ImageSettings, Generated.Data.ImageSettings.WorkingDirectory )
         )
 getImageSettings =
     Http.request
@@ -101,7 +101,7 @@ getImageSettings =
                                         }
                                     )
                                 )
-                                (Json.Decode.decodeString (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings) c)
+                                (Json.Decode.decodeString (Json.Decode.map2 Tuple.pair (Json.Decode.index 0 (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings)) (Json.Decode.index 1 Generated.Data.ImageSettings.decodeWorkingDirectory)) c)
                 )
         , timeout = Nothing
         , tracker = Nothing

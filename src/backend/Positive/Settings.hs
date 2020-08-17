@@ -135,5 +135,31 @@ instance Elm.HasElmEncoder Aeson.Value ImageCrop where
 
 -- DIR
 
-newtype Dir = Dir {toFilePath :: FilePath}
-  deriving (Show, Eq)
+newtype WorkingDirectory = WorkingDirectory {unWorkingDirectory :: Text}
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+instance Elm.HasElmType WorkingDirectory where
+  elmDefinition =
+    Just $
+      Elm.deriveElmTypeDefinition
+        @WorkingDirectory
+        Elm.defaultOptions
+        "Generated.Data.ImageSettings.WorkingDirectory"
+
+instance Elm.HasElmDecoder Aeson.Value WorkingDirectory where
+  elmDecoderDefinition =
+    Just $
+      Elm.deriveElmJSONDecoder
+        @WorkingDirectory
+        Elm.defaultOptions
+        Aeson.defaultOptions
+        "Generated.Data.ImageSettings.decodeWorkingDirectory"
+
+instance Elm.HasElmEncoder Aeson.Value WorkingDirectory where
+  elmEncoderDefinition =
+    Just $
+      Elm.deriveElmJSONEncoder
+        @WorkingDirectory
+        Elm.defaultOptions
+        Aeson.defaultOptions
+        "Generated.Data.ImageSettings.encodeWorkingDirectory"

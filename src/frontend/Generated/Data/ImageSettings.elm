@@ -1,4 +1,4 @@
-module Generated.Data.ImageSettings exposing (ImageCrop, ImageSettings, decodeImageCrop, decodeImageSettings, encodeImageCrop, encodeImageSettings)
+module Generated.Data.ImageSettings exposing (ImageCrop, ImageSettings, WorkingDirectory, decodeImageCrop, decodeImageSettings, decodeWorkingDirectory, encodeImageCrop, encodeImageSettings, encodeWorkingDirectory)
 
 import Json.Decode
 import Json.Decode.Pipeline
@@ -66,3 +66,18 @@ decodeImageCrop =
         |> Json.Decode.Pipeline.required "icTop" Json.Decode.float
         |> Json.Decode.Pipeline.required "icLeft" Json.Decode.float
         |> Json.Decode.Pipeline.required "icWidth" Json.Decode.float
+
+
+type alias WorkingDirectory =
+    { unWorkingDirectory : String }
+
+
+encodeWorkingDirectory : WorkingDirectory -> Json.Encode.Value
+encodeWorkingDirectory a =
+    Json.Encode.object [ ( "unWorkingDirectory", Json.Encode.string a.unWorkingDirectory ) ]
+
+
+decodeWorkingDirectory : Json.Decode.Decoder WorkingDirectory
+decodeWorkingDirectory =
+    Json.Decode.succeed WorkingDirectory
+        |> Json.Decode.Pipeline.required "unWorkingDirectory" Json.Decode.string

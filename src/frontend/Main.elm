@@ -10,6 +10,7 @@ import Generated.Data.ImageSettings as ImageSettings
     exposing
         ( ImageCrop
         , ImageSettings
+        , WorkingDirectory
         )
 import Generated.Request as Request
 import Html exposing (..)
@@ -107,6 +108,7 @@ type alias Model =
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : { filename : String }
+    , workingDirectory : Maybe WorkingDirectory
     , saveStatus : SaveStatus
     , scrollTo : ScrollTo.State
     , histogram : List Int
@@ -149,6 +151,7 @@ init _ url key =
       , clipboard = Nothing
       , route = route
       , saveStatus = Idle
+      , workingDirectory = Nothing
       , scrollTo = ScrollTo.init
       , histogram = []
       }
@@ -184,7 +187,7 @@ type Msg
     | ScrollToMsg ScrollTo.Msg
     | AttemptSave Time.Posix
     | GotSaveImageSettings (HttpResult (List ImageSettings))
-    | GotFilmRollSettings (HttpResult (List ImageSettings))
+    | GotFilmRollSettings (HttpResult ( List ImageSettings, WorkingDirectory ))
     | GotGenerateHighres (HttpResult ())
     | GotGeneratePreviews (HttpResult ())
     | GotHistogram (HttpResult (List Int))
@@ -252,9 +255,10 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        GotFilmRollSettings (Ok settings) ->
+        GotFilmRollSettings (Ok ( settings, workingDirectory )) ->
             ( { model
-                | filmRoll =
+                | workingDirectory = Just workingDirectory
+                , filmRoll =
                     Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == model.route.filename)) <|
                         Zipper.fromList (List.sortBy .iFilename settings)
               }
@@ -413,22 +417,20 @@ updateSettings f model =
 
 view : Model -> Browser.Document Msg
 view model =
-    case model.filmRoll of
+    case Maybe.map2 Tuple.pair model.filmRoll model.workingDirectory of
         Nothing ->
             { title = "Positive"
             , body = [ main_ [] [ div [ class "loading-spinner" ] [] ] ]
             }
 
-        Just filmRoll ->
+        Just ( filmRoll, workingDirectory ) ->
             { title = model.route.filename ++ " | Positive"
             , body =
                 [ main_ []
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
                     , viewSettings filmRoll model
-
-                    -- FIXME don't hardcode dir
-                    , viewFileBrowser "assets" filmRoll
+                    , viewFileBrowser workingDirectory filmRoll
                     ]
                 ]
             }
@@ -449,14 +451,14 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFileBrowser : String -> FilmRoll -> Html Msg
+viewFileBrowser : WorkingDirectory -> FilmRoll -> Html Msg
 viewFileBrowser dir filmRoll =
     section [ id "files" ]
         [ ul [] <|
             List.concat
-                [ List.map (viewFileLink "" dir) (Zipper.before filmRoll)
-                , [ viewFileLink "-current" dir (Zipper.current filmRoll) ]
-                , List.map (viewFileLink "" dir) (Zipper.after filmRoll)
+                [ List.map (viewFileLink "" dir.unWorkingDirectory) (Zipper.before filmRoll)
+                , [ viewFileLink "-current" dir.unWorkingDirectory (Zipper.current filmRoll) ]
+                , List.map (viewFileLink "" dir.unWorkingDirectory) (Zipper.after filmRoll)
                 ]
         ]
 
