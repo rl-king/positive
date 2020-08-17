@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -41,7 +42,8 @@ type PositiveM =
   ReaderT Env Handler
 
 data Env = Env
-  { eLoadedImage :: MVar (Text, MonochromeImage HIP.VU),
+  { eImageMVar :: MVar (Text, MonochromeImage HIP.VU),
+    eDir :: Dir,
     eLogger :: TimedFastLogger
   }
 
@@ -102,15 +104,15 @@ data SettingsApi route = SettingsApi
 
 -- SERVER
 
-server :: TimedFastLogger -> IO ()
-server logger =
+server :: TimedFastLogger -> Dir -> IO ()
+server logger dir =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
             (logMsg_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
       nt ref =
-        flip runReaderT (Env ref logger)
+        flip runReaderT (Env ref dir logger)
    in do
         ref <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         runSettings settings (genericServeT (nt ref) handlers)
@@ -177,7 +179,7 @@ handleGetSettings dir = do
 handleGeneratePreviews :: Text -> PositiveM NoContent
 handleGeneratePreviews dir = do
   filmRollSettings <- getSettingsFile dir
-  Env _ logger <- ask
+  Env {eLogger} <- ask
   case filmRollSettings of
     Left _ -> pure NoContent
     Right (FilmRollSettings files) ->
@@ -185,7 +187,7 @@ handleGeneratePreviews dir = do
         \settings -> do
           let input = Text.unpack dir </> Text.unpack (iFilename settings)
               output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-          logMsg_ logger $ "Generating preview for: " <> Text.pack input
+          logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
           ByteString.writeFile output
             =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 350
             <$> readImageFromDisk input
@@ -242,18 +244,18 @@ getAllPngs dir = do
 
 getImage :: Int -> Text -> PositiveM (MonochromeImage HIP.VU, IO ())
 getImage previewWidth path = do
-  Env ref _ <- ask
-  currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar ref
+  Env {eImageMVar} <- ask
+  currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
   logMsg $ "MVar: " <> tshow currentlyLoaded
   if path == loadedPath && HIP.cols loadedImage == previewWidth
     then do
       logMsg "Loaded image"
-      pure (loadedImage, putMVar ref currentlyLoaded)
+      pure (loadedImage, putMVar eImageMVar currentlyLoaded)
     else do
       logMsg "Reading image"
       image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
       logMsg "Read image"
-      pure (image, putMVar ref (path, image))
+      pure (image, putMVar eImageMVar (path, image))
 
 -- IMAGE
 
@@ -333,8 +335,8 @@ instance MimeRender Image ByteString where
 
 logMsg :: Text -> PositiveM ()
 logMsg msg = do
-  Env _ logger <- ask
-  liftIO $ logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
+  Env {eLogger} <- ask
+  liftIO $ eLogger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
 
 logMsg_ :: TimedFastLogger -> Text -> IO ()
 logMsg_ logger msg =

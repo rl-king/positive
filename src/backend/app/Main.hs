@@ -5,10 +5,10 @@
 module Main where
 
 import Control.Monad (when)
-import Data.Text as Text
 import Options.Applicative
 import Positive.CodeGen
 import Positive.Server
+import Positive.Settings
 import qualified System.Log.FastLogger as FastLogger
 
 -- MAIN
@@ -20,12 +20,12 @@ main = do
     \logger -> do
       Flags {fDir, fCodeGen} <- parseArgs
       when fCodeGen (codeGen logger)
-      server logger
+      server logger fDir
 
 -- FLAGS
 
 data Flags = Flags
-  { fDir :: !Text,
+  { fDir :: !Dir,
     fCodeGen :: !Bool
   }
   deriving (Show, Eq)
@@ -41,12 +41,15 @@ parser =
     <$> parseDir
     <*> flag False True (long "codegen")
 
-parseDir :: Parser Text
+parseDir :: Parser Dir
 parseDir =
-  option auto $
-    long "dir"
-      <> short 'd'
-      <> showDefault
-      <> value "./"
-      <> metavar "DIR"
-      <> help "Directory to use"
+  Dir
+    <$> option
+      auto
+      ( long "dir"
+          <> short 'd'
+          <> showDefault
+          <> value "./"
+          <> metavar "DIR"
+          <> help "Directory to use"
+      )
