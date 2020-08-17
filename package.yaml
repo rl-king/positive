@@ -33,6 +33,7 @@ dependencies:
   - http-media
   - http-types
   - mtl
+  - optparse-applicative
   - process
   - safe-exceptions
   - servant
