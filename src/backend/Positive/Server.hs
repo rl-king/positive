@@ -27,7 +27,9 @@ import GHC.Float (int2Double)
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
+import Positive.Flags
 import Positive.Settings as Settings
+import qualified Positive.Static as Static
 import Servant
 import Servant.API.Generic
 import Servant.Server.Generic
@@ -90,29 +92,29 @@ data SettingsApi route = SettingsApi
 
 -- SERVER
 
-server :: TimedFastLogger -> WorkingDirectory -> IO ()
-server logger dir =
+server :: TimedFastLogger -> Flags -> IO ()
+server logger flags =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
             (logMsg_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
       nt ref =
-        flip runReaderT (Env ref dir logger)
+        flip runReaderT (Env ref (fDir flags) logger)
    in do
         ref <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
-        runSettings settings (genericServeT (nt ref) handlers)
+        runSettings settings (genericServeT (nt ref) (handlers (fIsDev flags)))
 
 -- HANDLERS
 
-handlers :: Api (AsServerT PositiveM)
-handlers =
+handlers :: Bool -> Api (AsServerT PositiveM)
+handlers isDev =
   Api
     { aImageApi =
         genericServerT
           ImageApi
             { iaImage = handleImage,
-              iaRaw = serveDirectoryFileServer "./"
+              iaRaw = Static.serve isDev
             },
       aSettingsApi =
         genericServerT
@@ -231,7 +233,7 @@ getSettingsFile = do
 getAllPngs :: MonadIO m => FilePath -> m [Text]
 getAllPngs dir = do
   files <- liftIO $ listDirectory dir
-  pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
+  pure $ Text.pack <$> filter ((".png" ==) . Path.takeExtension) files
 
 -- IMAGE
 
@@ -266,7 +268,7 @@ resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 resizeImage previewWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
    in HIP.resize
-        (HIP.Bicubic (-1))
+        (HIP.Bicubic (-0.5))
         HIP.Edge
         (round (int2Double previewWidth * mul), previewWidth)
         image
@@ -289,8 +291,11 @@ processImage is image =
             . compress (iBlackpoint is) (iWhitepoint is)
             . invert
         )
+        -- NOTE: 'normalize' is the only "automatic" correction and has a subtle effect
+        -- at which it makes smaller images have more contrast due to different max and min
+        -- values vs the original size
         . HIP.normalize
-        . HIP.rotate HIP.Bilinear (HIP.Fill 0) (iRotate is)
+        . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-0.5)) (HIP.Fill 0) (iRotate is))
         $ HIP.crop cropOffset (cropHeight, cropWidth) image
 
 -- FILTERS

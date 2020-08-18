@@ -25,8 +25,9 @@ dependencies:
   - bytestring
   - directory
   - elm-syntax
-  - filepath
   - fast-logger
+  - filepath
+  - file-embed
   - generics-sop
   - haskell-to-elm
   - hip
@@ -43,6 +44,7 @@ dependencies:
   - time
   - vector
   - wai
+  - wai-app-static
   - warp
   - unordered-containers
 
