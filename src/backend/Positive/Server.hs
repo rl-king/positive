@@ -132,7 +132,7 @@ handleImage previewWidth imageSettings = do
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename imageSettings))
   processed <- timed "Apply settings" $ processImage imageSettings image
-  encoded <- timed "Encode JPG" $ HIP.encode HIP.JPG [] $ HIP.exchange HIP.VS processed
+  encoded <- timed "Encode PNG" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
   liftIO onDone
   pure encoded
 
@@ -161,7 +161,7 @@ handleGetSettings = do
       throwError err500
     Right settings -> do
       env <- ask
-      pure $ (Settings.toList settings, eDir env)
+      pure (Settings.toList settings, eDir env)
 
 -- GENERATE PREVIEWS
 
@@ -195,6 +195,7 @@ handleGenerateHighRes settings = do
       HIP.encode HIP.PNG [] . HIP.exchange HIP.VS . processImage settings
         <$> readImageFromDisk input
   liftIO $ ByteString.writeFile output image
+  logMsg $ "Wrote highres version of: " <> Text.pack input
   pure NoContent
 
 -- HISTOGRAM
@@ -229,7 +230,7 @@ getSettingsFile = do
 
 getAllPngs :: MonadIO m => FilePath -> m [Text]
 getAllPngs dir = do
-  files <- liftIO $ listDirectory (dir)
+  files <- liftIO $ listDirectory dir
   pure $ Text.pack <$> filter (\p -> Path.takeExtension p == ".png") files
 
 -- IMAGE
@@ -264,8 +265,11 @@ readImageFromDisk =
 resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 resizeImage previewWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
-   in HIP.resize HIP.Bilinear HIP.Edge (round (int2Double previewWidth * mul), previewWidth) $
-        HIP.resize HIP.Bilinear HIP.Edge (1800, 1200) image
+   in HIP.resize
+        (HIP.Bicubic (-1))
+        HIP.Edge
+        (round (int2Double previewWidth * mul), previewWidth)
+        image
 
 processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 processImage is image =
