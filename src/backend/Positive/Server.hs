@@ -174,7 +174,8 @@ handleGeneratePreviews = do
   Env {eLogger} <- ask
   case filmRollSettings of
     Left _ -> pure NoContent
-    Right (FilmRollSettings files) ->
+    Right (FilmRollSettings files) -> do
+      liftIO $ createDirectoryIfMissing False "previews"
       (NoContent <$) . liftIO . forkIO . for_ files $
         \settings -> do
           let input = dir </> Text.unpack (iFilename settings)
@@ -189,6 +190,7 @@ handleGeneratePreviews = do
 handleGenerateHighRes :: ImageSettings -> PositiveM NoContent
 handleGenerateHighRes settings = do
   dir <- workingDirectory
+  liftIO $ createDirectoryIfMissing False "highres"
   let input = dir </> Text.unpack (iFilename settings)
       output = dir </> "highres" </> Text.unpack (iFilename settings)
   logMsg $ "Generating highres version of: " <> Text.pack input
@@ -265,12 +267,12 @@ readImageFromDisk =
   HIP.readImageY HIP.VU
 
 resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
-resizeImage previewWidth image =
+resizeImage targetWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
    in HIP.resize
-        (HIP.Bicubic (-0.5))
+        (HIP.Bicubic (-1))
         HIP.Edge
-        (round (int2Double previewWidth * mul), previewWidth)
+        (round (int2Double targetWidth * mul), targetWidth)
         image
 
 processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU

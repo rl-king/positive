@@ -64,6 +64,35 @@ subscriptions model =
             matchKey "r" Rotate
         , Maybe.withDefault Sub.none <|
             Maybe.map
+                (\filmRoll ->
+                    Browser.Events.onKeyDown <|
+                        Decode.oneOf
+                            [ matchKey "s" (SaveSettings filmRoll)
+                            , matchKey "c" (CopySettings (Zipper.current filmRoll))
+                            ]
+                )
+                model.filmRoll
+        , Maybe.withDefault Sub.none <|
+            Maybe.map2
+                (\clipboard current ->
+                    Browser.Events.onKeyDown <|
+                        withCtrl <|
+                            Decode.map OnImageSettingsChange <|
+                                Decode.oneOf
+                                    [ matchKey "a" { clipboard | iFilename = current.iFilename }
+                                    , matchKey "c" { current | iCrop = clipboard.iCrop }
+                                    , matchKey "t"
+                                        { clipboard
+                                            | iFilename = current.iFilename
+                                            , iRotate = current.iRotate
+                                            , iCrop = current.iCrop
+                                        }
+                                    ]
+                )
+                model.clipboard
+                (Maybe.map Zipper.current model.filmRoll)
+        , Maybe.withDefault Sub.none <|
+            Maybe.map
                 (always <|
                     Browser.Events.onKeyDown <|
                         matchKey "Escape" (UpdateImageCropMode Nothing)
@@ -93,6 +122,19 @@ matchKey key msg =
 
                 else
                     Decode.fail "Not an match"
+            )
+
+
+withCtrl : Decode.Decoder a -> Decode.Decoder a
+withCtrl decoder =
+    Decode.field "ctrlKey" Decode.bool
+        |> Decode.andThen
+            (\ctrlPressed ->
+                if ctrlPressed then
+                    decoder
+
+                else
+                    Decode.fail "No ctrl pressed"
             )
 
 
