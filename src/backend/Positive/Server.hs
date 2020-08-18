@@ -182,7 +182,7 @@ handleGeneratePreviews = do
               output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
           logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
           ByteString.writeFile output
-            =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 350
+            =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
             <$> readImageFromDisk input
 
 -- GENERATE PREVIEWS

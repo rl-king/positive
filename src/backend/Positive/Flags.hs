@@ -31,7 +31,7 @@ parseDir =
       ( long "dir"
           <> short 'd'
           <> showDefault
-          <> value "./"
+          <> value "."
           <> metavar "DIR"
           <> help "Directory to use"
       )

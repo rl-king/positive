@@ -415,8 +415,13 @@ update msg model =
                         |> Maybe.withDefault ""
             in
             ( model
-            , Navigation.pushUrl model.key <|
-                toUrl filename
+            , Cmd.batch
+                [ Navigation.pushUrl model.key <|
+                    toUrl filename
+                , Maybe.withDefault Cmd.none <|
+                    Maybe.map (Cmd.map GotSaveImageSettings << Request.postImageSettings << Zipper.toList)
+                        model.filmRoll
+                ]
             )
 
         NextImage ->
@@ -428,8 +433,13 @@ update msg model =
                         |> Maybe.withDefault ""
             in
             ( model
-            , Navigation.pushUrl model.key <|
-                toUrl filename
+            , Cmd.batch
+                [ Navigation.pushUrl model.key <|
+                    toUrl filename
+                , Maybe.withDefault Cmd.none <|
+                    Maybe.map (Cmd.map GotSaveImageSettings << Request.postImageSettings << Zipper.toList)
+                        model.filmRoll
+                ]
             )
 
 

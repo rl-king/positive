@@ -20,7 +20,6 @@ serve isDev
     pure $ \req resp -> staticApp (defaultFileServerSettings "./") req resp
   | otherwise =
     pure $ \req resp -> do
-      print $ Wai.pathInfo req
       case Wai.pathInfo req of
         [] -> resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
         ["dist", "style.css"] -> resp $ Wai.responseLBS Http.status200 [] (fromStrict css)
