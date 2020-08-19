@@ -558,12 +558,12 @@ viewSettings filmRoll model =
             [ viewHistogram model.histogram ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
-                [ viewRangeInput (\v -> { settings | iGamma = v }) 0.1 ( 0, 10 ) "Gamma" settings.iGamma
-                , viewRangeInput (\v -> { settings | iZone1 = v }) 0.01 ( -0.5, 0.5 ) "Zone I" settings.iZone1
-                , viewRangeInput (\v -> { settings | iZone5 = v }) 0.01 ( -0.5, 0.5 ) "Zone V" settings.iZone5
-                , viewRangeInput (\v -> { settings | iZone9 = v }) 0.01 ( -0.5, 0.5 ) "Zone IX" settings.iZone9
-                , viewRangeInput (\v -> { settings | iBlackpoint = v }) 0.01 ( 0, 0.5 ) "Blackpoint" settings.iBlackpoint
-                , viewRangeInput (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1 ) "Whitepoint" settings.iWhitepoint
+                [ viewRangeInput (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
+                , viewRangeInput (\v -> { settings | iZone1 = v }) 0.01 ( -0.5, 0.5, 0 ) "Zone I" settings.iZone1
+                , viewRangeInput (\v -> { settings | iZone5 = v }) 0.01 ( -0.5, 0.5, 0 ) "Zone V" settings.iZone5
+                , viewRangeInput (\v -> { settings | iZone9 = v }) 0.01 ( -0.5, 0.5, 0 ) "Zone IX" settings.iZone9
+                , viewRangeInput (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.5, 0.5, 0 ) "Blackpoint" settings.iBlackpoint
+                , viewRangeInput (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
         , viewSettingsGroup
             [ viewImageCropMode settings model.imageCropMode
@@ -638,9 +638,9 @@ viewImageCropMode current imageCropMode =
 
         Just imageCrop ->
             div [ class "crop-settings" ] <|
-                [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5 ) "Top" imageCrop.icTop
-                , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5 ) "Left" imageCrop.icLeft
-                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 85, 100 ) "Width" imageCrop.icWidth
+                [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop
+                , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft
+                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth
                 , button [ onClick (UpdateImageCropMode Nothing) ] [ text "Cancel" ]
                 , button [ onClick (ApplyCrop imageCrop) ] [ text "Apply" ]
                 ]
@@ -656,9 +656,21 @@ scaleToString scale =
             "Contain"
 
 
-viewRangeInput : (Float -> msg) -> Float -> ( Float, Float ) -> String -> Float -> Html msg
-viewRangeInput toMsg stepSize ( min, max ) title val =
-    div [ class "range-slider" ]
+viewRangeInput : (Float -> msg) -> Float -> ( Float, Float, Float ) -> String -> Float -> Html msg
+viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
+    let
+        deDupe v =
+            if v == val then
+                Decode.fail "Is same as val"
+
+            else
+                Decode.succeed (toMsg v)
+    in
+    div
+        [ class "range-slider"
+        , on "dblclick" <|
+            Decode.andThen deDupe (Decode.succeed startingValue)
+        ]
         [ label [] [ span [] [ text title ], span [] [ text (String.fromFloat val) ] ]
         , input
             [ type_ "range"
@@ -667,16 +679,8 @@ viewRangeInput toMsg stepSize ( min, max ) title val =
             , Attributes.min (String.fromFloat min)
             , Attributes.max (String.fromFloat max)
             , on "input" <|
-                (Decode.at [ "target", "valueAsNumber" ] Decode.float
-                    |> Decode.andThen
-                        (\n ->
-                            if n == val then
-                                Decode.fail "Is same as val"
-
-                            else
-                                Decode.succeed (toMsg n)
-                        )
-                )
+                Decode.andThen deDupe <|
+                    Decode.at [ "target", "valueAsNumber" ] Decode.float
             ]
             []
         ]

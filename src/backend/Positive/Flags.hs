@@ -1,8 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Positive.Flags where
 
 import Options.Applicative
+import Positive.Prelude
 import Positive.Settings
 
 -- FLAGS

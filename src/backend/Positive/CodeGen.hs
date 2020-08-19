@@ -1,9 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Positive.CodeGen where
 
-import Data.Foldable (for_)
 import Data.HashMap.Strict as HashMap
 import Data.List as List
 import Data.Text as Text
@@ -11,6 +9,7 @@ import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Pretty as Pretty
 import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
+import Positive.Prelude
 import Positive.Server
 import Positive.Settings
 import Servant.API.Generic (ToServantApi)

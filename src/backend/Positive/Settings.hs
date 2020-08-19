@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Positive.Settings where
@@ -12,10 +11,9 @@ import qualified Data.ByteString.Base64 as Base64
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Text as Text
-import Data.Text.Encoding as Text
-import GHC.Generics (Generic)
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
+import Positive.Prelude
 import Servant
 
 -- FILMROLLSETTINGS
@@ -65,7 +63,7 @@ data ImageSettings = ImageSettings
 instance FromHttpApiData ImageSettings where
   parseUrlPiece piece =
     first Text.pack $
-      Aeson.eitherDecodeStrict =<< Base64.decode (Text.encodeUtf8 piece)
+      Aeson.eitherDecodeStrict =<< Base64.decode (encodeUtf8 piece)
   parseQueryParam = parseUrlPiece
 
 instance Elm.HasElmType ImageSettings where

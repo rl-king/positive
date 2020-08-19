@@ -3,23 +3,18 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Positive.Server where
 
-import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar
 import Control.Exception (evaluate)
-import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ReaderT, ask, asks, runReaderT)
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
-import Data.Foldable (for_)
-import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Data.Vector.Unboxed as Vector
@@ -28,6 +23,7 @@ import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
 import Positive.Flags
+import Positive.Prelude hiding (ByteString)
 import Positive.Settings as Settings
 import qualified Positive.Static as Static
 import Servant
@@ -44,9 +40,9 @@ type PositiveM =
   ReaderT Env Handler
 
 data Env = Env
-  { eImageMVar :: MVar (Text, MonochromeImage HIP.VU),
-    eDir :: WorkingDirectory,
-    eLogger :: TimedFastLogger
+  { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
+    eDir :: !WorkingDirectory,
+    eLogger :: !TimedFastLogger
   }
 
 -- API
@@ -130,60 +126,44 @@ handlers isDev =
 handleImage :: Int -> ImageSettings -> PositiveM ByteString
 handleImage previewWidth imageSettings = do
   dir <- workingDirectory
-  (image, onDone) <-
+  (image, putMVarBack) <-
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename imageSettings))
   processed <- timed "Apply settings" $ processImage imageSettings image
   encoded <- timed "Encode PNG" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
-  liftIO onDone
+  liftIO putMVarBack
   pure encoded
 
 handleSaveSettings :: [ImageSettings] -> PositiveM [ImageSettings]
 handleSaveSettings imageSettings = do
-  -- Maybe remove this, we could just write?
-  settingsFile <- getSettingsFile
-  case settingsFile of
-    Left err -> do
-      logMsg $ Text.pack err
-      throwError err500
-    Right _ -> do
-      dir <- workingDirectory
-      let newSettings = Settings.fromList imageSettings
-          path = dir </> "image-settings.json"
-      liftIO . ByteString.writeFile path $ Aeson.encode newSettings
-      logMsg "Updated settings"
-      pure $ Settings.toList newSettings
+  dir <- workingDirectory
+  let newSettings = Settings.fromList imageSettings
+      path = dir </> "image-settings.json"
+  liftIO . ByteString.writeFile path $ Aeson.encode newSettings
+  logMsg "Updated settings"
+  pure $ Settings.toList newSettings
 
 handleGetSettings :: PositiveM ([ImageSettings], WorkingDirectory)
-handleGetSettings = do
-  settingsFile <- getSettingsFile
-  case settingsFile of
-    Left err -> do
-      logMsg $ Text.pack err
-      throwError err500
-    Right settings -> do
-      env <- ask
-      pure (Settings.toList settings, eDir env)
+handleGetSettings =
+  (\a b -> (Settings.toList a, eDir b))
+    <$> getSettingsFile <*> ask
 
 -- GENERATE PREVIEWS
 
 handleGeneratePreviews :: PositiveM NoContent
 handleGeneratePreviews = do
   dir <- workingDirectory
-  filmRollSettings <- getSettingsFile
+  (FilmRollSettings files) <- getSettingsFile
   Env {eLogger} <- ask
-  case filmRollSettings of
-    Left _ -> pure NoContent
-    Right (FilmRollSettings files) -> do
-      liftIO $ createDirectoryIfMissing False "previews"
-      (NoContent <$) . liftIO . forkIO . for_ files $
-        \settings -> do
-          let input = dir </> Text.unpack (iFilename settings)
-              output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-          logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
-          ByteString.writeFile output
-            =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
-            <$> readImageFromDisk input
+  liftIO $ createDirectoryIfMissing False "previews"
+  (NoContent <$) . liftIO . forkIO . for_ files $
+    \settings -> do
+      let input = dir </> Text.unpack (iFilename settings)
+          output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+      logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
+      ByteString.writeFile output
+        =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
+        <$> readImageFromDisk input
 
 -- GENERATE PREVIEWS
 
@@ -207,35 +187,36 @@ handleGenerateHighRes settings = do
 handleGetSettingsHistogram :: Int -> ImageSettings -> PositiveM [Int]
 handleGetSettingsHistogram previewWidth imageSettings = do
   dir <- workingDirectory
-  (image, onDone) <-
+  (image, putMVarBack) <-
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename imageSettings))
-  liftIO onDone
-  pure . Vector.toList . HIP.hBins . head
-    . HIP.getHistograms
-    $ processImage imageSettings image
+  liftIO putMVarBack
+  pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
+    processImage imageSettings image
 
 -- SETTINGS FILE
 
-getSettingsFile :: PositiveM (Either String FilmRollSettings)
+getSettingsFile :: PositiveM FilmRollSettings
 getSettingsFile = do
   dir <- workingDirectory
   let path = dir </> "image-settings.json"
   exists <- liftIO $ doesPathExist path
   if exists
-    then liftIO $ Aeson.eitherDecodeFileStrict path
+    then
+      either (\e -> logMsg (tshow e) >> throwError err500) pure
+        =<< liftIO (Aeson.eitherDecodeFileStrict path)
     else do
       logMsg "No settings file found, creating one now"
       filenames <- getAllPngs dir
       let settings = Settings.fromFilenames filenames
       liftIO . ByteString.writeFile path $ Aeson.encode settings
       logMsg $ "Wrote: " <> Text.pack path
-      pure (Right settings)
+      pure settings
 
 getAllPngs :: MonadIO m => FilePath -> m [Text]
-getAllPngs dir = do
-  files <- liftIO $ listDirectory dir
-  pure $ Text.pack <$> filter ((".png" ==) . Path.takeExtension) files
+getAllPngs dir =
+  fmap Text.pack . filter ((".png" ==) . Path.takeExtension)
+    <$> liftIO (listDirectory dir)
 
 -- IMAGE
 
@@ -297,7 +278,7 @@ processImage is image =
         -- at which it makes smaller images have more contrast due to different max and min
         -- values vs the original size
         . HIP.normalize
-        . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-0.5)) (HIP.Fill 0) (iRotate is))
+        . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-1)) (HIP.Fill 0) (iRotate is))
         $ HIP.crop cropOffset (cropHeight, cropWidth) image
 
 -- FILTERS

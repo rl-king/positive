@@ -51,6 +51,10 @@ dependencies:
 library:
   source-dirs: src/backend
 
+default-extensions:
+  - OverloadedStrings
+  - NoImplicitPrelude
+
 executables:
   positive-exe:
     main:                Main.hs
