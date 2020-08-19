@@ -479,7 +479,7 @@ view model =
                 [ main_ []
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
-                    , viewSettings filmRoll model
+                    , viewSettings filmRoll workingDirectory model
                     , viewFileBrowser workingDirectory filmRoll
                     ]
                 ]
@@ -545,8 +545,8 @@ toUrl filename =
 -- IMAGE SETTINGS
 
 
-viewSettings : FilmRoll -> Model -> Html Msg
-viewSettings filmRoll model =
+viewSettings : FilmRoll -> WorkingDirectory -> Model -> Html Msg
+viewSettings filmRoll workingDirectory model =
     let
         settings =
             case model.imageProcessingState of
@@ -600,8 +600,15 @@ viewSettings filmRoll model =
                 \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]
         , viewSettingsGroup
-            [ button [ onClick PreviousImage ] [ text "<" ]
-            , button [ onClick NextImage ] [ text ">" ]
+            [ button [ onClick PreviousImage ] [ text "⯇" ]
+            , button [ onClick NextImage ] [ text "⯈" ]
+            ]
+        , pre [ class "info" ]
+            [ text <|
+                interpolate "{0} | {1}"
+                    [ settings.iFilename
+                    , workingDirectory.unWorkingDirectory
+                    ]
             ]
         ]
 

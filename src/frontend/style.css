@@ -123,6 +123,11 @@ li.-current {
     background-color: #333;
 }
 
+.info {
+    font-size: .875rem;
+    color: #666;
+}
+
 input {
     width: 100%;
 }
