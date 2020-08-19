@@ -392,7 +392,7 @@ update msg model =
                         -- FIXME: Don't default
                         |> Maybe.withDefault ""
             in
-            ( model
+            ( { model | undoState = [] }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
                     toUrl filename
@@ -410,7 +410,7 @@ update msg model =
                         -- FIXME: Don't default
                         |> Maybe.withDefault ""
             in
-            ( model
+            ( { model | undoState = [] }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
                     toUrl filename
@@ -436,19 +436,29 @@ updateSettings f model =
     let
         mapCurrent =
             Maybe.map (Zipper.mapCurrent f)
+
+        maybeCons xs =
+            Maybe.withDefault xs << Maybe.map (\x -> x :: xs)
     in
     case model.imageProcessingState of
         Ready ->
             { model
                 | imageProcessingState = Loading
                 , filmRoll = mapCurrent model.filmRoll
+                , undoState = maybeCons model.undoState model.filmRoll
             }
 
         Loading ->
-            { model | imageProcessingState = Queued (mapCurrent model.filmRoll) }
+            { model
+                | imageProcessingState = Queued (mapCurrent model.filmRoll)
+                , undoState = maybeCons model.undoState model.filmRoll
+            }
 
         Queued n ->
-            { model | imageProcessingState = Queued (mapCurrent n) }
+            { model
+                | imageProcessingState = Queued (mapCurrent n)
+                , undoState = maybeCons model.undoState model.filmRoll
+            }
 
 
 
@@ -539,7 +549,12 @@ viewSettings : FilmRoll -> Model -> Html Msg
 viewSettings filmRoll model =
     let
         settings =
-            Zipper.current filmRoll
+            case model.imageProcessingState of
+                Queued (Just queuedFilmRoll) ->
+                    Zipper.current queuedFilmRoll
+
+                _ ->
+                    Zipper.current filmRoll
     in
     section [ id "image-settings" ]
         [ viewSettingsGroup
@@ -581,7 +596,8 @@ viewSettings filmRoll model =
         , viewSettingsGroup
             [ button [ onClick (GenerateHighres settings) ] [ text "Generate highres" ]
             , button [ onClick GeneratePreviews ] [ text "Generate previews" ]
-            , button [ onClick Undo ] [ text "Undo" ]
+            , viewIf (not (List.isEmpty model.undoState)) <|
+                \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]
         , viewSettingsGroup
             [ button [ onClick PreviousImage ] [ text "<" ]
