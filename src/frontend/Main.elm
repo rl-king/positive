@@ -155,6 +155,7 @@ type alias Model =
     , scrollTo : ScrollTo.State
     , histogram : List Int
     , undoState : List FilmRoll
+    , scale : Float
     }
 
 
@@ -193,6 +194,7 @@ init _ url key =
       , scrollTo = ScrollTo.init
       , histogram = []
       , undoState = []
+      , scale = 1
       }
     , Cmd.map GotFilmRollSettings Request.getImageSettings
     )
@@ -243,6 +245,7 @@ type Msg
     | PreviousImage
     | NextImage
     | Undo
+    | UpdateScale Float
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -430,6 +433,9 @@ update msg model =
                     , Cmd.none
                     )
 
+        UpdateScale val ->
+            ( { model | scale = val }, Cmd.none )
+
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
@@ -577,7 +583,7 @@ viewSettings filmRoll workingDirectory model =
             , viewMaybe model.clipboard <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
-                        [ label [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
+                        [ pre [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
                         , viewClipboardButton "All" { clipboard | iFilename = settings.iFilename }
                         , viewClipboardButton "Tone"
                             { clipboard
@@ -692,9 +698,12 @@ viewImage filmRoll model =
             Maybe.withDefault settings <|
                 Maybe.map (\_ -> { settings | iRotate = 0, iCrop = ImageCrop 0 0 100 })
                     model.imageCropMode
+
+        scale =
+            style "transform" ("scale(" ++ String.fromFloat model.scale ++ ")")
     in
     section [ id "image-section" ]
-        [ div [ class "image-wrapper" ]
+        [ div [ class "image-wrapper", scale ]
             [ viewMaybe model.imageWidth <|
                 \imageWidth ->
                     img
@@ -766,8 +775,11 @@ viewZones filmRoll model =
         apply =
             zone 0.95 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.15 settings.iZone1
     in
-    Html.Keyed.ul [ class "zones" ] <|
-        List.map2 viewZoneBar (List.map apply vs) vs
+    section [ class "zones" ]
+        [ viewRangeInput UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" model.scale
+        , Html.Keyed.ul [] <|
+            List.map2 viewZoneBar (List.map apply vs) vs
+        ]
 
 
 viewZoneBar : Float -> Float -> ( String, Html msg )
