@@ -98,18 +98,7 @@ subscriptions model =
                         matchKey "Escape" (UpdateImageCropMode Nothing)
                 )
                 model.imageCropMode
-        , saveSubscription model.saveStatus
         ]
-
-
-saveSubscription : SaveStatus -> Sub Msg
-saveSubscription saveStatus =
-    case saveStatus of
-        SaveAfter _ _ ->
-            Time.every 1000 AttemptSave
-
-        _ ->
-            Sub.none
 
 
 matchKey : String -> msg -> Decode.Decoder msg
@@ -151,7 +140,6 @@ type alias Model =
     , clipboard : Maybe ImageSettings
     , route : { filename : String }
     , workingDirectory : Maybe WorkingDirectory
-    , saveStatus : SaveStatus
     , scrollTo : ScrollTo.State
     , histogram : List Int
     , undoState : List FilmRoll
@@ -169,13 +157,6 @@ type ImageProcessingState
     | Queued (Maybe FilmRoll)
 
 
-type SaveStatus
-    = Idle
-    | SavedAt Time.Posix
-    | SaveAfter Int FilmRoll
-    | Error Http.Error
-
-
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
@@ -189,7 +170,6 @@ init _ url key =
       , imageCropMode = Nothing
       , clipboard = Nothing
       , route = route
-      , saveStatus = Idle
       , workingDirectory = Nothing
       , scrollTo = ScrollTo.init
       , histogram = []
@@ -226,7 +206,6 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
-    | AttemptSave Time.Posix
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult ( List ImageSettings, WorkingDirectory ))
     | GotGenerateHighres (HttpResult ())
@@ -280,22 +259,6 @@ update msg model =
             ( { model | scrollTo = scrollToModel }
             , Cmd.map ScrollToMsg scrollToCmds
             )
-
-        AttemptSave currentTime ->
-            case model.saveStatus of
-                SaveAfter 0 filmRoll ->
-                    ( model
-                    , Cmd.map GotSaveImageSettings <|
-                        Request.postImageSettings (Zipper.toList filmRoll)
-                    )
-
-                SaveAfter t settings ->
-                    ( { model | saveStatus = SaveAfter (t - 1) settings }
-                    , Cmd.none
-                    )
-
-                _ ->
-                    ( model, Cmd.none )
 
         GotFilmRollSettings (Ok ( settings, workingDirectory )) ->
             ( { model
