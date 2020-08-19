@@ -1,9 +1,22 @@
-# positive
+# Positive
 
-Convert black and white film
+Convert linear scanned monochrome film without automatic corrections,
+making it possible to understand your exposure and development characteristics.
+
+![](https://raw.githubusercontent.com/rl-king/positive/master/positive.png)
+
+## Using it
+File an issue if you're interested in using this and have a hard time figuring out how.
+It's very specific to my workflow.
+
+I made this because I've always felt the need for less magic and more control compared to other tools avaliable.
 
 ## Compile things
+
 ```
-stack build
-elm make src/frontend/Main.elm  --output=dist/main.js
+# Reload hs/elm/css on save
+./build-dev.sh
+
+# Build hs/elm, embed assets into final binary
+./build-bin.sh
 ```
