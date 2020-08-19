@@ -574,7 +574,7 @@ viewSettings filmRoll model =
             , viewMaybe model.clipboard <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
-                        [ label [] [ text "Paste settings" ]
+                        [ label [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
                         , viewClipboardButton "All" { clipboard | iFilename = settings.iFilename }
                         , viewClipboardButton "Tone"
                             { clipboard
