@@ -146,7 +146,7 @@ type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
     , key : Navigation.Key
-    , imageWidth : Maybe ( Int, Scale )
+    , imageWidth : Maybe Int
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : { filename : String }
@@ -154,6 +154,7 @@ type alias Model =
     , saveStatus : SaveStatus
     , scrollTo : ScrollTo.State
     , histogram : List Int
+    , undoState : List FilmRoll
     }
 
 
@@ -165,11 +166,6 @@ type ImageProcessingState
     = Ready
     | Loading
     | Queued (Maybe FilmRoll)
-
-
-type Scale
-    = Half
-    | Contain
 
 
 type SaveStatus
@@ -196,6 +192,7 @@ init _ url key =
       , workingDirectory = Nothing
       , scrollTo = ScrollTo.init
       , histogram = []
+      , undoState = []
       }
     , Cmd.map GotFilmRollSettings Request.getImageSettings
     )
@@ -238,7 +235,6 @@ type Msg
     | OnImageSettingsChange ImageSettings
     | OnImageLoad ImageSettings Int
     | SaveSettings FilmRoll
-    | CycleScale Scale
     | GenerateHighres ImageSettings
     | GeneratePreviews
     | CopySettings ImageSettings
@@ -246,6 +242,7 @@ type Msg
     | ApplyCrop ImageCrop
     | PreviousImage
     | NextImage
+    | Undo
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -327,7 +324,7 @@ update msg model =
             ( { model
                 | imageWidth =
                     Result.toMaybe <|
-                        Result.map (\v -> ( floor v.element.width, Contain )) result
+                        Result.map (\v -> floor v.element.width) result
               }
             , Cmd.none
             )
@@ -365,25 +362,6 @@ update msg model =
             ( model
             , Cmd.map GotSaveImageSettings <|
                 Request.postImageSettings (Zipper.toList filmRoll)
-            )
-
-        CycleScale scale ->
-            let
-                newScale =
-                    case scale of
-                        Contain ->
-                            Half
-
-                        Half ->
-                            Contain
-            in
-            ( { model
-                | imageWidth =
-                    Maybe.map (Tuple.mapSecond (always newScale))
-                        model.imageWidth
-                , imageProcessingState = Loading
-              }
-            , Cmd.none
             )
 
         GenerateHighres settings ->
@@ -441,6 +419,16 @@ update msg model =
                         model.filmRoll
                 ]
             )
+
+        Undo ->
+            case model.undoState of
+                [] ->
+                    ( model, Cmd.none )
+
+                x :: xs ->
+                    ( { model | undoState = xs, filmRoll = Just x }
+                    , Cmd.none
+                    )
 
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
@@ -585,13 +573,6 @@ viewSettings filmRoll model =
                         , viewClipboardButton "Crop" { settings | iCrop = clipboard.iCrop }
                         ]
             ]
-
-        -- , viewMaybe model.imageWidth <|
-        --     \( _, scale ) ->
-        --         button [ onClick (CycleScale scale) ]
-        --             [ text "Scale "
-        --             , text (scaleToString scale)
-        --             ]
         , viewSettingsGroup
             [ button [ onClick (SaveSettings filmRoll) ] [ text "Save" ]
             , button [ onClick (OnImageSettingsChange (resetAll settings)) ] [ text "Reset" ]
@@ -600,6 +581,7 @@ viewSettings filmRoll model =
         , viewSettingsGroup
             [ button [ onClick (GenerateHighres settings) ] [ text "Generate highres" ]
             , button [ onClick GeneratePreviews ] [ text "Generate previews" ]
+            , button [ onClick Undo ] [ text "Undo" ]
             ]
         , viewSettingsGroup
             [ button [ onClick PreviousImage ] [ text "<" ]
@@ -646,16 +628,6 @@ viewImageCropMode current imageCropMode =
                 ]
 
 
-scaleToString : Scale -> String
-scaleToString scale =
-    case scale of
-        Half ->
-            "Half"
-
-        Contain ->
-            "Contain"
-
-
 viewRangeInput : (Float -> msg) -> Float -> ( Float, Float, Float ) -> String -> Float -> Html msg
 viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
     let
@@ -689,14 +661,6 @@ viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
 viewImage : FilmRoll -> Model -> Html Msg
 viewImage filmRoll model =
     let
-        applyScale ( width, scale ) =
-            case scale of
-                Half ->
-                    floor (toFloat width * 0.5)
-
-                Contain ->
-                    width
-
         currentCrop =
             .iCrop <|
                 Zipper.current filmRoll
@@ -708,7 +672,7 @@ viewImage filmRoll model =
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper" ]
-            [ viewMaybe (Maybe.map applyScale model.imageWidth) <|
+            [ viewMaybe model.imageWidth <|
                 \imageWidth ->
                     img
                         [ on "load" (Decode.succeed (OnImageLoad (Zipper.current filmRoll) imageWidth))
