@@ -339,10 +339,14 @@ update msg model =
             )
 
         GenerateHighres settings ->
-            ( model
-            , Cmd.map GotGenerateHighres <|
-                Request.postImageSettingsHighres settings
-            )
+            pushNotification "Generating highres version" model
+                |> Tuple.mapSecond
+                    (\cmds ->
+                        Cmd.batch
+                            [ Cmd.map GotGenerateHighres (Request.postImageSettingsHighres settings)
+                            , cmds
+                            ]
+                    )
 
         GeneratePreviews ->
             ( model
