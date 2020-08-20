@@ -56,12 +56,6 @@ subscriptions model =
     Sub.batch
         [ Sub.map ScrollToMsg <|
             ScrollTo.subscriptions model.scrollTo
-        , Browser.Events.onKeyDown <|
-            matchKey "ArrowLeft" PreviousImage
-        , Browser.Events.onKeyDown <|
-            matchKey "ArrowRight" NextImage
-        , Browser.Events.onKeyDown <|
-            matchKey "r" Rotate
         , Maybe.withDefault Sub.none <|
             Maybe.map
                 (\filmRoll ->
@@ -69,6 +63,9 @@ subscriptions model =
                         Decode.oneOf
                             [ matchKey "s" (SaveSettings filmRoll)
                             , matchKey "c" (CopySettings (Zipper.current filmRoll))
+                            , matchKey "r" Rotate
+                            , matchKey "ArrowLeft" (PreviousImage filmRoll)
+                            , matchKey "ArrowRight" (NextImage filmRoll)
                             ]
                 )
                 model.filmRoll
@@ -221,8 +218,8 @@ type Msg
     | CopySettings ImageSettings
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
-    | PreviousImage
-    | NextImage
+    | PreviousImage FilmRoll
+    | NextImage FilmRoll
     | Undo
     | UpdateScale Float
 
@@ -350,39 +347,25 @@ update msg model =
             , Cmd.none
             )
 
-        PreviousImage ->
-            let
-                filename =
-                    Maybe.map (\z -> Maybe.withDefault (Zipper.last z) (Zipper.previous z)) model.filmRoll
-                        |> Maybe.map (.iFilename << Zipper.current)
-                        -- FIXME: Don't default
-                        |> Maybe.withDefault ""
-            in
+        PreviousImage filmRoll ->
             ( { model | undoState = [] }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
-                    toUrl filename
-                , Maybe.withDefault Cmd.none <|
-                    Maybe.map (Cmd.map GotSaveImageSettings << Request.postImageSettings << Zipper.toList)
-                        model.filmRoll
+                    (toUrl << .iFilename << Zipper.current) <|
+                        Maybe.withDefault (Zipper.last filmRoll) (Zipper.previous filmRoll)
+                , Cmd.map GotSaveImageSettings <|
+                    Request.postImageSettings (Zipper.toList filmRoll)
                 ]
             )
 
-        NextImage ->
-            let
-                filename =
-                    Maybe.map (\z -> Maybe.withDefault (Zipper.first z) (Zipper.next z)) model.filmRoll
-                        |> Maybe.map (.iFilename << Zipper.current)
-                        -- FIXME: Don't default
-                        |> Maybe.withDefault ""
-            in
+        NextImage filmRoll ->
             ( { model | undoState = [] }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
-                    toUrl filename
-                , Maybe.withDefault Cmd.none <|
-                    Maybe.map (Cmd.map GotSaveImageSettings << Request.postImageSettings << Zipper.toList)
-                        model.filmRoll
+                    (toUrl << .iFilename << Zipper.current) <|
+                        Maybe.withDefault (Zipper.first filmRoll) (Zipper.next filmRoll)
+                , Cmd.map GotSaveImageSettings <|
+                    Request.postImageSettings (Zipper.toList filmRoll)
                 ]
             )
 
@@ -569,8 +552,8 @@ viewSettings filmRoll workingDirectory model =
                 \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]
         , viewSettingsGroup
-            [ button [ onClick PreviousImage ] [ text "⯇" ]
-            , button [ onClick NextImage ] [ text "⯈" ]
+            [ button [ onClick (PreviousImage filmRoll) ] [ text "⯇" ]
+            , button [ onClick (NextImage filmRoll) ] [ text "⯈" ]
             ]
         , pre [ class "info" ]
             [ text <|
