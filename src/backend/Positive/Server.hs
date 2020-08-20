@@ -300,7 +300,7 @@ gamma x =
 
 zone :: Double -> Double -> MonochromePixel -> MonochromePixel
 zone t i =
-  let m v = (1 - abs (v - t)) * (1 - abs (v - t))
+  let m v = (1 - v - t) ^ 4
    in fmap (\v -> v + (i * m v))
 {-# INLINE zone #-}
 

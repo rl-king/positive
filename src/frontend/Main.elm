@@ -751,7 +751,7 @@ viewZones filmRoll model =
             v + (i * m t v)
 
         m t v =
-            (1 - abs (v - t)) * (1 - abs (v - t))
+            (1 - v - t) ^ 4
 
         vs =
             List.map (\x -> toFloat x / 10) <| List.range 1 10
