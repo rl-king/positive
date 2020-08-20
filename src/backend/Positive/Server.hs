@@ -155,7 +155,7 @@ handleGeneratePreviews = do
   dir <- workingDirectory
   (FilmRollSettings files) <- getSettingsFile
   Env {eLogger} <- ask
-  liftIO $ createDirectoryIfMissing False "previews"
+  liftIO $ createDirectoryIfMissing False (dir </> "previews")
   (NoContent <$) . liftIO . forkIO . for_ files $
     \settings -> do
       let input = dir </> Text.unpack (iFilename settings)
@@ -170,7 +170,7 @@ handleGeneratePreviews = do
 handleGenerateHighRes :: ImageSettings -> PositiveM NoContent
 handleGenerateHighRes settings = do
   dir <- workingDirectory
-  liftIO $ createDirectoryIfMissing False "highres"
+  liftIO $ createDirectoryIfMissing False (dir </> "highres")
   let input = dir </> Text.unpack (iFilename settings)
       output = dir </> "highres" </> Text.unpack (iFilename settings)
   logMsg $ "Generating highres version of: " <> Text.pack input
