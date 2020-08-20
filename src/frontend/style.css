@@ -1,3 +1,13 @@
+@keyframes slideup {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
 @keyframes appear {
     from {
         opacity: 0;
@@ -283,6 +293,27 @@ img {
     max-width: 100%;
     max-height: 80vh;
     display: block;
+}
+
+.notifications {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+}
+
+.notifications span {
+    padding: .25rem 1rem;
+    margin: .25rem 0;
+    opacity: .25;
+    display: block;
+    border-radius: 2px;
+    font-size: .875rem;
+    background-color: #333;
+    animation: slideup .35s;
+}
+
+.notifications span:hover {
+    opacity: 1;
 }
 
 .loading-spinner {

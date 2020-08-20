@@ -9,7 +9,7 @@ making it possible to understand your exposure and development characteristics.
 File an issue if you're interested in using this and have a hard time figuring out how.
 It's very specific to my workflow.
 
-I made this because I've always felt the need for less magic and more control compared to other tools avaliable.
+I made this because I've always felt the need for less magic and more control compared to other tools available.
 
 ## Compile things
 

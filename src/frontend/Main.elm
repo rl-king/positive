@@ -21,6 +21,7 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
+import Process
 import ScrollTo
 import String.Interpolate exposing (interpolate)
 import Task
@@ -141,6 +142,7 @@ type alias Model =
     , histogram : List Int
     , undoState : List FilmRoll
     , scale : Float
+    , notifications : List String
     }
 
 
@@ -172,6 +174,7 @@ init _ url key =
       , histogram = []
       , undoState = []
       , scale = 1
+      , notifications = []
       }
     , Cmd.map GotFilmRollSettings Request.getImageSettings
     )
@@ -222,6 +225,7 @@ type Msg
     | NextImage FilmRoll
     | Undo
     | UpdateScale Float
+    | RemoveNotification
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -269,28 +273,35 @@ update msg model =
             )
 
         GotFilmRollSettings (Err err) ->
-            ( model, Cmd.none )
+            pushNotification "Error getting filmroll settings" model
 
         GotHistogram result ->
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
 
-        GotSaveImageSettings _ ->
-            ( model, Cmd.none )
+        GotSaveImageSettings (Ok _) ->
+            pushNotification "Saved settings" model
 
-        GotGenerateHighres _ ->
-            ( model, Cmd.none )
+        GotSaveImageSettings (Err _) ->
+            pushNotification "Error saving settings" model
 
-        GotGeneratePreviews _ ->
-            ( model, Cmd.none )
+        GotGenerateHighres (Ok _) ->
+            pushNotification "Generated highres" model
 
-        GotImageDimensions result ->
-            ( { model
-                | imageWidth =
-                    Result.toMaybe <|
-                        Result.map (\v -> floor v.element.width) result
-              }
-            , Cmd.none
-            )
+        GotGenerateHighres (Err _) ->
+            pushNotification "Error generating highres" model
+
+        GotGeneratePreviews (Ok _) ->
+            pushNotification "Generating previews in the background" model
+
+        GotGeneratePreviews (Err _) ->
+            pushNotification "Error generating previews" model
+
+        GotImageDimensions (Ok { element }) ->
+            pushNotification ("Got image dimensions: " ++ String.fromInt (floor element.width))
+                { model | imageWidth = Just (floor element.width) }
+
+        GotImageDimensions (Err _) ->
+            pushNotification "Error getting image dimensions from element" model
 
         Rotate ->
             ( updateSettings (\s -> { s | iRotate = s.iRotate + degrees -90 }) model, Cmd.none )
@@ -382,6 +393,17 @@ update msg model =
         UpdateScale val ->
             ( { model | scale = val }, Cmd.none )
 
+        RemoveNotification ->
+            ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
+
+
+pushNotification : String -> Model -> ( Model, Cmd Msg )
+pushNotification msg model =
+    ( { model | notifications = msg :: model.notifications }
+    , Task.perform (\_ -> RemoveNotification) <|
+        Process.sleep 4000
+    )
+
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
@@ -422,7 +444,12 @@ view model =
     case Maybe.map2 Tuple.pair model.filmRoll model.workingDirectory of
         Nothing ->
             { title = "Positive"
-            , body = [ main_ [] [ div [ class "loading-spinner" ] [] ] ]
+            , body =
+                [ main_ []
+                    [ div [ class "loading-spinner" ] []
+                    , viewNotification model.notifications
+                    ]
+                ]
             }
 
         Just ( filmRoll, workingDirectory ) ->
@@ -433,13 +460,20 @@ view model =
                     , viewImage filmRoll model
                     , viewSettings filmRoll workingDirectory model
                     , viewFileBrowser workingDirectory filmRoll
+                    , viewNotification model.notifications
                     ]
                 ]
             }
 
 
 
--- LOADING
+-- NOTIFICATONS
+
+
+viewNotification : List String -> Html msg
+viewNotification notifications =
+    div [ class "notifications" ] <|
+        List.map (\x -> span [] [ text x ]) (List.reverse notifications)
 
 
 viewLoading : ImageProcessingState -> Html msg
