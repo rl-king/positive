@@ -191,6 +191,7 @@ handleGetSettingsHistogram previewWidth imageSettings = do
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename imageSettings))
   liftIO putMVarBack
+  logMsg $ "Generating histogram fro: " <> iFilename imageSettings
   pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
     processImage imageSettings image
 
@@ -267,9 +268,9 @@ processImage is image =
       cropHeight = floor $ int2Double cropWidth * mul
       mul = int2Double h / int2Double w
    in HIP.map
-        ( zone 0.95 (iZone9 is)
+        ( zone 0.9 (iZone9 is)
             . zone 0.5 (iZone5 is)
-            . zone 0.15 (iZone1 is)
+            . zone 0.1 (iZone1 is)
             . gamma (iGamma is)
             . compress (iBlackpoint is) (iWhitepoint is)
             . invert
@@ -300,7 +301,7 @@ gamma x =
 
 zone :: Double -> Double -> MonochromePixel -> MonochromePixel
 zone t i =
-  let m v = (1 - v - t) ^ 4
+  let m v = (1 - abs (v - t)) ^ 2
    in fmap (\v -> v + (i * m v))
 {-# INLINE zone #-}
 

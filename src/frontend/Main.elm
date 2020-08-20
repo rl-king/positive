@@ -747,17 +747,17 @@ viewZones filmRoll model =
         settings =
             Zipper.current filmRoll
 
-        zone t i v =
-            v + (i * m t v)
+        zone t x v =
+            v + (x * m t v)
 
         m t v =
-            (1 - v - t) ^ 4
+            (1 - abs (v - t)) ^ 2
 
         vs =
             List.map (\x -> toFloat x / 10) <| List.range 1 10
 
         apply =
-            zone 0.95 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.15 settings.iZone1
+            zone 0.9 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.1 settings.iZone1
     in
     section [ class "zones" ]
         [ viewRangeInput UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" model.scale
@@ -770,7 +770,7 @@ viewZoneBar : Float -> Float -> ( String, Html msg )
 viewZoneBar value zone =
     let
         height v =
-            style "height" (String.fromFloat (1 + 2 * v) ++ "rem")
+            style "height" (String.fromFloat (abs (1 + 4 * v)) ++ "rem")
 
         background v =
             style "background-color" ("hsl(0, 0%," ++ String.fromFloat (v * 100) ++ "%)")
@@ -778,6 +778,7 @@ viewZoneBar value zone =
     ( String.fromFloat value
     , li [ height (value - zone), background zone ]
         []
+      -- [ span [] [ text (String.left 6 (String.fromFloat value)) ] ]
     )
 
 
