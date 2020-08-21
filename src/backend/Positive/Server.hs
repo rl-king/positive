@@ -252,7 +252,7 @@ resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 resizeImage targetWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
    in HIP.resize
-        (HIP.Bicubic (-1))
+        (HIP.Bicubic (-0.25))
         HIP.Edge
         (round (int2Double targetWidth * mul), targetWidth)
         image
@@ -279,7 +279,7 @@ processImage is image =
         -- at which it makes smaller images have more contrast due to different max and min
         -- values vs the original size
         . HIP.normalize
-        . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-1)) (HIP.Fill 0) (iRotate is))
+        . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-0.25)) (HIP.Fill 0) (iRotate is))
         $ HIP.crop cropOffset (cropHeight, cropWidth) image
 
 -- FILTERS
@@ -301,7 +301,7 @@ gamma x =
 
 zone :: Double -> Double -> MonochromePixel -> MonochromePixel
 zone t i =
-  let m v = (1 - abs (v - t)) ^ 2
+  let m v = (1 - abs (v - t)) ^ (2 :: Int)
    in fmap (\v -> v + (i * m v))
 {-# INLINE zone #-}
 
