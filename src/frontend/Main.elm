@@ -133,7 +133,7 @@ type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
     , key : Navigation.Key
-    , imageWidth : Maybe Int
+    , canvasSize : Maybe Browser.Dom.Element
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : { filename : String }
@@ -165,7 +165,7 @@ init _ url key =
     ( { imageProcessingState = Loading
       , filmRoll = Nothing
       , key = key
-      , imageWidth = Nothing
+      , canvasSize = Nothing
       , imageCropMode = Nothing
       , clipboard = Nothing
       , route = route
@@ -296,15 +296,28 @@ update msg model =
         GotGeneratePreviews (Err _) ->
             pushNotification "Error generating previews" model
 
-        GotImageDimensions (Ok { element }) ->
-            pushNotification ("Got image dimensions: " ++ String.fromInt (floor element.width))
-                { model | imageWidth = Just (floor element.width) }
+        GotImageDimensions (Ok element) ->
+            pushNotification
+                (interpolate "Got canvas dimensions: w:{0} h:{1}"
+                    [ String.fromInt (floor element.element.width)
+                    , String.fromInt (floor element.element.height)
+                    ]
+                )
+                { model | canvasSize = Just element }
 
         GotImageDimensions (Err _) ->
             pushNotification "Error getting image dimensions from element" model
 
         Rotate ->
-            ( updateSettings (\s -> { s | iRotate = s.iRotate + degrees -90 }) model, Cmd.none )
+            ( updateSettings
+                (\s ->
+                    { s
+                        | iRotate = fractionalModBy (degrees -360) (s.iRotate - degrees 90)
+                    }
+                )
+                model
+            , Cmd.none
+            )
 
         OnImageSettingsChange settings ->
             ( updateSettings (\_ -> settings) model, Cmd.none )
@@ -312,11 +325,11 @@ update msg model =
         CopySettings settings ->
             ( { model | clipboard = Just settings }, Cmd.none )
 
-        OnImageLoad settings previewWidth ->
+        OnImageLoad settings canvasSize ->
             let
                 getHistogram =
                     Cmd.map GotHistogram <|
-                        Request.postImageSettingsHistogram previewWidth settings
+                        Request.postImageSettingsHistogram canvasSize settings
             in
             case model.imageProcessingState of
                 Ready ->
@@ -405,7 +418,7 @@ pushNotification : String -> Model -> ( Model, Cmd Msg )
 pushNotification msg model =
     ( { model | notifications = msg :: model.notifications }
     , Task.perform (\_ -> RemoveNotification) <|
-        Process.sleep 4000
+        Process.sleep 10000
     )
 
 
@@ -496,20 +509,20 @@ viewFileBrowser dir filmRoll =
     section [ id "files" ]
         [ ul [] <|
             List.concat
-                [ List.map (viewFileLink "" dir.unWorkingDirectory) (Zipper.before filmRoll)
-                , [ viewFileLink "-current" dir.unWorkingDirectory (Zipper.current filmRoll) ]
-                , List.map (viewFileLink "" dir.unWorkingDirectory) (Zipper.after filmRoll)
+                [ List.map (viewFileLink False dir.unWorkingDirectory) (Zipper.before filmRoll)
+                , [ viewFileLink True dir.unWorkingDirectory (Zipper.current filmRoll) ]
+                , List.map (viewFileLink False dir.unWorkingDirectory) (Zipper.after filmRoll)
                 ]
         ]
 
 
-viewFileLink : String -> String -> ImageSettings -> Html Msg
-viewFileLink className dir imageSettings =
+viewFileLink : Bool -> String -> ImageSettings -> Html Msg
+viewFileLink isCurrent dir imageSettings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
     in
-    li [ class className ]
+    li [ classList [ ( "-current", isCurrent ) ] ]
         [ a
             [ href <|
                 toUrl imageSettings.iFilename
@@ -674,6 +687,9 @@ viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
 viewImage : FilmRoll -> Model -> Html Msg
 viewImage filmRoll model =
     let
+        current =
+            Zipper.current filmRoll
+
         currentCrop =
             .iCrop <|
                 Zipper.current filmRoll
@@ -688,15 +704,15 @@ viewImage filmRoll model =
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper", scale ]
-            [ viewMaybe model.imageWidth <|
-                \imageWidth ->
+            [ viewMaybe model.canvasSize <|
+                \{ element } ->
                     img
-                        [ on "load" (Decode.succeed (OnImageLoad (Zipper.current filmRoll) imageWidth))
+                        [ on "load" (Decode.succeed (OnImageLoad (Zipper.current filmRoll) (floor element.width)))
                         , style "user-select" "none"
                         , src <|
                             Url.Builder.absolute [ "image" ]
                                 [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
-                                , Url.Builder.int "preview-width" imageWidth
+                                , Url.Builder.int "preview-width" (floor element.width)
                                 ]
                         ]
                         []
@@ -821,3 +837,8 @@ viewMaybe maybe html =
 
         Nothing ->
             text ""
+
+
+fractionalModBy : Float -> Float -> Float
+fractionalModBy m v =
+    v - m * Basics.toFloat (Basics.floor (v / m))
