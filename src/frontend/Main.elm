@@ -8,9 +8,9 @@ import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings
     exposing
-        ( Dir
-        , ImageCrop
+        ( ImageCrop
         , ImageSettings
+        , PathSegment
         )
 import Generated.Request as Request
 import Html exposing (..)
@@ -137,7 +137,7 @@ type alias Model =
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : { filename : String }
-    , dir : Maybe Dir
+    , dir : Maybe PathSegment
     , scrollTo : ScrollTo.State
     , histogram : List Int
     , undoState : List FilmRoll
@@ -207,7 +207,7 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
-    | GotFilmRollSettings (HttpResult ( List ImageSettings, Dir ))
+    | GotFilmRollSettings (HttpResult ( List ImageSettings, PathSegment ))
     | GotGenerateHighres (HttpResult ())
     | GotGeneratePreviews (HttpResult ())
     | GotHistogram (HttpResult (List Int))
@@ -504,14 +504,14 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFileBrowser : Dir -> FilmRoll -> Html Msg
+viewFileBrowser : PathSegment -> FilmRoll -> Html Msg
 viewFileBrowser dir filmRoll =
     section [ id "files" ]
         [ ul [] <|
             List.concat
-                [ List.map (viewFileLink False dir.unDir) (Zipper.before filmRoll)
-                , [ viewFileLink True dir.unDir (Zipper.current filmRoll) ]
-                , List.map (viewFileLink False dir.unDir) (Zipper.after filmRoll)
+                [ List.map (viewFileLink False dir.unPathSegment) (Zipper.before filmRoll)
+                , [ viewFileLink True dir.unPathSegment (Zipper.current filmRoll) ]
+                , List.map (viewFileLink False dir.unPathSegment) (Zipper.after filmRoll)
                 ]
         ]
 
@@ -548,7 +548,7 @@ toUrl filename =
 -- IMAGE SETTINGS
 
 
-viewSettings : FilmRoll -> Dir -> Model -> Html Msg
+viewSettings : FilmRoll -> PathSegment -> Model -> Html Msg
 viewSettings filmRoll dir model =
     let
         settings =
@@ -610,7 +610,7 @@ viewSettings filmRoll dir model =
             [ text <|
                 interpolate "{0} | {1}"
                     [ settings.iFilename
-                    , dir.unDir
+                    , dir.unPathSegment
                     ]
             ]
         ]

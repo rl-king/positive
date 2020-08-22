@@ -52,7 +52,7 @@ type PositiveM sig m =
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
     ePreviewMVar :: !(MVar FilmRollSettings),
-    eDir :: !Dir,
+    eDir :: !PathSegment,
     eLogger :: !TimedFastLogger
   }
 
@@ -81,7 +81,7 @@ data SettingsApi route = SettingsApi
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image" :> "settings"
-        :> Get '[JSON] ([ImageSettings], Dir),
+        :> Get '[JSON] ([ImageSettings], PathSegment),
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "preview-width" Int
@@ -108,10 +108,10 @@ server logger Flags {fDir, fIsDev} =
             defaultSettings
       runEffects imageMVar previewMVar =
         runReader (Env imageMVar previewMVar fDir logger)
-          >>> runLog logger
           >>> runFilmRoll fDir
-          >>> Error.Church.runError (\(_ :: String) -> throwError err500) pure
+          >>> Error.Church.runError (\err -> log (Text.pack err) >> throwError err500) pure
           >>> Error.Either.runError
+          >>> runLog logger
           >>> runM
           >>> ExceptT
           >>> Servant.Handler
@@ -173,10 +173,9 @@ handleSaveSettings imageSettings = do
   sendIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
 
-handleGetSettings :: PositiveM sig m => m ([ImageSettings], Dir)
+handleGetSettings :: PositiveM sig m => m ([ImageSettings], PathSegment)
 handleGetSettings =
-  (\a b -> (Settings.toList a, eDir b))
-    <$> FilmRoll.read <*> ask
+  (\a b -> (Settings.toList a, eDir b)) <$> FilmRoll.readSettings <*> ask
 
 -- GENERATE PREVIEWS
 
@@ -340,7 +339,7 @@ zone t i =
 
 -- PREVIEW LOOP
 
-previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> Dir -> IO ()
+previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> PathSegment -> IO ()
 previewWorker logger previewMVar workingDirectory =
   void . forkIO . forever $ do
     settings <- takeMVar previewMVar
@@ -388,7 +387,7 @@ timed name action = do
 
 workingDirectory :: PositiveM sig m => m FilePath
 workingDirectory =
-  asks (Text.unpack . unDir . eDir)
+  asks (segmentToString . eDir)
 
 pSwapMVar :: MVar a -> a -> IO ()
 pSwapMVar mvar a = do

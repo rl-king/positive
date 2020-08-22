@@ -15,6 +15,7 @@ import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Prelude
 import Servant
+import System.FilePath.Posix ((</>))
 
 -- FILMROLLSETTINGS
 
@@ -133,31 +134,38 @@ instance Elm.HasElmEncoder Aeson.Value ImageCrop where
 
 -- DIR
 
-newtype Dir = Dir {unDir :: Text}
+newtype PathSegment = PathSegment {unPathSegment :: Text}
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
 
-instance Elm.HasElmType Dir where
+instance Semigroup PathSegment where
+  (<>) (PathSegment a) (PathSegment b) = PathSegment . Text.pack $ Text.unpack a </> Text.unpack b
+
+segmentToString :: PathSegment -> String
+segmentToString =
+  Text.unpack . unPathSegment
+
+instance Elm.HasElmType PathSegment where
   elmDefinition =
     Just $
       Elm.deriveElmTypeDefinition
-        @Dir
+        @PathSegment
         Elm.defaultOptions
-        "Generated.Data.ImageSettings.Dir"
+        "Generated.Data.ImageSettings.PathSegment"
 
-instance Elm.HasElmDecoder Aeson.Value Dir where
+instance Elm.HasElmDecoder Aeson.Value PathSegment where
   elmDecoderDefinition =
     Just $
       Elm.deriveElmJSONDecoder
-        @Dir
+        @PathSegment
         Elm.defaultOptions
         Aeson.defaultOptions
-        "Generated.Data.ImageSettings.decodeDir"
+        "Generated.Data.ImageSettings.decodePathSegment"
 
-instance Elm.HasElmEncoder Aeson.Value Dir where
+instance Elm.HasElmEncoder Aeson.Value PathSegment where
   elmEncoderDefinition =
     Just $
       Elm.deriveElmJSONEncoder
-        @Dir
+        @PathSegment
         Elm.defaultOptions
         Aeson.defaultOptions
-        "Generated.Data.ImageSettings.encodeDir"
+        "Generated.Data.ImageSettings.encodePathSegment"

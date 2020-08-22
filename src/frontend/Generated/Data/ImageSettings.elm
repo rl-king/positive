@@ -1,4 +1,4 @@
-module Generated.Data.ImageSettings exposing (Dir, ImageCrop, ImageSettings, decodeDir, decodeImageCrop, decodeImageSettings, encodeDir, encodeImageCrop, encodeImageSettings)
+module Generated.Data.ImageSettings exposing (ImageCrop, ImageSettings, PathSegment, decodeImageCrop, decodeImageSettings, decodePathSegment, encodeImageCrop, encodeImageSettings, encodePathSegment)
 
 import Json.Decode
 import Json.Decode.Pipeline
@@ -68,16 +68,16 @@ decodeImageCrop =
         |> Json.Decode.Pipeline.required "icWidth" Json.Decode.float
 
 
-type alias Dir =
-    { unDir : String }
+type alias PathSegment =
+    { unPathSegment : String }
 
 
-encodeDir : Dir -> Json.Encode.Value
-encodeDir a =
-    Json.Encode.object [ ( "unDir", Json.Encode.string a.unDir ) ]
+encodePathSegment : PathSegment -> Json.Encode.Value
+encodePathSegment a =
+    Json.Encode.object [ ( "unPathSegment", Json.Encode.string a.unPathSegment ) ]
 
 
-decodeDir : Json.Decode.Decoder Dir
-decodeDir =
-    Json.Decode.succeed Dir
-        |> Json.Decode.Pipeline.required "unDir" Json.Decode.string
+decodePathSegment : Json.Decode.Decoder PathSegment
+decodePathSegment =
+    Json.Decode.succeed PathSegment
+        |> Json.Decode.Pipeline.required "unPathSegment" Json.Decode.string

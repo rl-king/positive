@@ -7,7 +7,7 @@ import Positive.Settings
 -- FLAGS
 
 data Flags = Flags
-  { fDir :: !Dir,
+  { fDir :: !PathSegment,
     fIsDev :: !Bool
   }
   deriving (Show, Eq)
@@ -23,9 +23,9 @@ parser =
     <$> parseDir
     <*> flag False True (long "dev")
 
-parseDir :: Parser Dir
+parseDir :: Parser PathSegment
 parseDir =
-  Dir
+  PathSegment
     <$> strOption
       ( long "dir"
           <> short 'd'

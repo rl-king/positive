@@ -23,13 +23,22 @@ import System.FilePath.Posix ((</>))
 import qualified System.FilePath.Posix as Path
 
 data FilmRoll (m :: Type -> Type) k where
-  Read :: FilmRoll m FilmRollSettings
+  Read :: Maybe PathSegment -> FilmRoll m FilmRollSettings
+  Write :: Maybe PathSegment -> FilmRollSettings -> FilmRoll m ()
 
-read :: Has FilmRoll sig m => m FilmRollSettings
-read =
-  send Read
+readSettings :: Has FilmRoll sig m => m FilmRollSettings
+readSettings = send (Read Nothing)
 
-newtype FilmRollC m a = FilmRollC {unFilmRollC :: ReaderC Dir m a}
+writeSettings :: Has FilmRoll sig m => FilmRollSettings -> m ()
+writeSettings = send . Write Nothing
+
+readPreviewSettings :: Has FilmRoll sig m => m FilmRollSettings
+readPreviewSettings = send (Read (Just (PathSegment "previews")))
+
+writePreviewSettings :: Has FilmRoll sig m => FilmRollSettings -> m ()
+writePreviewSettings = send . Write (Just (PathSegment "previews"))
+
+newtype FilmRollC m a = FilmRollC {unFilmRollC :: ReaderC PathSegment m a}
   deriving newtype (Applicative, Functor, Monad, MonadIO)
 
 instance (Algebra sig m, Has (Lift IO) sig m, Has (Throw String) sig m) => Algebra (FilmRoll :+: sig) (FilmRollC m) where
@@ -37,17 +46,22 @@ instance (Algebra sig m, Has (Lift IO) sig m, Has (Throw String) sig m) => Algeb
     case sig of
       R other ->
         FilmRollC (alg (unFilmRollC . hdl) (R other) ctx)
-      L Read ->
-        fmap (<$ ctx) . either throwError pure =<< sendIO . getSettingsFile =<< FilmRollC ask
+      L (Read maybeDir) -> do
+        dir <- FilmRollC ask
+        fmap (<$ ctx) . either throwError pure =<< sendIO (getSettingsFile (maybe dir (dir <>) maybeDir))
+      L (Write maybeDir settings) -> do
+        dir <- FilmRollC ask
+        let path = maybe dir (dir <>) maybeDir <> PathSegment "image-settings.json"
+        fmap (<$ ctx) . sendIO . ByteString.writeFile (segmentToString path) $ Aeson.encode settings
 
-runFilmRoll :: Dir -> FilmRollC m a -> m a
+runFilmRoll :: PathSegment -> FilmRollC m a -> m a
 runFilmRoll dir =
   runReader dir . unFilmRollC
 
 --
 
-getSettingsFile :: Dir -> IO (Either String FilmRollSettings)
-getSettingsFile (Dir dir) = do
+getSettingsFile :: PathSegment -> IO (Either String FilmRollSettings)
+getSettingsFile (PathSegment dir) = do
   let path = Text.unpack dir </> "image-settings.json"
   exists <- doesPathExist path
   if exists
