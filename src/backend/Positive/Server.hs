@@ -20,7 +20,6 @@ import qualified Data.Time.Clock as Time
 import qualified Data.Vector.Unboxed as Vector
 import GHC.Float (int2Double)
 import qualified Graphics.Image as HIP
-import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
 import Positive.Flags
 import Positive.Prelude hiding (ByteString)
@@ -141,7 +140,7 @@ handleSaveSettings settings = do
       path = dir </> "image-settings.json"
   liftIO . ByteString.writeFile path $ Aeson.encode newSettings
   logMsg "Updated settings"
-  liftIO . pSwapMVar ePreviewMVar $ Settings.fromList settings
+  liftIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
 
 handleGetSettings :: PositiveM ([ImageSettings], WorkingDirectory)
@@ -289,23 +288,12 @@ zone t i =
    in fmap (\v -> v + (i * m v))
 {-# INLINE zone #-}
 
--- IMAGE
-
-data Image
-
-instance Accept Image where
-  contentType _ =
-    "image" Media.// "jpg"
-
-instance MimeRender Image ByteString where
-  mimeRender _ = id
-
 -- PREVIEW LOOP
 
 previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
-previewWorker logger previewMVar wd@(WorkingDirectory dir) = do
-  let path = Text.unpack dir </> "previews" </> "image-settings.json"
+previewWorker logger previewMVar wd@(WorkingDirectory dir) =
   void . forkIO . forever $ do
+    let path = Text.unpack dir </> "previews" </> "image-settings.json"
     queuedSettings <- takeMVar previewMVar
     diffed <- do
       exists <- doesPathExist path
@@ -315,6 +303,7 @@ previewWorker logger previewMVar wd@(WorkingDirectory dir) = do
           logMsg_ logger "No preview settings file found, creating one now"
           filenames <- getAllPngs (Text.unpack dir)
           let settings = Settings.fromFilenames filenames
+          liftIO $ createDirectoryIfMissing False (Text.unpack dir </> "previews")
           liftIO . ByteString.writeFile path $ Aeson.encode settings
           logMsg_ logger $ "Wrote: " <> Text.pack path
           pure $ Right settings
@@ -371,7 +360,6 @@ workingDirectory =
 pSwapMVar :: MVar a -> a -> IO ()
 pSwapMVar mvar a = do
   isEmpty <- isEmptyMVar mvar
-  print isEmpty
   if isEmpty
     then putMVar mvar a
     else void $ swapMVar mvar a

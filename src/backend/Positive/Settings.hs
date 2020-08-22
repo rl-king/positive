@@ -8,13 +8,26 @@ module Positive.Settings where
 import qualified Data.Aeson as Aeson
 import Data.Bifunctor
 import qualified Data.ByteString.Base64 as Base64
+import Data.ByteString.Lazy (ByteString)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Text as Text
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
-import Positive.Prelude
+import qualified Network.HTTP.Media as Media
+import Positive.Prelude hiding (ByteString)
 import Servant
+
+-- IMAGE
+
+data Image
+
+instance Accept Image where
+  contentType _ =
+    "image" Media.// "jpg"
+
+instance MimeRender Image ByteString where
+  mimeRender _ = id
 
 -- FILMROLLSETTINGS
 
