@@ -24,6 +24,7 @@ dependencies:
   - base64-bytestring
   - bytestring
   - directory
+  - deepseq
   - elm-syntax
   - fast-logger
   - filepath

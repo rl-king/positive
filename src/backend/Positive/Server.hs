@@ -16,17 +16,16 @@ import Control.Carrier.Error.Either as Error.Either
 import Control.Carrier.Lift
 import Control.Carrier.Reader
 import Control.Concurrent.MVar
-import Control.Exception (evaluate)
 import Control.Monad.Trans.Except (ExceptT (..))
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Text as Text
-import qualified Data.Time.Clock as Time
 import qualified Data.Vector.Unboxed as Vector
 import qualified Graphics.Image as HIP
 import Network.Wai.Handler.Warp
 import Positive.Effect.FilmRoll as FilmRoll
 import Positive.Effect.Log
+import Positive.Effect.Profile
 import Positive.Flags
 import Positive.Image
 import Positive.ImageSettings as ImageSettings
@@ -100,6 +99,7 @@ server logger Flags {fDir, fIsDev} =
           >>> runFilmRoll fDir
           >>> Error.Church.runError (\err -> log (Text.pack err) >> throwError err500) pure
           >>> Error.Either.runError
+          >>> runProfile
           >>> runLog logger
           >>> runM
           >>> ExceptT
@@ -117,6 +117,7 @@ handlers ::
   ( Has Log sig m,
     Has (Reader Env) sig m,
     Has FilmRoll sig m,
+    Has Profile sig m,
     Has (Lift IO) sig m
   ) =>
   Bool ->
@@ -142,6 +143,7 @@ handlers isDev =
 handleImage ::
   ( Has (Lift IO) sig m,
     Has (Reader Env) sig m,
+    Has Profile sig m,
     Has Log sig m
   ) =>
   Int ->
@@ -149,11 +151,9 @@ handleImage ::
   m ByteString
 handleImage previewWidth imageSettings = do
   dir <- workingDirectory
-  (image, putMVarBack) <-
-    getImage previewWidth $
-      Text.pack (dir </> Text.unpack (iFilename imageSettings))
-  processed <- timed "Apply settings" $ processImage imageSettings image
-  encoded <- timed "Encode PNG" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
+  (image, putMVarBack) <- getImage previewWidth $ Text.pack (dir </> Text.unpack (iFilename imageSettings))
+  processed <- measure "Apply settings" $ processImage imageSettings image
+  encoded <- measure "Encode as PNG" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
   sendIO putMVarBack
   pure encoded
 
@@ -167,11 +167,10 @@ handleSaveSettings ::
   m [ImageSettings]
 handleSaveSettings settings = do
   Env {ePreviewMVar} <- ask
-  let newSettings = ImageSettings.fromList settings
-  FilmRoll.writeSettings newSettings
+  FilmRoll.writeSettings $ ImageSettings.fromList settings
   log "Updated settings"
-  sendIO $ pSwapMVar ePreviewMVar newSettings
-  pure $ ImageSettings.toList newSettings
+  sendIO . pSwapMVar ePreviewMVar $ ImageSettings.fromList settings
+  pure settings
 
 handleGetSettings ::
   ( Has (Reader Env) sig m,
@@ -214,9 +213,7 @@ handleGetSettingsHistogram ::
   m [Int]
 handleGetSettingsHistogram previewWidth imageSettings = do
   dir <- workingDirectory
-  (image, putMVarBack) <-
-    getImage previewWidth $
-      Text.pack (dir </> Text.unpack (iFilename imageSettings))
+  (image, putMVarBack) <- getImage previewWidth $ Text.pack (dir </> Text.unpack (iFilename imageSettings))
   sendIO putMVarBack
   log $ "Generating histogram fro: " <> iFilename imageSettings
   pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
@@ -261,29 +258,22 @@ previewWorker logger previewMVar dir =
       Left err ->
         log_ logger (Text.pack err) >> threadDelay 10000000
       Right newSettings -> do
-        for_ (toList newSettings) $
-          \settings -> do
-            let input = dir <> PathSegment (iFilename settings)
-                output =
-                  dir
-                    <> PathSegment "previews"
-                    <> PathSegment (Text.pack (Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"))
-            log_ logger $ "Generating preview for: " <> tshow input
-            ByteString.writeFile (segmentToString output)
-              =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
-              <$> readImageFromDisk (segmentToString input)
+        generatePreviews logger newSettings dir
         threadDelay 10000000
 
--- PROFILE
-
-timed :: (Has (Lift IO) sig m, Has Log sig m) => Text -> a -> m a
-timed name action = do
-  log $ name <> " - started"
-  start <- sendIO Time.getCurrentTime
-  a <- sendIO $ evaluate action
-  done <- sendIO Time.getCurrentTime
-  log $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
-  pure a
+generatePreviews :: TimedFastLogger -> FilmRollSettings -> PathSegment -> IO ()
+generatePreviews logger filmRoll dir =
+  for_ (toList filmRoll) $
+    \settings -> do
+      let input = dir <> PathSegment (iFilename settings)
+          output =
+            dir
+              <> PathSegment "previews"
+              <> PathSegment (Text.pack (Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"))
+      log_ logger $ "Generating preview for: " <> tshow input
+      ByteString.writeFile (segmentToString output)
+        =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
+        <$> readImageFromDisk (segmentToString input)
 
 -- HELPERS
 
