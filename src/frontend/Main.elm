@@ -217,7 +217,6 @@ type Msg
     | OnImageLoad ImageSettings Int
     | SaveSettings FilmRoll
     | GenerateHighres ImageSettings
-    | GeneratePreviews
     | CopySettings ImageSettings
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
@@ -360,11 +359,6 @@ update msg model =
                             , cmds
                             ]
                     )
-
-        GeneratePreviews ->
-            ( model
-            , Cmd.map GotGeneratePreviews Request.postImageSettingsPreviews
-            )
 
         UpdateImageCropMode mode ->
             ( { model | imageCropMode = mode }, Cmd.none )
@@ -598,7 +592,6 @@ viewSettings filmRoll workingDirectory model =
             ]
         , viewSettingsGroup
             [ button [ onClick (GenerateHighres settings) ] [ text "Generate highres" ]
-            , button [ onClick GeneratePreviews ] [ text "Generate previews" ]
             , viewIf (not (List.isEmpty model.undoState)) <|
                 \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]

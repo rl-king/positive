@@ -41,6 +41,7 @@ type PositiveM =
 
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
+    ePreviewMVar :: !(MVar FilmRollSettings),
     eDir :: !WorkingDirectory,
     eLogger :: !TimedFastLogger
   }
@@ -79,9 +80,6 @@ data SettingsApi route = SettingsApi
     saGenerateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent,
-    saGeneratePreviews ::
-      route :- "image" :> "settings" :> "previews"
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)
@@ -89,17 +87,19 @@ data SettingsApi route = SettingsApi
 -- SERVER
 
 server :: TimedFastLogger -> Flags -> IO ()
-server logger flags =
+server logger Flags {fDir, fIsDev} =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
             (logMsg_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
-      nt ref =
-        flip runReaderT (Env ref (fDir flags) logger)
+      nt imageMVar previewMVar =
+        flip runReaderT (Env imageMVar previewMVar fDir logger)
    in do
-        ref <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
-        runSettings settings (genericServeT (nt ref) (handlers (fIsDev flags)))
+        imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
+        previewMVar <- newEmptyMVar
+        previewWorker logger previewMVar fDir
+        runSettings settings (genericServeT (nt imageMVar previewMVar) (handlers fIsDev))
 
 -- HANDLERS
 
@@ -118,52 +118,36 @@ handlers isDev =
             { saSaveSettings = handleSaveSettings,
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
-              saGenerateHighRes = handleGenerateHighRes,
-              saGeneratePreviews = handleGeneratePreviews
+              saGenerateHighRes = handleGenerateHighRes
             }
     }
 
 handleImage :: Int -> ImageSettings -> PositiveM ByteString
-handleImage previewWidth imageSettings = do
+handleImage previewWidth settings = do
   dir <- workingDirectory
   (image, putMVarBack) <-
     getImage previewWidth $
-      Text.pack (dir </> Text.unpack (iFilename imageSettings))
-  processed <- timed "Apply settings" $ processImage imageSettings image
+      Text.pack (dir </> Text.unpack (iFilename settings))
+  processed <- timed "Apply settings" $ processImage settings image
   encoded <- timed "Encode PNG" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
   liftIO putMVarBack
   pure encoded
 
 handleSaveSettings :: [ImageSettings] -> PositiveM [ImageSettings]
-handleSaveSettings imageSettings = do
+handleSaveSettings settings = do
+  Env {ePreviewMVar} <- ask
   dir <- workingDirectory
-  let newSettings = Settings.fromList imageSettings
+  let newSettings = Settings.fromList settings
       path = dir </> "image-settings.json"
   liftIO . ByteString.writeFile path $ Aeson.encode newSettings
   logMsg "Updated settings"
+  liftIO . pSwapMVar ePreviewMVar $ Settings.fromList settings
   pure $ Settings.toList newSettings
 
 handleGetSettings :: PositiveM ([ImageSettings], WorkingDirectory)
 handleGetSettings =
   (\a b -> (Settings.toList a, eDir b))
     <$> getSettingsFile <*> ask
-
--- GENERATE PREVIEWS
-
-handleGeneratePreviews :: PositiveM NoContent
-handleGeneratePreviews = do
-  dir <- workingDirectory
-  (FilmRollSettings files) <- getSettingsFile
-  Env {eLogger} <- ask
-  liftIO $ createDirectoryIfMissing False (dir </> "previews")
-  (NoContent <$) . liftIO . forkIO . for_ files $
-    \settings -> do
-      let input = dir </> Text.unpack (iFilename settings)
-          output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-      logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
-      ByteString.writeFile output
-        =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
-        <$> readImageFromDisk input
 
 -- GENERATE PREVIEWS
 
@@ -185,15 +169,15 @@ handleGenerateHighRes settings = do
 -- HISTOGRAM
 
 handleGetSettingsHistogram :: Int -> ImageSettings -> PositiveM [Int]
-handleGetSettingsHistogram previewWidth imageSettings = do
+handleGetSettingsHistogram previewWidth settings = do
   dir <- workingDirectory
   (image, putMVarBack) <-
     getImage previewWidth $
-      Text.pack (dir </> Text.unpack (iFilename imageSettings))
+      Text.pack (dir </> Text.unpack (iFilename settings))
   liftIO putMVarBack
-  logMsg $ "Generating histogram fro: " <> iFilename imageSettings
+  logMsg $ "Generating histogram for: " <> iFilename settings
   pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
-    processImage imageSettings image
+    processImage settings image
 
 -- SETTINGS FILE
 
@@ -316,6 +300,42 @@ instance Accept Image where
 instance MimeRender Image ByteString where
   mimeRender _ = id
 
+-- PREVIEW LOOP
+
+previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
+previewWorker logger previewMVar wd@(WorkingDirectory dir) = do
+  let path = Text.unpack dir </> "previews" </> "image-settings.json"
+  void . forkIO . forever $ do
+    queuedSettings <- takeMVar previewMVar
+    diffed <- do
+      exists <- doesPathExist path
+      if exists
+        then fmap (Settings.difference queuedSettings) <$> Aeson.eitherDecodeFileStrict path
+        else do
+          logMsg_ logger "No preview settings file found, creating one now"
+          filenames <- getAllPngs (Text.unpack dir)
+          let settings = Settings.fromFilenames filenames
+          liftIO . ByteString.writeFile path $ Aeson.encode settings
+          logMsg_ logger $ "Wrote: " <> Text.pack path
+          pure $ Right settings
+    case diffed of
+      Left err -> logMsg_ logger $ Text.pack err
+      Right newSettings -> do
+        ByteString.writeFile path $ Aeson.encode queuedSettings
+        generatePreviews logger newSettings wd
+        threadDelay 10000000
+
+generatePreviews :: TimedFastLogger -> FilmRollSettings -> WorkingDirectory -> IO ()
+generatePreviews logger filmRoll (WorkingDirectory dir) =
+  for_ (toList filmRoll) $
+    \settings -> do
+      let input = Text.unpack dir </> Text.unpack (iFilename settings)
+          output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+      logMsg_ logger $ "Generating preview for: " <> tshow input
+      ByteString.writeFile output
+        =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
+        <$> readImageFromDisk input
+
 -- LOG
 
 logMsg :: Text -> PositiveM ()
@@ -347,3 +367,11 @@ timed name action = do
 workingDirectory :: PositiveM FilePath
 workingDirectory =
   asks (Text.unpack . unWorkingDirectory . eDir)
+
+pSwapMVar :: MVar a -> a -> IO ()
+pSwapMVar mvar a = do
+  isEmpty <- isEmptyMVar mvar
+  print isEmpty
+  if isEmpty
+    then putMVar mvar a
+    else void $ swapMVar mvar a
