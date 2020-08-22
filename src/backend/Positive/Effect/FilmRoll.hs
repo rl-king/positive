@@ -16,8 +16,8 @@ import Control.Effect.Throw
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Text as Text
+import Positive.ImageSettings
 import Positive.Prelude
-import Positive.Settings
 import System.Directory
 import System.FilePath.Posix ((</>))
 import qualified System.FilePath.Posix as Path

@@ -2,7 +2,7 @@ module Positive.Flags where
 
 import Options.Applicative
 import Positive.Prelude
-import Positive.Settings
+import Positive.ImageSettings
 
 -- FLAGS
 

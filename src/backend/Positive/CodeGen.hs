@@ -12,7 +12,7 @@ import qualified Language.Haskell.To.Elm as Elm
 import Positive.Effect.Log
 import Positive.Prelude
 import Positive.Server
-import Positive.Settings
+import Positive.ImageSettings
 import Servant.API.Generic (ToServantApi)
 import qualified Servant.To.Elm
 import qualified System.Directory as Directory
