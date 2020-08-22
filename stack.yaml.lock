@@ -12,6 +12,13 @@ packages:
   original:
     hackage: elm-syntax-0.3.0.0@sha256:8fd57f8e15e499c11b78983bce3c4b237eb2f22e467a55d51702b43a18c61323,2257
 - completed:
+    hackage: fused-effects-1.1.0.0@sha256:29d03c73b585920c0999a18b73c9a0bf9e61e1fa58c5c2bed3f89423c8078f4a,5139
+    pantry-tree:
+      size: 6288
+      sha256: e427a329bd733f5096e37bfcf5a211bb2e8555b88b7e87ac43607d2f455e3f66
+  original:
+    hackage: fused-effects-1.1.0.0@sha256:29d03c73b585920c0999a18b73c9a0bf9e61e1fa58c5c2bed3f89423c8078f4a,5139
+- completed:
     hackage: haskell-to-elm-0.3.0.0@sha256:b8a016087523596c7420fc0b78611b2ffa9b8094c8c5930b89ef7bbec82401a5,3614
     pantry-tree:
       size: 505

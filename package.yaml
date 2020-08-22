@@ -28,12 +28,12 @@ dependencies:
   - fast-logger
   - filepath
   - file-embed
+  - fused-effects == 1.1.0.0
   - generics-sop
   - haskell-to-elm
   - hip
   - http-media
   - http-types
-  - mtl
   - optparse-applicative
   - process
   - safe-exceptions
@@ -42,6 +42,7 @@ dependencies:
   - servant-to-elm
   - text
   - time
+  - transformers
   - vector
   - wai
   - wai-app-static

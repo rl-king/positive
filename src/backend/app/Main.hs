@@ -3,6 +3,7 @@
 module Main where
 
 import Positive.CodeGen
+import Positive.Effect.Log
 import Positive.Flags
 import Positive.Prelude
 import Positive.Server
@@ -17,5 +18,5 @@ main = do
     \logger -> do
       flags@Flags {fIsDev} <- parseArgs
       when fIsDev (codeGen logger)
-      logMsg_ logger (tshow flags)
+      log_ logger (tshow flags)
       server logger flags

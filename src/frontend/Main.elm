@@ -8,9 +8,9 @@ import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings
     exposing
-        ( ImageCrop
+        ( Dir
+        , ImageCrop
         , ImageSettings
-        , WorkingDirectory
         )
 import Generated.Request as Request
 import Html exposing (..)
@@ -137,7 +137,7 @@ type alias Model =
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : { filename : String }
-    , workingDirectory : Maybe WorkingDirectory
+    , dir : Maybe Dir
     , scrollTo : ScrollTo.State
     , histogram : List Int
     , undoState : List FilmRoll
@@ -169,7 +169,7 @@ init _ url key =
       , imageCropMode = Nothing
       , clipboard = Nothing
       , route = route
-      , workingDirectory = Nothing
+      , dir = Nothing
       , scrollTo = ScrollTo.init
       , histogram = []
       , undoState = []
@@ -207,7 +207,7 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
-    | GotFilmRollSettings (HttpResult ( List ImageSettings, WorkingDirectory ))
+    | GotFilmRollSettings (HttpResult ( List ImageSettings, Dir ))
     | GotGenerateHighres (HttpResult ())
     | GotGeneratePreviews (HttpResult ())
     | GotHistogram (HttpResult (List Int))
@@ -261,9 +261,9 @@ update msg model =
             , Cmd.map ScrollToMsg scrollToCmds
             )
 
-        GotFilmRollSettings (Ok ( settings, workingDirectory )) ->
+        GotFilmRollSettings (Ok ( settings, dir )) ->
             ( { model
-                | workingDirectory = Just workingDirectory
+                | dir = Just dir
                 , filmRoll =
                     Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == model.route.filename)) <|
                         Zipper.fromList (List.sortBy .iFilename settings)
@@ -458,7 +458,7 @@ updateSettings f model =
 
 view : Model -> Browser.Document Msg
 view model =
-    case Maybe.map2 Tuple.pair model.filmRoll model.workingDirectory of
+    case Maybe.map2 Tuple.pair model.filmRoll model.dir of
         Nothing ->
             { title = "Positive"
             , body =
@@ -469,14 +469,14 @@ view model =
                 ]
             }
 
-        Just ( filmRoll, workingDirectory ) ->
+        Just ( filmRoll, dir ) ->
             { title = model.route.filename ++ " | Positive"
             , body =
                 [ main_ []
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
-                    , viewSettings filmRoll workingDirectory model
-                    , viewFileBrowser workingDirectory filmRoll
+                    , viewSettings filmRoll dir model
+                    , viewFileBrowser dir filmRoll
                     , viewNotification model.notifications
                     ]
                 ]
@@ -504,14 +504,14 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFileBrowser : WorkingDirectory -> FilmRoll -> Html Msg
+viewFileBrowser : Dir -> FilmRoll -> Html Msg
 viewFileBrowser dir filmRoll =
     section [ id "files" ]
         [ ul [] <|
             List.concat
-                [ List.map (viewFileLink False dir.unWorkingDirectory) (Zipper.before filmRoll)
-                , [ viewFileLink True dir.unWorkingDirectory (Zipper.current filmRoll) ]
-                , List.map (viewFileLink False dir.unWorkingDirectory) (Zipper.after filmRoll)
+                [ List.map (viewFileLink False dir.unDir) (Zipper.before filmRoll)
+                , [ viewFileLink True dir.unDir (Zipper.current filmRoll) ]
+                , List.map (viewFileLink False dir.unDir) (Zipper.after filmRoll)
                 ]
         ]
 
@@ -548,8 +548,8 @@ toUrl filename =
 -- IMAGE SETTINGS
 
 
-viewSettings : FilmRoll -> WorkingDirectory -> Model -> Html Msg
-viewSettings filmRoll workingDirectory model =
+viewSettings : FilmRoll -> Dir -> Model -> Html Msg
+viewSettings filmRoll dir model =
     let
         settings =
             case model.imageProcessingState of
@@ -610,7 +610,7 @@ viewSettings filmRoll workingDirectory model =
             [ text <|
                 interpolate "{0} | {1}"
                     [ settings.iFilename
-                    , workingDirectory.unWorkingDirectory
+                    , dir.unDir
                     ]
             ]
         ]

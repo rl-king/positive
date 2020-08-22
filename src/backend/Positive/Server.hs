@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -9,9 +10,14 @@
 
 module Positive.Server where
 
+import Control.Algebra
+import Control.Carrier.Error.Church as Error.Church
+import Control.Carrier.Error.Either as Error.Either
+import Control.Carrier.Lift
+import Control.Carrier.Reader
 import Control.Concurrent.MVar
 import Control.Exception (evaluate)
-import Control.Monad.Reader (ReaderT, ask, asks, runReaderT)
+import Control.Monad.Trans.Except (ExceptT (..))
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
@@ -22,27 +28,31 @@ import GHC.Float (int2Double)
 import qualified Graphics.Image as HIP
 import qualified Network.HTTP.Media as Media
 import Network.Wai.Handler.Warp
+import Positive.Effect.FilmRoll as FilmRoll
+import Positive.Effect.Log
 import Positive.Flags
 import Positive.Prelude hiding (ByteString)
 import Positive.Settings as Settings
 import qualified Positive.Static as Static
-import Servant
+import Servant hiding (throwError)
 import Servant.API.Generic
 import Servant.Server.Generic
 import System.Directory
 import System.FilePath.Posix ((</>))
-import qualified System.FilePath.Posix as Path
-import System.Log.FastLogger (TimedFastLogger, toLogStr)
+import System.Log.FastLogger (TimedFastLogger)
 
 -- POSITIVE
-
-type PositiveM =
-  ReaderT Env Handler
+type PositiveM sig m =
+  ( Has Log sig m,
+    Has (Reader Env) sig m,
+    Has FilmRoll sig m,
+    Has (Lift IO) sig m
+  )
 
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
     ePreviewMVar :: !(MVar FilmRollSettings),
-    eDir :: !WorkingDirectory,
+    eDir :: !Dir,
     eLogger :: !TimedFastLogger
   }
 
@@ -71,7 +81,7 @@ data SettingsApi route = SettingsApi
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image" :> "settings"
-        :> Get '[JSON] ([ImageSettings], WorkingDirectory),
+        :> Get '[JSON] ([ImageSettings], Dir),
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "preview-width" Int
@@ -90,23 +100,38 @@ data SettingsApi route = SettingsApi
 -- SERVER
 
 server :: TimedFastLogger -> Flags -> IO ()
-server logger flags =
+server logger Flags {fDir, fIsDev} =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
-            (logMsg_ logger ("listening on port " <> tshow @Int 8080))
+            (log_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
-      nt imageMVar previewMVar =
-        flip runReaderT (Env imageMVar previewMVar (fDir flags) logger)
+      runEffects imageMVar previewMVar =
+        runReader (Env imageMVar previewMVar fDir logger)
+          >>> runLog logger
+          >>> runFilmRoll fDir
+          >>> Error.Church.runError (\(_ :: String) -> throwError err500) pure
+          >>> Error.Either.runError
+          >>> runM
+          >>> ExceptT
+          >>> Servant.Handler
    in do
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         previewMVar <- newEmptyMVar
-        previewWorker logger previewMVar (fDir flags)
-        runSettings settings (genericServeT (nt imageMVar previewMVar) (handlers (fIsDev flags)))
+        previewWorker logger previewMVar fDir
+        runSettings settings $
+          genericServeT (runEffects imageMVar previewMVar) (handlers fIsDev)
 
 -- HANDLERS
 
-handlers :: Bool -> Api (AsServerT PositiveM)
+handlers ::
+  ( Has Log sig m,
+    Has (Reader Env) sig m,
+    Has FilmRoll sig m,
+    Has (Lift IO) sig m
+  ) =>
+  Bool ->
+  Api (AsServerT m)
 handlers isDev =
   Api
     { aImageApi =
@@ -122,11 +147,11 @@ handlers isDev =
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
               saGenerateHighRes = handleGenerateHighRes,
-              saGeneratePreviews = handleGeneratePreviews
+              saGeneratePreviews = error "" -- handleGeneratePreviews
             }
     }
 
-handleImage :: Int -> ImageSettings -> PositiveM ByteString
+handleImage :: PositiveM sig m => Int -> ImageSettings -> m ByteString
 handleImage previewWidth imageSettings = do
   dir <- workingDirectory
   (image, putMVarBack) <-
@@ -134,113 +159,114 @@ handleImage previewWidth imageSettings = do
       Text.pack (dir </> Text.unpack (iFilename imageSettings))
   processed <- timed "Apply settings" $ processImage imageSettings image
   encoded <- timed "Encode PNG" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
-  liftIO putMVarBack
+  sendIO putMVarBack
   pure encoded
 
-handleSaveSettings :: [ImageSettings] -> PositiveM [ImageSettings]
+handleSaveSettings :: PositiveM sig m => [ImageSettings] -> m [ImageSettings]
 handleSaveSettings imageSettings = do
   Env {ePreviewMVar} <- ask
   dir <- workingDirectory
   let newSettings = Settings.fromList imageSettings
       path = dir </> "image-settings.json"
-  liftIO . ByteString.writeFile path $ Aeson.encode newSettings
-  logMsg "Updated settings"
-  liftIO $ pSwapMVar ePreviewMVar newSettings
+  sendIO . ByteString.writeFile path $ Aeson.encode newSettings
+  log "Updated settings"
+  sendIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
 
-handleGetSettings :: PositiveM ([ImageSettings], WorkingDirectory)
+handleGetSettings :: PositiveM sig m => m ([ImageSettings], Dir)
 handleGetSettings =
   (\a b -> (Settings.toList a, eDir b))
-    <$> getSettingsFile <*> ask
+    <$> FilmRoll.read <*> ask
 
 -- GENERATE PREVIEWS
 
-handleGeneratePreviews :: PositiveM NoContent
-handleGeneratePreviews = do
-  dir <- workingDirectory
-  (FilmRollSettings files) <- getSettingsFile
-  Env {eLogger} <- ask
-  liftIO $ createDirectoryIfMissing False (dir </> "previews")
-  (NoContent <$) . liftIO . forkIO . for_ files $
-    \settings -> do
-      let input = dir </> Text.unpack (iFilename settings)
-          filename = Path.dropExtension . Text.unpack $ iFilename settings
-          hash = Aeson.encode settings
-          output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-      logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
-      ByteString.writeFile output
-        =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
-        <$> readImageFromDisk input
+-- handleGeneratePreviews :: PositiveM sig m => m NoContent
+-- handleGeneratePreviews = do
+--   dir <- workingDirectory
+--   (FilmRollSettings files) <- getSettingsFile
+
+--   Env {eLogger} <- ask
+--   sendIO $ createDirectoryIfMissing False (dir </> "previews")
+--   (NoContent <$) . sendIO . forkIO . for_ files $
+--     \settings -> do
+--       let input = dir </> Text.unpack (iFilename settings)
+--           filename = Path.dropExtension . Text.unpack $ iFilename settings
+--           hash = Aeson.encode settings
+--           output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+--       log_ eLogger $ "Generating preview for: " <> Text.pack input
+--       ByteString.writeFile output
+--         =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
+--         <$> readImageFromDisk input
 
 -- GENERATE PREVIEWS
 
-handleGenerateHighRes :: ImageSettings -> PositiveM NoContent
+handleGenerateHighRes :: PositiveM sig m => ImageSettings -> m NoContent
 handleGenerateHighRes settings = do
   dir <- workingDirectory
-  liftIO $ createDirectoryIfMissing False (dir </> "highres")
+  sendIO $ createDirectoryIfMissing False (dir </> "highres")
   let input = dir </> Text.unpack (iFilename settings)
       output = dir </> "highres" </> Text.unpack (iFilename settings)
-  logMsg $ "Generating highres version of: " <> Text.pack input
+  log $ "Generating highres version of: " <> Text.pack input
   image <-
-    liftIO $
+    sendIO $
       HIP.encode HIP.PNG [] . HIP.exchange HIP.VS . processImage settings
         <$> readImageFromDisk input
-  liftIO $ ByteString.writeFile output image
-  logMsg $ "Wrote highres version of: " <> Text.pack input
+  sendIO $ ByteString.writeFile output image
+  log $ "Wrote highres version of: " <> Text.pack input
   pure NoContent
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Int -> ImageSettings -> PositiveM [Int]
+handleGetSettingsHistogram :: PositiveM sig m => Int -> ImageSettings -> m [Int]
 handleGetSettingsHistogram previewWidth imageSettings = do
   dir <- workingDirectory
   (image, putMVarBack) <-
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename imageSettings))
-  liftIO putMVarBack
-  logMsg $ "Generating histogram fro: " <> iFilename imageSettings
+  sendIO putMVarBack
+  log $ "Generating histogram fro: " <> iFilename imageSettings
   pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
     processImage imageSettings image
 
 -- SETTINGS FILE
 
-getSettingsFile :: PositiveM FilmRollSettings
-getSettingsFile = do
-  dir <- workingDirectory
-  let path = dir </> "image-settings.json"
-  exists <- liftIO $ doesPathExist path
-  if exists
-    then
-      either (\e -> logMsg (tshow e) >> throwError err500) pure
-        =<< liftIO (Aeson.eitherDecodeFileStrict path)
-    else do
-      logMsg "No settings file found, creating one now"
-      filenames <- getAllPngs dir
-      let settings = Settings.fromFilenames filenames
-      liftIO . ByteString.writeFile path $ Aeson.encode settings
-      logMsg $ "Wrote: " <> Text.pack path
-      pure settings
+-- getSettingsFile :: PositiveM FilmRollSettings
+-- getSettingsFile = do
+--   dir <- workingDirectory
+--   let path = dir </> "image-settings.json"
+--   exists <- sendIO $ doesPathExist path
+--   if exists
+--     then
+--       either (\e -> log (tshow e) >> throwError err500) pure
+--         =<< sendIO (Aeson.eitherDecodeFileStrict path)
+--     else do
+--       log "No settings file found, creating one now"
+--       filenames <- getAllPngs dir
+--       let settings = Settings.fromFilenames filenames
+--       sendIO . ByteString.writeFile path $ Aeson.encode settings
+--       log $ "Wrote: " <> Text.pack path
+--       pure settings
 
-getAllPngs :: MonadIO m => FilePath -> m [Text]
-getAllPngs dir =
-  fmap Text.pack . filter ((".png" ==) . Path.takeExtension)
-    <$> liftIO (listDirectory dir)
+-- getAllPngs :: MonadIO m => FilePath -> m [Text]
+-- getAllPngs dir =
+--   fmap Text.pack . filter ((".png" ==) . Path.takeExtension)
+--     <$> sendIO (listDirectory dir)
 
 -- IMAGE
 
-getImage :: Int -> Text -> PositiveM (MonochromeImage HIP.VU, IO ())
+getImage :: PositiveM sig m => Int -> Text -> m (MonochromeImage HIP.VU, IO ())
 getImage previewWidth path = do
   Env {eImageMVar} <- ask
-  currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
-  logMsg $ "MVar: " <> tshow currentlyLoaded
+  currentlyLoaded@(loadedPath, loadedImage) <- sendIO $ takeMVar eImageMVar
+  log $ "MVar: " <> tshow currentlyLoaded
   if path == loadedPath && HIP.cols loadedImage == previewWidth
     then do
-      logMsg "Loaded image"
+      log "Loaded image"
       pure (loadedImage, putMVar eImageMVar currentlyLoaded)
     else do
-      logMsg "Reading image"
-      image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
-      logMsg "Read image"
+      log "Reading image"
+      image <- sendIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
+      log "Read image"
       pure (image, putMVar eImageMVar (path, image))
 
 -- IMAGE
@@ -314,11 +340,11 @@ zone t i =
 
 -- PREVIEW LOOP
 
-previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
+previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> Dir -> IO ()
 previewWorker logger previewMVar workingDirectory =
   void . forkIO . forever $ do
     settings <- takeMVar previewMVar
-    logMsg_ logger "worker"
+    log_ logger "worker"
     threadDelay 1000000
 
 -- IMAGE
@@ -334,14 +360,14 @@ instance MimeRender Image ByteString where
 
 -- LOG
 
-logMsg :: Text -> PositiveM ()
-logMsg msg = do
-  Env {eLogger} <- ask
-  liftIO $ eLogger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
+-- log :: Text -> PositiveM ()
+-- log msg = do
+--   Env {eLogger} <- ask
+--   sendIO $ eLogger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
 
-logMsg_ :: TimedFastLogger -> Text -> IO ()
-logMsg_ logger msg =
-  logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
+-- log_ :: TimedFastLogger -> Text -> IO ()
+-- log_ logger msg =
+--   logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
 
 tshow :: Show a => a -> Text
 tshow =
@@ -349,20 +375,20 @@ tshow =
 
 -- PROFILE
 
-timed :: Text -> a -> PositiveM a
+timed :: PositiveM sig m => Text -> a -> m a
 timed name action = do
-  logMsg $ name <> " - started"
-  start <- liftIO Time.getCurrentTime
-  a <- liftIO $ evaluate action
-  done <- liftIO Time.getCurrentTime
-  logMsg $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
+  log $ name <> " - started"
+  start <- sendIO Time.getCurrentTime
+  a <- sendIO $ evaluate action
+  done <- sendIO Time.getCurrentTime
+  log $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a
 
 -- HELPERS
 
-workingDirectory :: PositiveM FilePath
+workingDirectory :: PositiveM sig m => m FilePath
 workingDirectory =
-  asks (Text.unpack . unWorkingDirectory . eDir)
+  asks (Text.unpack . unDir . eDir)
 
 pSwapMVar :: MVar a -> a -> IO ()
 pSwapMVar mvar a = do
