@@ -41,6 +41,7 @@ type PositiveM =
 
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
+    ePreviewMVar :: !(MVar FilmRollSettings),
     eDir :: !WorkingDirectory,
     eLogger :: !TimedFastLogger
   }
@@ -95,11 +96,13 @@ server logger flags =
           setBeforeMainLoop
             (logMsg_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
-      nt ref =
-        flip runReaderT (Env ref (fDir flags) logger)
+      nt imageMVar previewMVar =
+        flip runReaderT (Env imageMVar previewMVar (fDir flags) logger)
    in do
-        ref <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
-        runSettings settings (genericServeT (nt ref) (handlers (fIsDev flags)))
+        imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
+        previewMVar <- newEmptyMVar
+        previewWorker logger previewMVar (fDir flags)
+        runSettings settings (genericServeT (nt imageMVar previewMVar) (handlers (fIsDev flags)))
 
 -- HANDLERS
 
@@ -136,11 +139,13 @@ handleImage previewWidth imageSettings = do
 
 handleSaveSettings :: [ImageSettings] -> PositiveM [ImageSettings]
 handleSaveSettings imageSettings = do
+  Env {ePreviewMVar} <- ask
   dir <- workingDirectory
   let newSettings = Settings.fromList imageSettings
       path = dir </> "image-settings.json"
   liftIO . ByteString.writeFile path $ Aeson.encode newSettings
   logMsg "Updated settings"
+  liftIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
 
 handleGetSettings :: PositiveM ([ImageSettings], WorkingDirectory)
@@ -159,6 +164,8 @@ handleGeneratePreviews = do
   (NoContent <$) . liftIO . forkIO . for_ files $
     \settings -> do
       let input = dir </> Text.unpack (iFilename settings)
+          filename = Path.dropExtension . Text.unpack $ iFilename settings
+          hash = Aeson.encode settings
           output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
       logMsg_ eLogger $ "Generating preview for: " <> Text.pack input
       ByteString.writeFile output
@@ -305,6 +312,15 @@ zone t i =
    in fmap (\v -> v + (i * m v))
 {-# INLINE zone #-}
 
+-- PREVIEW LOOP
+
+previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
+previewWorker logger previewMVar workingDirectory =
+  void . forkIO . forever $ do
+    settings <- takeMVar previewMVar
+    logMsg_ logger "worker"
+    threadDelay 1000000
+
 -- IMAGE
 
 data Image
@@ -347,3 +363,10 @@ timed name action = do
 workingDirectory :: PositiveM FilePath
 workingDirectory =
   asks (Text.unpack . unWorkingDirectory . eDir)
+
+pSwapMVar :: MVar a -> a -> IO ()
+pSwapMVar mvar a = do
+  isEmpty <- isEmptyMVar mvar
+  if isEmpty
+    then putMVar mvar a
+    else void $ swapMVar mvar a
