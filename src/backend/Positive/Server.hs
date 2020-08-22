@@ -38,10 +38,12 @@ import Servant hiding (throwError)
 import Servant.API.Generic
 import Servant.Server.Generic
 import System.Directory
+import qualified System.FilePath.Posix as Path
 import System.FilePath.Posix ((</>))
 import System.Log.FastLogger (TimedFastLogger)
 
 -- POSITIVE
+
 type PositiveM sig m =
   ( Has Log sig m,
     Has (Reader Env) sig m,
@@ -163,12 +165,10 @@ handleImage previewWidth imageSettings = do
   pure encoded
 
 handleSaveSettings :: PositiveM sig m => [ImageSettings] -> m [ImageSettings]
-handleSaveSettings imageSettings = do
+handleSaveSettings settings = do
   Env {ePreviewMVar} <- ask
-  dir <- workingDirectory
-  let newSettings = Settings.fromList imageSettings
-      path = dir </> "image-settings.json"
-  sendIO . ByteString.writeFile path $ Aeson.encode newSettings
+  let newSettings = Settings.fromList settings
+  FilmRoll.writeSettings newSettings
   log "Updated settings"
   sendIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
@@ -176,28 +176,6 @@ handleSaveSettings imageSettings = do
 handleGetSettings :: PositiveM sig m => m ([ImageSettings], PathSegment)
 handleGetSettings =
   (\a b -> (Settings.toList a, eDir b)) <$> FilmRoll.readSettings <*> ask
-
--- GENERATE PREVIEWS
-
--- handleGeneratePreviews :: PositiveM sig m => m NoContent
--- handleGeneratePreviews = do
---   dir <- workingDirectory
---   (FilmRollSettings files) <- getSettingsFile
-
---   Env {eLogger} <- ask
---   sendIO $ createDirectoryIfMissing False (dir </> "previews")
---   (NoContent <$) . sendIO . forkIO . for_ files $
---     \settings -> do
---       let input = dir </> Text.unpack (iFilename settings)
---           filename = Path.dropExtension . Text.unpack $ iFilename settings
---           hash = Aeson.encode settings
---           output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
---       log_ eLogger $ "Generating preview for: " <> Text.pack input
---       ByteString.writeFile output
---         =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
---         <$> readImageFromDisk input
-
--- GENERATE PREVIEWS
 
 handleGenerateHighRes :: PositiveM sig m => ImageSettings -> m NoContent
 handleGenerateHighRes settings = do
@@ -226,30 +204,6 @@ handleGetSettingsHistogram previewWidth imageSettings = do
   log $ "Generating histogram fro: " <> iFilename imageSettings
   pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
     processImage imageSettings image
-
--- SETTINGS FILE
-
--- getSettingsFile :: PositiveM FilmRollSettings
--- getSettingsFile = do
---   dir <- workingDirectory
---   let path = dir </> "image-settings.json"
---   exists <- sendIO $ doesPathExist path
---   if exists
---     then
---       either (\e -> log (tshow e) >> throwError err500) pure
---         =<< sendIO (Aeson.eitherDecodeFileStrict path)
---     else do
---       log "No settings file found, creating one now"
---       filenames <- getAllPngs dir
---       let settings = Settings.fromFilenames filenames
---       sendIO . ByteString.writeFile path $ Aeson.encode settings
---       log $ "Wrote: " <> Text.pack path
---       pure settings
-
--- getAllPngs :: MonadIO m => FilePath -> m [Text]
--- getAllPngs dir =
---   fmap Text.pack . filter ((".png" ==) . Path.takeExtension)
---     <$> sendIO (listDirectory dir)
 
 -- IMAGE
 
@@ -340,11 +294,30 @@ zone t i =
 -- PREVIEW LOOP
 
 previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> PathSegment -> IO ()
-previewWorker logger previewMVar workingDirectory =
+previewWorker logger previewMVar dir =
   void . forkIO . forever $ do
-    settings <- takeMVar previewMVar
-    log_ logger "worker"
-    threadDelay 1000000
+    queuedSettings <- takeMVar previewMVar
+    result <-
+      runM . Error.Either.runError . runFilmRoll dir $ do
+        currentSettings <- FilmRoll.readPreviewSettings
+        writePreviewSettings queuedSettings
+        pure $ difference queuedSettings currentSettings
+    case result of
+      Left err ->
+        log_ logger (Text.pack err) >> threadDelay 30000000
+      Right newSettings -> do
+        for_ (toList newSettings) $
+          \settings -> do
+            let input = dir <> PathSegment (iFilename settings)
+                output =
+                  dir
+                    <> PathSegment "previews"
+                    <> PathSegment (Text.pack (Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"))
+            log_ logger $ "Generating preview for: " <> tshow input
+            ByteString.writeFile (segmentToString output)
+              =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
+              <$> readImageFromDisk (segmentToString input)
+        threadDelay 30000000
 
 -- IMAGE
 
@@ -356,21 +329,6 @@ instance Accept Image where
 
 instance MimeRender Image ByteString where
   mimeRender _ = id
-
--- LOG
-
--- log :: Text -> PositiveM ()
--- log msg = do
---   Env {eLogger} <- ask
---   sendIO $ eLogger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
-
--- log_ :: TimedFastLogger -> Text -> IO ()
--- log_ logger msg =
---   logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
-
-tshow :: Show a => a -> Text
-tshow =
-  Text.pack . show
 
 -- PROFILE
 
@@ -392,6 +350,7 @@ workingDirectory =
 pSwapMVar :: MVar a -> a -> IO ()
 pSwapMVar mvar a = do
   isEmpty <- isEmptyMVar mvar
+  print isEmpty
   if isEmpty
     then putMVar mvar a
     else void $ swapMVar mvar a

@@ -1,5 +1,6 @@
 module Positive.Prelude
   ( module X,
+    tshow,
   )
 where
 
@@ -25,7 +26,7 @@ import Data.List as X (sortBy)
 import Data.List.NonEmpty as X (NonEmpty)
 import Data.Maybe as X (catMaybes, fromMaybe)
 import Data.Proxy as X (Proxy (..))
-import Data.Text as X (Text)
+import Data.Text as X (Text, pack)
 import Data.Text.Encoding as X (decodeUtf8, encodeUtf8)
 import Data.Traversable as X (for)
 import Data.Vector as X (Vector)
@@ -35,3 +36,7 @@ import GHC.Generics as X (Generic, Generic1)
 import Numeric.Natural as X (Natural)
 import Text.Read as X (readMaybe)
 import Prelude as X hiding (log, undefined)
+
+tshow :: Show a => a -> Text
+tshow =
+  pack . show

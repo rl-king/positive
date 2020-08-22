@@ -46,6 +46,11 @@ toList :: FilmRollSettings -> [ImageSettings]
 toList =
   HashMap.elems . unFilmRollSettings
 
+difference :: FilmRollSettings -> FilmRollSettings -> FilmRollSettings
+difference (FilmRollSettings a) (FilmRollSettings b) =
+  FilmRollSettings $
+    HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b
+
 -- IMAGESETTINGS
 
 data ImageSettings = ImageSettings
