@@ -18,7 +18,6 @@ import Control.Carrier.Reader
 import Control.Concurrent.MVar
 import Control.Exception (evaluate)
 import Control.Monad.Trans.Except (ExceptT (..))
-import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Text as Text
@@ -54,8 +53,7 @@ type PositiveM sig m =
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
     ePreviewMVar :: !(MVar FilmRollSettings),
-    eDir :: !PathSegment,
-    eLogger :: !TimedFastLogger
+    eDir :: !PathSegment
   }
 
 -- API
@@ -109,7 +107,7 @@ server logger Flags {fDir, fIsDev} =
             (log_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
       runEffects imageMVar previewMVar =
-        runReader (Env imageMVar previewMVar fDir logger)
+        runReader (Env imageMVar previewMVar fDir)
           >>> runFilmRoll fDir
           >>> Error.Church.runError (\err -> log (Text.pack err) >> throwError err500) pure
           >>> Error.Either.runError
