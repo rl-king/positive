@@ -142,6 +142,7 @@ type alias Model =
     , histogram : List Int
     , undoState : List FilmRoll
     , scale : Float
+    , previewColumns : Int
     , notifications : List String
     }
 
@@ -174,6 +175,7 @@ init _ url key =
       , histogram = []
       , undoState = []
       , scale = 1
+      , previewColumns = 5
       , notifications = []
       }
     , Cmd.map GotFilmRollSettings Request.getImageSettings
@@ -225,6 +227,7 @@ type Msg
     | Undo
     | UpdateScale Float
     | RemoveNotification
+    | SetPreviewScale Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -407,6 +410,9 @@ update msg model =
         RemoveNotification ->
             ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
 
+        SetPreviewScale scale ->
+            ( { model | previewColumns = scale }, Cmd.none )
+
 
 pushNotification : String -> Model -> ( Model, Cmd Msg )
 pushNotification msg model =
@@ -470,7 +476,7 @@ view model =
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
                     , viewSettings filmRoll workingDirectory model
-                    , viewFileBrowser workingDirectory filmRoll
+                    , viewFileBrowser workingDirectory model.previewColumns filmRoll
                     , viewNotification model.notifications
                     ]
                 ]
@@ -498,37 +504,45 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFileBrowser : WorkingDirectory -> FilmRoll -> Html Msg
-viewFileBrowser dir filmRoll =
+viewFileBrowser : WorkingDirectory -> Int -> FilmRoll -> Html Msg
+viewFileBrowser dir columns filmRoll =
     section [ id "files" ]
-        [ ul [] <|
+        [ viewRangeInput (SetPreviewScale << floor) 1 ( 3, 12, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
+        , ul [] <|
             List.concat
-                [ List.map (viewFileLink False dir.unWorkingDirectory) (Zipper.before filmRoll)
-                , [ viewFileLink True dir.unWorkingDirectory (Zipper.current filmRoll) ]
-                , List.map (viewFileLink False dir.unWorkingDirectory) (Zipper.after filmRoll)
+                [ List.map (viewFileLink False dir.unWorkingDirectory columns) (Zipper.before filmRoll)
+                , [ viewFileLink True dir.unWorkingDirectory columns (Zipper.current filmRoll) ]
+                , List.map (viewFileLink False dir.unWorkingDirectory columns) (Zipper.after filmRoll)
                 ]
         ]
 
 
-viewFileLink : Bool -> String -> ImageSettings -> Html Msg
-viewFileLink isCurrent dir imageSettings =
+viewFileLink : Bool -> String -> Int -> ImageSettings -> Html Msg
+viewFileLink isCurrent dir columns settings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
+
+        width =
+            style "width" <|
+                interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
     in
-    li [ classList [ ( "-current", isCurrent ) ] ]
+    li [ classList [ ( "-current", isCurrent ) ], width ]
         [ a
             [ href <|
-                toUrl imageSettings.iFilename
+                toUrl settings.iFilename
             ]
             [ img
                 [ src <|
                     Url.Builder.absolute
-                        [ dir, "previews", previewExtension imageSettings.iFilename ]
+                        [ dir, "previews", previewExtension settings.iFilename ]
                         []
                 ]
                 []
-            , text imageSettings.iFilename
+            ]
+        , span []
+            [ text settings.iFilename
+            , button [ onClick (CopySettings settings) ] [ text "copy settings" ]
             ]
         ]
 

@@ -105,24 +105,40 @@ a:hover {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    justify-content: space-around;
+}
+
+#files li span {
+    padding: .25rem;
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
+}
+
+#files li button {
+    padding: 0;
+    margin: 0;
+    background: none;
+}
+
+#files li button:hover {
+    color: #999;
+}
+
+#files .range-slider {
+    width: 20rem;
+    margin-right: 2rem;
+    margin-left: auto;
 }
 
 li {
-    width: calc(20% - 1rem);
     padding: .125rem;
     margin: 0 1rem .5rem 0;
-    border-radius: 2px;
+    border-bottom: 3px solid transparent;
     list-style: none;
 }
 
-li:hover {
-    background-color: #333;
-}
-
 li.-current {
-    padding: 1rem;
-    background-color: #333;
+    border-bottom: 3px solid red;
 }
 
 #image-settings {
