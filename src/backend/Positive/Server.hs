@@ -83,9 +83,6 @@ data SettingsApi route = SettingsApi
     saGenerateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent,
-    saGeneratePreviews ::
-      route :- "image" :> "settings" :> "previews"
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)
@@ -139,8 +136,7 @@ handlers isDev =
             { saSaveSettings = handleSaveSettings,
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
-              saGenerateHighRes = handleGenerateHighRes,
-              saGeneratePreviews = error "" -- handleGeneratePreviews
+              saGenerateHighRes = handleGenerateHighRes
             }
     }
 
@@ -333,7 +329,7 @@ previewWorker logger previewMVar dir =
         pure $ difference queuedSettings currentSettings
     case result of
       Left err ->
-        log_ logger (Text.pack err) >> threadDelay 30000000
+        log_ logger (Text.pack err) >> threadDelay 10000000
       Right newSettings -> do
         for_ (toList newSettings) $
           \settings -> do
@@ -346,7 +342,7 @@ previewWorker logger previewMVar dir =
             ByteString.writeFile (segmentToString output)
               =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
               <$> readImageFromDisk (segmentToString input)
-        threadDelay 30000000
+        threadDelay 10000000
 
 -- IMAGE
 

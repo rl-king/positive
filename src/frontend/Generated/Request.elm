@@ -1,4 +1,4 @@
-module Generated.Request exposing (getImageSettings, postImageSettings, postImageSettingsHighres, postImageSettingsHistogram, postImageSettingsPreviews)
+module Generated.Request exposing (getImageSettings, postImageSettings, postImageSettingsHighres, postImageSettingsHistogram)
 
 import Generated.Data.ImageSettings
 import Http
@@ -206,57 +206,6 @@ postImageSettingsHighres a =
                                     , Just
                                         { metadata = c
                                         , body = d
-                                        }
-                                    )
-                )
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-postImageSettingsPreviews :
-    Cmd
-        (Result
-            ( Http.Error
-            , Maybe
-                { metadata : Http.Metadata
-                , body : String
-                }
-            )
-            ()
-        )
-postImageSettingsPreviews =
-    Http.request
-        { method = "POST"
-        , headers = []
-        , url = "/image/settings/previews"
-        , body = Http.emptyBody
-        , expect =
-            Http.expectStringResponse identity
-                (\a ->
-                    case a of
-                        Http.BadUrl_ b ->
-                            Err ( Http.BadUrl b, Nothing )
-
-                        Http.Timeout_ ->
-                            Err ( Http.Timeout, Nothing )
-
-                        Http.NetworkError_ ->
-                            Err ( Http.NetworkError, Nothing )
-
-                        Http.BadStatus_ b c ->
-                            Err ( Http.BadStatus b.statusCode, Just { metadata = b, body = c } )
-
-                        Http.GoodStatus_ b c ->
-                            if c == "" then
-                                Ok ()
-
-                            else
-                                Err
-                                    ( Http.BadBody "Expected the response body to be empty"
-                                    , Just
-                                        { metadata = b
-                                        , body = c
                                         }
                                     )
                 )
