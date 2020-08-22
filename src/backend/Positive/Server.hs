@@ -43,13 +43,6 @@ import System.Log.FastLogger (TimedFastLogger)
 
 -- POSITIVE
 
-type PositiveM sig m =
-  ( Has Log sig m,
-    Has (Reader Env) sig m,
-    Has FilmRoll sig m,
-    Has (Lift IO) sig m
-  )
-
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
     ePreviewMVar :: !(MVar FilmRollSettings),
@@ -151,7 +144,14 @@ handlers isDev =
             }
     }
 
-handleImage :: PositiveM sig m => Int -> ImageSettings -> m ByteString
+handleImage ::
+  ( Has (Lift IO) sig m,
+    Has (Reader Env) sig m,
+    Has Log sig m
+  ) =>
+  Int ->
+  ImageSettings ->
+  m ByteString
 handleImage previewWidth imageSettings = do
   dir <- workingDirectory
   (image, putMVarBack) <-
@@ -162,7 +162,14 @@ handleImage previewWidth imageSettings = do
   sendIO putMVarBack
   pure encoded
 
-handleSaveSettings :: PositiveM sig m => [ImageSettings] -> m [ImageSettings]
+handleSaveSettings ::
+  ( Has (Lift IO) sig m,
+    Has (Reader Env) sig m,
+    Has FilmRoll sig m,
+    Has Log sig m
+  ) =>
+  [ImageSettings] ->
+  m [ImageSettings]
 handleSaveSettings settings = do
   Env {ePreviewMVar} <- ask
   let newSettings = Settings.fromList settings
@@ -171,11 +178,21 @@ handleSaveSettings settings = do
   sendIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
 
-handleGetSettings :: PositiveM sig m => m ([ImageSettings], PathSegment)
+handleGetSettings ::
+  ( Has (Reader Env) sig m,
+    Has FilmRoll sig m
+  ) =>
+  m ([ImageSettings], PathSegment)
 handleGetSettings =
   (\a b -> (Settings.toList a, eDir b)) <$> FilmRoll.readSettings <*> ask
 
-handleGenerateHighRes :: PositiveM sig m => ImageSettings -> m NoContent
+handleGenerateHighRes ::
+  ( Has (Lift IO) sig m,
+    Has (Reader Env) sig m,
+    Has Log sig m
+  ) =>
+  ImageSettings ->
+  m NoContent
 handleGenerateHighRes settings = do
   dir <- workingDirectory
   sendIO $ createDirectoryIfMissing False (dir </> "highres")
@@ -192,7 +209,14 @@ handleGenerateHighRes settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: PositiveM sig m => Int -> ImageSettings -> m [Int]
+handleGetSettingsHistogram ::
+  ( Has (Lift IO) sig m,
+    Has (Reader Env) sig m,
+    Has Log sig m
+  ) =>
+  Int ->
+  ImageSettings ->
+  m [Int]
 handleGetSettingsHistogram previewWidth imageSettings = do
   dir <- workingDirectory
   (image, putMVarBack) <-
@@ -205,7 +229,14 @@ handleGetSettingsHistogram previewWidth imageSettings = do
 
 -- IMAGE
 
-getImage :: PositiveM sig m => Int -> Text -> m (MonochromeImage HIP.VU, IO ())
+getImage ::
+  ( Has (Lift IO) sig m,
+    Has (Reader Env) sig m,
+    Has Log sig m
+  ) =>
+  Int ->
+  Text ->
+  m (MonochromeImage HIP.VU, IO ())
 getImage previewWidth path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- sendIO $ takeMVar eImageMVar
@@ -330,7 +361,7 @@ instance MimeRender Image ByteString where
 
 -- PROFILE
 
-timed :: PositiveM sig m => Text -> a -> m a
+timed :: (Has (Lift IO) sig m, Has Log sig m) => Text -> a -> m a
 timed name action = do
   log $ name <> " - started"
   start <- sendIO Time.getCurrentTime
@@ -341,7 +372,7 @@ timed name action = do
 
 -- HELPERS
 
-workingDirectory :: PositiveM sig m => m FilePath
+workingDirectory :: Has (Reader Env) sig m => m FilePath
 workingDirectory =
   asks (segmentToString . eDir)
 
