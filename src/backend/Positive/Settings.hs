@@ -11,7 +11,7 @@ import qualified Data.ByteString.Base64 as Base64
 import Data.ByteString.Lazy (ByteString)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import Data.Text as Text
+import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Network.HTTP.Media as Media
@@ -60,7 +60,7 @@ toList =
 
 grab :: FilmRollSettings -> Maybe (ImageSettings, FilmRollSettings)
 grab filmRoll =
-  case sortOn iFilename (toList filmRoll) of
+  case sortOn (Down . iFilename) (toList filmRoll) of
     [] -> Nothing
     x : xs -> Just (x, fromList xs)
 
