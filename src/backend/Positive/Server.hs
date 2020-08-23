@@ -31,7 +31,7 @@ import Servant.Server.Generic
 import System.Directory
 import System.FilePath.Posix ((</>))
 import qualified System.FilePath.Posix as Path
-import System.Log.FastLogger (TimedFastLogger, toLogStr)
+import System.Log.FastLogger (FormattedTime, LogStr, TimedFastLogger, toLogStr)
 
 -- POSITIVE
 
@@ -42,6 +42,7 @@ data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
     ePreviewMVar :: !(MVar FilmRollSettings),
     eDir :: !WorkingDirectory,
+    eIsDev :: !Bool,
     eLogger :: !TimedFastLogger
   }
 
@@ -93,7 +94,7 @@ server logger Flags {fDir, fIsDev} =
             (logMsg_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
       nt imageMVar previewMVar =
-        flip runReaderT (Env imageMVar previewMVar fDir logger)
+        flip runReaderT (Env imageMVar previewMVar fDir fIsDev logger)
    in do
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         previewMVar <- newEmptyMVar
@@ -124,13 +125,22 @@ handlers isDev =
 handleImage :: Int -> ImageSettings -> PositiveM ByteString
 handleImage previewWidth settings = do
   dir <- workingDirectory
+  Env {eIsDev} <- ask
   (image, putMVarBack) <-
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename settings))
-  processed <- timed "Apply settings" $ processImage settings image
-  encoded <- timed "Encode PNG" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
-  liftIO putMVarBack
-  pure encoded
+  if eIsDev
+    then do
+      processed <- timed "Apply" $ processImage settings image
+      encoded <- timed "Encode" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
+      liftIO putMVarBack
+      pure encoded
+    else do
+      logMsg "Apply and encode"
+      let encoded = HIP.encode HIP.PNG [] . HIP.exchange HIP.VS $ processImage settings image
+      logMsg "Apply and encode done"
+      liftIO putMVarBack
+      pure encoded
 
 handleSaveSettings :: [ImageSettings] -> PositiveM [ImageSettings]
 handleSaveSettings settings = do
@@ -139,7 +149,7 @@ handleSaveSettings settings = do
   let newSettings = Settings.fromList settings
       path = dir </> "image-settings.json"
   liftIO . ByteString.writeFile path $ Aeson.encode newSettings
-  logMsg "Updated settings"
+  logMsgDebug "Wrote settings"
   liftIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
 
@@ -174,7 +184,7 @@ handleGetSettingsHistogram previewWidth settings = do
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename settings))
   liftIO putMVarBack
-  logMsg $ "Generating histogram for: " <> iFilename settings
+  logMsgDebug $ "Creating histogram for: " <> iFilename settings
   pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
     processImage settings image
 
@@ -194,7 +204,7 @@ getSettingsFile = do
       filenames <- getAllPngs dir
       let settings = Settings.fromFilenames filenames
       liftIO . ByteString.writeFile path $ Aeson.encode settings
-      logMsg $ "Wrote: " <> Text.pack path
+      logMsgDebug $ "Wrote: " <> Text.pack path
       pure settings
 
 getAllPngs :: MonadIO m => FilePath -> m [Text]
@@ -208,15 +218,14 @@ getImage :: Int -> Text -> PositiveM (MonochromeImage HIP.VU, IO ())
 getImage previewWidth path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
-  logMsg $ "MVar: " <> tshow currentlyLoaded
+  logMsgDebug $ "MVar: " <> tshow currentlyLoaded
   if path == loadedPath && HIP.cols loadedImage == previewWidth
     then do
-      logMsg "Loaded image"
+      logMsgDebug "From cache"
       pure (loadedImage, putMVar eImageMVar currentlyLoaded)
     else do
-      logMsg "Reading image"
+      logMsgDebug "From disk"
       image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
-      logMsg "Read image"
       pure (image, putMVar eImageMVar (path, image))
 
 -- IMAGE
@@ -330,25 +339,30 @@ generatePreviews logger filmRoll (WorkingDirectory dir) =
 logMsg :: Text -> PositiveM ()
 logMsg msg = do
   Env {eLogger} <- ask
-  liftIO $ eLogger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
+  liftIO . eLogger $ formatLog "info" msg
+
+logMsgDebug :: Text -> PositiveM ()
+logMsgDebug msg = do
+  Env {eIsDev, eLogger} <- ask
+  when eIsDev . liftIO . eLogger $ formatLog "debug" msg
 
 logMsg_ :: TimedFastLogger -> Text -> IO ()
 logMsg_ logger msg =
-  logger (\time -> toLogStr time <> " | " <> toLogStr msg <> "\n")
+  logger (formatLog "info" msg)
 
-tshow :: Show a => a -> Text
-tshow =
-  Text.pack . show
+formatLog :: Text -> Text -> FormattedTime -> LogStr
+formatLog lvl msg time =
+  toLogStr time <> " [" <> toLogStr lvl <> "] " <> toLogStr msg <> "\n"
 
 -- PROFILE
 
 timed :: Text -> a -> PositiveM a
 timed name action = do
-  logMsg $ name <> " - started"
+  logMsgDebug $ name <> " - started"
   start <- liftIO Time.getCurrentTime
   a <- liftIO $ evaluate action
   done <- liftIO Time.getCurrentTime
-  logMsg $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
+  logMsgDebug $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a
 
 -- HELPERS
