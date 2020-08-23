@@ -58,6 +58,12 @@ toList :: FilmRollSettings -> [ImageSettings]
 toList =
   HashMap.elems . unFilmRollSettings
 
+grab :: FilmRollSettings -> Maybe (ImageSettings, FilmRollSettings)
+grab filmRoll =
+  case sortOn iFilename (toList filmRoll) of
+    [] -> Nothing
+    x : xs -> Just (x, fromList xs)
+
 difference :: FilmRollSettings -> FilmRollSettings -> FilmRollSettings
 difference (FilmRollSettings a) (FilmRollSettings b) =
   FilmRollSettings $

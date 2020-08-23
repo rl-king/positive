@@ -38,5 +38,6 @@ main = do
             filenames <- fmap Text.pack . filter (Path.isExtensionOf ".png") <$> listDirectory (toFilePath fDir)
             let settings = fromFilenames filenames
             ByteString.writeFile path $ Aeson.encode settings
-            log_ logger $ "Created: " <> tshow absolutePath
+            createDirectoryIfMissing False (toFilePath fDir </> "previews")
+            ByteString.writeFile (toFilePath fDir </> "previews" </> "image-settings.json") . Aeson.encode $ fromList []
             server logger flags

@@ -149,7 +149,7 @@ handleSaveSettings settings = do
       path = dir </> "image-settings.json"
   liftIO . ByteString.writeFile path $ Aeson.encode newSettings
   logDebug "Wrote settings"
-  liftIO $ pSwapMVar ePreviewMVar newSettings
+  liftIO $ pSwapMVar ePreviewMVar =<< diffedPreviewSettings newSettings dir
   pure $ Settings.toList newSettings
 
 handleGetSettings :: PositiveM ([ImageSettings], (WorkingDirectory, Text))
@@ -217,39 +217,33 @@ getImage previewWidth path = do
 -- PREVIEW LOOP
 
 previewWorker :: TimedFastLogger -> MVar a -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
-previewWorker logger imageMVar previewMVar wd@(WorkingDirectory dir) =
+previewWorker logger imageMVar previewMVar dir =
   void . forkIO . forever $ do
-    let path = Text.unpack dir </> "previews" </> "image-settings.json"
+    let path = toFilePath dir </> "previews" </> "image-settings.json"
     queuedSettings <- takeMVar previewMVar
-    diffed <- do
-      exists <- doesPathExist path
-      if exists
-        then fmap (Settings.difference queuedSettings) <$> Aeson.eitherDecodeFileStrict path
-        else do
-          log_ logger "No preview settings file found, creating one now"
-          liftIO $ createDirectoryIfMissing False (Text.unpack dir </> "previews")
-          liftIO . ByteString.writeFile path $ Aeson.encode (Settings.fromList [])
-          log_ logger $ "Wrote: " <> Text.pack path
-          pure $ Right queuedSettings
-    case diffed of
-      Left err -> log_ logger $ Text.pack err
-      Right newSettings -> do
-        ByteString.writeFile path $ Aeson.encode queuedSettings
-        generatePreviews logger imageMVar newSettings wd
-        threadDelay 30000000
+    case grab queuedSettings of
+      Nothing -> pure ()
+      Just (settings, rest) -> do
+        -- Block till image is done processing
+        _ <- readMVar imageMVar
+        let input = toFilePath dir </> Text.unpack (iFilename settings)
+            output = toFilePath dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+        log_ logger $ "Generating preview for: " <> iFilename settings
+        ByteString.writeFile output
+          =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
+          <$> readImageFromDisk input
+        insertPreviewSettings path settings
+        void $ tryPutMVar previewMVar rest
 
-generatePreviews :: TimedFastLogger -> MVar a -> FilmRollSettings -> WorkingDirectory -> IO ()
-generatePreviews logger imageMVar filmRoll (WorkingDirectory dir) =
-  for_ (sortOn iFilename (toList filmRoll)) $
-    \settings -> do
-      -- Block till image is done processing
-      _ <- readMVar imageMVar
-      let input = Text.unpack dir </> Text.unpack (iFilename settings)
-          output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-      log_ logger $ "Generating preview for: " <> iFilename settings
-      ByteString.writeFile output
-        =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
-        <$> readImageFromDisk input
+diffedPreviewSettings :: FilmRollSettings -> FilePath -> IO FilmRollSettings
+diffedPreviewSettings filmRoll dir = do
+  Just current <- Aeson.decodeFileStrict $ dir </> "previews" </> "image-settings.json"
+  pure $ Settings.difference filmRoll current
+
+insertPreviewSettings :: FilePath -> ImageSettings -> IO ()
+insertPreviewSettings path settings = do
+  Just filmRoll <- Aeson.decodeFileStrict path
+  ByteString.writeFile path . Aeson.encode $ Settings.insert settings filmRoll
 
 -- LOG
 
@@ -290,7 +284,5 @@ workingDirectory =
 
 pSwapMVar :: MVar a -> a -> IO ()
 pSwapMVar mvar a = do
-  isEmpty <- isEmptyMVar mvar
-  if isEmpty
-    then putMVar mvar a
-    else void $ swapMVar mvar a
+  success <- tryPutMVar mvar a
+  unless success (void $ swapMVar mvar a)
