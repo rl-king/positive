@@ -300,12 +300,10 @@ previewWorker logger previewMVar wd@(WorkingDirectory dir) =
         then fmap (Settings.difference queuedSettings) <$> Aeson.eitherDecodeFileStrict path
         else do
           logMsg_ logger "No preview settings file found, creating one now"
-          filenames <- getAllPngs (Text.unpack dir)
-          let settings = Settings.fromFilenames filenames
           liftIO $ createDirectoryIfMissing False (Text.unpack dir </> "previews")
-          liftIO . ByteString.writeFile path $ Aeson.encode settings
+          liftIO . ByteString.writeFile path $ Aeson.encode queuedSettings
           logMsg_ logger $ "Wrote: " <> Text.pack path
-          pure $ Right settings
+          pure $ Right queuedSettings
     case diffed of
       Left err -> logMsg_ logger $ Text.pack err
       Right newSettings -> do
