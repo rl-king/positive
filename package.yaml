@@ -57,7 +57,7 @@ default-extensions:
   - NoImplicitPrelude
 
 executables:
-  positive-exe:
+  pos:
     main:                Main.hs
     source-dirs:         src/backend/app
     dependencies:
