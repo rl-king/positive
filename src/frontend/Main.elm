@@ -220,6 +220,7 @@ type Msg
     | SaveSettings FilmRoll
     | GenerateHighres ImageSettings
     | CopySettings ImageSettings
+    | ApplyCopyToAll FilmRoll
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
     | PreviousImage FilmRoll
@@ -326,6 +327,18 @@ update msg model =
 
         CopySettings settings ->
             ( { model | clipboard = Just settings }, Cmd.none )
+
+        ApplyCopyToAll filmRoll ->
+            let
+                isLoading =
+                    Maybe.withDefault False <|
+                        Maybe.map (\f -> Zipper.current f /= Zipper.current filmRoll) model.filmRoll
+            in
+            if isLoading then
+                ( { model | imageProcessingState = Loading, filmRoll = Just filmRoll }, Cmd.none )
+
+            else
+                ( { model | filmRoll = Just filmRoll }, Cmd.none )
 
         OnImageLoad settings canvasSize ->
             let
@@ -589,7 +602,7 @@ viewSettings filmRoll workingDirectory model =
                 \clipboard ->
                     div [ class "image-settings-paste" ]
                         [ pre [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
-                        , viewClipboardButton "All" { clipboard | iFilename = settings.iFilename }
+                        , viewClipboardButton "Both" { clipboard | iFilename = settings.iFilename }
                         , viewClipboardButton "Tone"
                             { clipboard
                                 | iFilename = settings.iFilename
@@ -597,6 +610,12 @@ viewSettings filmRoll workingDirectory model =
                                 , iCrop = settings.iCrop
                             }
                         , viewClipboardButton "Crop" { settings | iCrop = clipboard.iCrop }
+                        , button
+                            [ onClick <|
+                                ApplyCopyToAll <|
+                                    Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
+                            ]
+                            [ text "Apply to all" ]
                         ]
             ]
         , viewSettingsGroup
