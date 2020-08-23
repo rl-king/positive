@@ -197,11 +197,6 @@ getSettingsFile = do
   either (\e -> logMsg (tshow e) >> throwError err404) pure
     =<< liftIO (Aeson.eitherDecodeFileStrict path)
 
-getAllPngs :: MonadIO m => FilePath -> m [Text]
-getAllPngs dir =
-  fmap Text.pack . filter ((".png" ==) . Path.takeExtension)
-    <$> liftIO (listDirectory dir)
-
 -- IMAGE
 
 getImage :: Int -> Text -> PositiveM (MonochromeImage HIP.VU, IO ())

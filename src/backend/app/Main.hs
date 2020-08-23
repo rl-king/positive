@@ -4,6 +4,7 @@ module Main where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as ByteString
+import qualified Data.Text as Text
 import Positive.CodeGen
 import Positive.Flags
 import Positive.Prelude
@@ -11,7 +12,7 @@ import Positive.Server
 import Positive.Settings
 import qualified System.Console.Haskeline as Haskeline
 import System.Directory
-import System.FilePath.Posix ((</>))
+import System.FilePath.Posix as Path
 import qualified System.Log.FastLogger as FastLogger
 
 -- MAIN
@@ -34,7 +35,7 @@ main = do
             Haskeline.runInputT Haskeline.defaultSettings . fmap (== Just 'y') . Haskeline.getInputChar $
               "Could not find " <> absolutePath <> ", press 'y' to create one now."
           when createSettingsFile $ do
-            filenames <- getAllPngs (toFilePath fDir)
+            filenames <- fmap Text.pack . filter (Path.isExtensionOf ".png") <$> listDirectory (toFilePath fDir)
             let settings = fromFilenames filenames
             ByteString.writeFile path $ Aeson.encode settings
             logMsg_ logger $ "Created: " <> tshow absolutePath
