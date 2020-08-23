@@ -20,11 +20,12 @@ readImageFromDisk =
 resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 resizeImage targetWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
-   in HIP.resize
-        (HIP.Bicubic (-0.25))
-        HIP.Edge
-        (round (int2Double targetWidth * mul), targetWidth)
-        image
+      preSize =
+        if HIP.rows image - targetWidth > 3000
+          then HIP.resize (HIP.Bicubic 0.25) HIP.Edge (round (int2Double 2500 * mul), 2500)
+          else id
+   in HIP.resize (HIP.Bicubic (-0.25)) HIP.Edge (round (int2Double targetWidth * mul), targetWidth) $
+        preSize image
 
 processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
 processImage is image =

@@ -65,8 +65,10 @@ subscriptions model =
                             [ matchKey "s" (SaveSettings filmRoll)
                             , matchKey "c" (CopySettings (Zipper.current filmRoll))
                             , matchKey "r" Rotate
-                            , matchKey "ArrowLeft" (PreviousImage filmRoll)
-                            , matchKey "ArrowRight" (NextImage filmRoll)
+                            , matchKey "h" (PreviousImage filmRoll)
+                            , matchKey "l" (NextImage filmRoll)
+                            , matchKey "8" (SetPreviewScale 8)
+                            , matchKey "9" (SetPreviewScale 9)
                             ]
                 )
                 model.filmRoll
