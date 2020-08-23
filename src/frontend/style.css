@@ -64,6 +64,7 @@ main {
 pre {
     font-family: var(--mono);
     font-size: .875rem;
+    white-space: pre-wrap;
     color: #666;
 }
 

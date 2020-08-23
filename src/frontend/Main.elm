@@ -137,7 +137,7 @@ type alias Model =
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : { filename : String }
-    , workingDirectory : Maybe WorkingDirectory
+    , workingDirectory : Maybe ( WorkingDirectory, String )
     , scrollTo : ScrollTo.State
     , histogram : List Int
     , undoState : List FilmRoll
@@ -209,7 +209,7 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
-    | GotFilmRollSettings (HttpResult ( List ImageSettings, WorkingDirectory ))
+    | GotFilmRollSettings (HttpResult ( List ImageSettings, ( WorkingDirectory, String ) ))
     | GotGenerateHighres (HttpResult ())
     | GotGeneratePreviews (HttpResult ())
     | GotHistogram (HttpResult (List Int))
@@ -482,13 +482,13 @@ view model =
                 ]
             }
 
-        Just ( filmRoll, workingDirectory ) ->
+        Just ( filmRoll, ( workingDirectory, absolutePath ) ) ->
             { title = model.route.filename ++ " | Positive"
             , body =
                 [ main_ []
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
-                    , viewSettings filmRoll workingDirectory model
+                    , viewSettings filmRoll workingDirectory absolutePath model
                     , viewFileBrowser workingDirectory model.previewColumns filmRoll
                     , viewNotification model.notifications
                     ]
@@ -569,8 +569,8 @@ toUrl filename =
 -- IMAGE SETTINGS
 
 
-viewSettings : FilmRoll -> WorkingDirectory -> Model -> Html Msg
-viewSettings filmRoll workingDirectory model =
+viewSettings : FilmRoll -> WorkingDirectory -> String -> Model -> Html Msg
+viewSettings filmRoll workingDirectory absolutePath model =
     let
         settings =
             case model.imageProcessingState of
@@ -634,8 +634,9 @@ viewSettings filmRoll workingDirectory model =
             ]
         , pre [ class "info" ]
             [ text <|
-                interpolate "{0} | {1}"
+                interpolate "{0} | {1}/{2}"
                     [ settings.iFilename
+                    , absolutePath
                     , workingDirectory.unWorkingDirectory
                     ]
             ]

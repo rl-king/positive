@@ -24,7 +24,7 @@ main = do
     \logger -> do
       flags@Flags {fIsDev, fDir} <- parseArgs
       when fIsDev (codeGen logger)
-      logMsg_ logger (tshow flags)
+      log_ logger (tshow flags)
       let path = toFilePath fDir </> "image-settings.json"
       exists <- doesPathExist path
       if exists
@@ -38,5 +38,5 @@ main = do
             filenames <- fmap Text.pack . filter (Path.isExtensionOf ".png") <$> listDirectory (toFilePath fDir)
             let settings = fromFilenames filenames
             ByteString.writeFile path $ Aeson.encode settings
-            logMsg_ logger $ "Created: " <> tshow absolutePath
+            log_ logger $ "Created: " <> tshow absolutePath
             server logger flags

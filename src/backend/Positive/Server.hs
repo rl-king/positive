@@ -71,7 +71,7 @@ data SettingsApi route = SettingsApi
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image" :> "settings"
-        :> Get '[JSON] ([ImageSettings], WorkingDirectory),
+        :> Get '[JSON] ([ImageSettings], (WorkingDirectory, Text)),
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "preview-width" Int
@@ -91,7 +91,7 @@ server logger Flags {fDir, fIsDev} =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
-            (logMsg_ logger ("listening on port " <> tshow @Int 8080))
+            (log_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
       nt imageMVar previewMVar =
         flip runReaderT (Env imageMVar previewMVar fDir fIsDev logger)
@@ -136,9 +136,9 @@ handleImage previewWidth settings = do
       liftIO putMVarBack
       pure encoded
     else do
-      logMsg "Apply and encode"
+      log "Apply and encode"
       let encoded = HIP.encode HIP.PNG [] . HIP.exchange HIP.VS $ processImage settings image
-      logMsg "Apply and encode done"
+      log "Apply and encode done"
       liftIO putMVarBack
       pure encoded
 
@@ -149,14 +149,16 @@ handleSaveSettings settings = do
   let newSettings = Settings.fromList settings
       path = dir </> "image-settings.json"
   liftIO . ByteString.writeFile path $ Aeson.encode newSettings
-  logMsgDebug "Wrote settings"
+  logDebug "Wrote settings"
   liftIO $ pSwapMVar ePreviewMVar newSettings
   pure $ Settings.toList newSettings
 
-handleGetSettings :: PositiveM ([ImageSettings], WorkingDirectory)
-handleGetSettings =
-  (\a b -> (Settings.toList a, eDir b))
-    <$> getSettingsFile <*> ask
+handleGetSettings :: PositiveM ([ImageSettings], (WorkingDirectory, Text))
+handleGetSettings = do
+  dir <- asks eDir
+  path <- liftIO . makeAbsolute =<< workingDirectory
+  settings <- getSettingsFile
+  pure (Settings.toList settings, (dir, Text.pack path))
 
 -- GENERATE PREVIEWS
 
@@ -166,13 +168,13 @@ handleGenerateHighRes settings = do
   liftIO $ createDirectoryIfMissing False (dir </> "highres")
   let input = dir </> Text.unpack (iFilename settings)
       output = dir </> "highres" </> Text.unpack (iFilename settings)
-  logMsg $ "Generating highres version of: " <> Text.pack input
+  log $ "Generating highres version of: " <> Text.pack input
   image <-
     liftIO $
       HIP.encode HIP.PNG [] . HIP.exchange HIP.VS . processImage settings
         <$> readImageFromDisk input
   liftIO $ ByteString.writeFile output image
-  logMsg $ "Wrote highres version of: " <> Text.pack input
+  log $ "Wrote highres version of: " <> Text.pack input
   pure NoContent
 
 -- HISTOGRAM
@@ -184,7 +186,7 @@ handleGetSettingsHistogram previewWidth settings = do
     getImage previewWidth $
       Text.pack (dir </> Text.unpack (iFilename settings))
   liftIO putMVarBack
-  logMsgDebug $ "Creating histogram for: " <> iFilename settings
+  logDebug $ "Creating histogram for: " <> iFilename settings
   pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
     processImage settings image
 
@@ -194,7 +196,7 @@ getSettingsFile :: PositiveM FilmRollSettings
 getSettingsFile = do
   dir <- workingDirectory
   let path = dir </> "image-settings.json"
-  either (\e -> logMsg (tshow e) >> throwError err404) pure
+  either (\e -> log (tshow e) >> throwError err404) pure
     =<< liftIO (Aeson.eitherDecodeFileStrict path)
 
 -- IMAGE
@@ -203,13 +205,13 @@ getImage :: Int -> Text -> PositiveM (MonochromeImage HIP.VU, IO ())
 getImage previewWidth path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
-  logMsgDebug $ "MVar: " <> tshow currentlyLoaded
+  logDebug $ "MVar: " <> tshow currentlyLoaded
   if path == loadedPath && HIP.cols loadedImage == previewWidth
     then do
-      logMsgDebug "From cache"
+      logDebug "From cache"
       pure (loadedImage, putMVar eImageMVar currentlyLoaded)
     else do
-      logMsgDebug "From disk"
+      logDebug "From disk"
       image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
       pure (image, putMVar eImageMVar (path, image))
 
@@ -225,43 +227,43 @@ previewWorker logger previewMVar wd@(WorkingDirectory dir) =
       if exists
         then fmap (Settings.difference queuedSettings) <$> Aeson.eitherDecodeFileStrict path
         else do
-          logMsg_ logger "No preview settings file found, creating one now"
+          log_ logger "No preview settings file found, creating one now"
           liftIO $ createDirectoryIfMissing False (Text.unpack dir </> "previews")
           liftIO . ByteString.writeFile path $ Aeson.encode queuedSettings
-          logMsg_ logger $ "Wrote: " <> Text.pack path
+          log_ logger $ "Wrote: " <> Text.pack path
           pure $ Right queuedSettings
     case diffed of
-      Left err -> logMsg_ logger $ Text.pack err
+      Left err -> log_ logger $ Text.pack err
       Right newSettings -> do
         ByteString.writeFile path $ Aeson.encode queuedSettings
         generatePreviews logger newSettings wd
-        threadDelay 10000000
+        threadDelay 30000000
 
 generatePreviews :: TimedFastLogger -> FilmRollSettings -> WorkingDirectory -> IO ()
 generatePreviews logger filmRoll (WorkingDirectory dir) =
-  for_ (toList filmRoll) $
+  for_ (sortOn iFilename (toList filmRoll)) $
     \settings -> do
       let input = Text.unpack dir </> Text.unpack (iFilename settings)
           output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-      logMsg_ logger $ "Generating preview for: " <> tshow input
+      log_ logger $ "Generating preview for: " <> tshow input
       ByteString.writeFile output
         =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
         <$> readImageFromDisk input
 
 -- LOG
 
-logMsg :: Text -> PositiveM ()
-logMsg msg = do
+log :: Text -> PositiveM ()
+log msg = do
   Env {eLogger} <- ask
   liftIO . eLogger $ formatLog "info" msg
 
-logMsgDebug :: Text -> PositiveM ()
-logMsgDebug msg = do
+logDebug :: Text -> PositiveM ()
+logDebug msg = do
   Env {eIsDev, eLogger} <- ask
   when eIsDev . liftIO . eLogger $ formatLog "debug" msg
 
-logMsg_ :: TimedFastLogger -> Text -> IO ()
-logMsg_ logger msg =
+log_ :: TimedFastLogger -> Text -> IO ()
+log_ logger msg =
   logger (formatLog "info" msg)
 
 formatLog :: Text -> Text -> FormattedTime -> LogStr
@@ -272,11 +274,11 @@ formatLog lvl msg time =
 
 timed :: Text -> a -> PositiveM a
 timed name action = do
-  logMsgDebug $ name <> " - started"
+  logDebug $ name <> " - started"
   start <- liftIO Time.getCurrentTime
   a <- liftIO $ evaluate action
   done <- liftIO Time.getCurrentTime
-  logMsgDebug $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
+  logDebug $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a
 
 -- HELPERS
