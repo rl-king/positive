@@ -228,11 +228,13 @@ previewWorker logger imageMVar previewMVar dir =
         _ <- readMVar imageMVar
         let input = toFilePath dir </> Text.unpack (iFilename settings)
             output = toFilePath dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-        log_ logger $ "Generating preview for: " <> iFilename settings
         ByteString.writeFile output
           =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
           <$> readImageFromDisk input
         insertPreviewSettings path settings
+        log_ logger $
+          Text.unwords
+            ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
         void $ tryPutMVar previewMVar rest
 
 diffedPreviewSettings :: FilmRollSettings -> FilePath -> IO FilmRollSettings

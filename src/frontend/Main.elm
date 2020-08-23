@@ -135,6 +135,7 @@ type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
     , key : Navigation.Key
+    , saveKey : Key { saveKey : () }
     , canvasSize : Maybe Browser.Dom.Element
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
@@ -168,6 +169,7 @@ init _ url key =
     ( { imageProcessingState = Loading
       , filmRoll = Nothing
       , key = key
+      , saveKey = Key 0
       , canvasSize = Nothing
       , imageCropMode = Nothing
       , clipboard = Nothing
@@ -231,6 +233,7 @@ type Msg
     | UpdateScale Float
     | RemoveNotification
     | SetPreviewScale Int
+    | AttemptSave (Key { saveKey : () }) FilmRoll
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -388,24 +391,24 @@ update msg model =
             )
 
         PreviousImage filmRoll ->
-            ( { model | undoState = [] }
+            ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
                     (toUrl << .iFilename << Zipper.current) <|
                         Maybe.withDefault (Zipper.last filmRoll) (Zipper.previous filmRoll)
-                , Cmd.map GotSaveImageSettings <|
-                    Request.postImageSettings (Zipper.toList filmRoll)
+                , Task.perform (\_ -> AttemptSave (nextKey model.saveKey) filmRoll) <|
+                    Process.sleep 10000
                 ]
             )
 
         NextImage filmRoll ->
-            ( { model | undoState = [] }
+            ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
                     (toUrl << .iFilename << Zipper.current) <|
                         Maybe.withDefault (Zipper.first filmRoll) (Zipper.next filmRoll)
-                , Cmd.map GotSaveImageSettings <|
-                    Request.postImageSettings (Zipper.toList filmRoll)
+                , Task.perform (\_ -> AttemptSave (nextKey model.saveKey) filmRoll) <|
+                    Process.sleep 10000
                 ]
             )
 
@@ -427,6 +430,25 @@ update msg model =
 
         SetPreviewScale scale ->
             ( { model | previewColumns = scale }, Cmd.none )
+
+        AttemptSave key filmRoll ->
+            if key /= model.saveKey then
+                ( model, Cmd.none )
+
+            else
+                ( model
+                , Cmd.map GotSaveImageSettings <|
+                    Request.postImageSettings (Zipper.toList filmRoll)
+                )
+
+
+type Key a
+    = Key Int
+
+
+nextKey : Key a -> Key a
+nextKey (Key k) =
+    Key (k + 1)
 
 
 pushNotification : String -> Model -> ( Model, Cmd Msg )
