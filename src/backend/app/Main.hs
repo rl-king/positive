@@ -2,10 +2,16 @@
 
 module Main where
 
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy as ByteString
 import Positive.CodeGen
 import Positive.Flags
 import Positive.Prelude
 import Positive.Server
+import Positive.Settings
+import qualified System.Console.Haskeline as Haskeline
+import System.Directory
+import System.FilePath.Posix ((</>))
 import qualified System.Log.FastLogger as FastLogger
 
 -- MAIN
@@ -15,7 +21,21 @@ main = do
   timeCache <- FastLogger.newTimeCache FastLogger.simpleTimeFormat
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
-      flags@Flags {fIsDev} <- parseArgs
+      flags@Flags {fIsDev, fDir} <- parseArgs
       when fIsDev (codeGen logger)
       logMsg_ logger (tshow flags)
-      server logger flags
+      let path = toFilePath fDir </> "image-settings.json"
+      exists <- doesPathExist path
+      if exists
+        then server logger flags
+        else do
+          absolutePath <- (</> "image-settings.json") <$> makeAbsolute (toFilePath fDir)
+          createSettingsFile <-
+            Haskeline.runInputT Haskeline.defaultSettings . fmap (== Just 'y') . Haskeline.getInputChar $
+              "Could not find " <> absolutePath <> ", press 'y' to create one now."
+          when createSettingsFile $ do
+            filenames <- getAllPngs (toFilePath fDir)
+            let settings = fromFilenames filenames
+            ByteString.writeFile path $ Aeson.encode settings
+            logMsg_ logger $ "Created: " <> tshow absolutePath
+            server logger flags

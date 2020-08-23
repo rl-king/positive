@@ -194,18 +194,8 @@ getSettingsFile :: PositiveM FilmRollSettings
 getSettingsFile = do
   dir <- workingDirectory
   let path = dir </> "image-settings.json"
-  exists <- liftIO $ doesPathExist path
-  if exists
-    then
-      either (\e -> logMsg (tshow e) >> throwError err500) pure
-        =<< liftIO (Aeson.eitherDecodeFileStrict path)
-    else do
-      logMsg "No settings file found, creating one now"
-      filenames <- getAllPngs dir
-      let settings = Settings.fromFilenames filenames
-      liftIO . ByteString.writeFile path $ Aeson.encode settings
-      logMsgDebug $ "Wrote: " <> Text.pack path
-      pure settings
+  either (\e -> logMsg (tshow e) >> throwError err404) pure
+    =<< liftIO (Aeson.eitherDecodeFileStrict path)
 
 getAllPngs :: MonadIO m => FilePath -> m [Text]
 getAllPngs dir =
@@ -369,7 +359,7 @@ timed name action = do
 
 workingDirectory :: PositiveM FilePath
 workingDirectory =
-  asks (Text.unpack . unWorkingDirectory . eDir)
+  asks (toFilePath . eDir)
 
 pSwapMVar :: MVar a -> a -> IO ()
 pSwapMVar mvar a = do
