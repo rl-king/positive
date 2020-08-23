@@ -98,7 +98,7 @@ server logger Flags {fDir, fIsDev} =
    in do
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         previewMVar <- newEmptyMVar
-        previewWorker logger previewMVar fDir
+        previewWorker logger imageMVar previewMVar fDir
         runSettings settings (genericServeT (nt imageMVar previewMVar) (handlers fIsDev))
 
 -- HANDLERS
@@ -136,9 +136,8 @@ handleImage previewWidth settings = do
       liftIO putMVarBack
       pure encoded
     else do
-      log "Apply and encode"
+      log $ "Apply settings and encode: " <> iFilename settings
       let encoded = HIP.encode HIP.PNG [] . HIP.exchange HIP.VS $ processImage settings image
-      log "Apply and encode done"
       liftIO putMVarBack
       pure encoded
 
@@ -217,8 +216,8 @@ getImage previewWidth path = do
 
 -- PREVIEW LOOP
 
-previewWorker :: TimedFastLogger -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
-previewWorker logger previewMVar wd@(WorkingDirectory dir) =
+previewWorker :: TimedFastLogger -> MVar a -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
+previewWorker logger imageMVar previewMVar wd@(WorkingDirectory dir) =
   void . forkIO . forever $ do
     let path = Text.unpack dir </> "previews" </> "image-settings.json"
     queuedSettings <- takeMVar previewMVar
@@ -229,23 +228,25 @@ previewWorker logger previewMVar wd@(WorkingDirectory dir) =
         else do
           log_ logger "No preview settings file found, creating one now"
           liftIO $ createDirectoryIfMissing False (Text.unpack dir </> "previews")
-          liftIO . ByteString.writeFile path $ Aeson.encode queuedSettings
+          liftIO . ByteString.writeFile path $ Aeson.encode (Settings.fromList [])
           log_ logger $ "Wrote: " <> Text.pack path
           pure $ Right queuedSettings
     case diffed of
       Left err -> log_ logger $ Text.pack err
       Right newSettings -> do
         ByteString.writeFile path $ Aeson.encode queuedSettings
-        generatePreviews logger newSettings wd
+        generatePreviews logger imageMVar newSettings wd
         threadDelay 30000000
 
-generatePreviews :: TimedFastLogger -> FilmRollSettings -> WorkingDirectory -> IO ()
-generatePreviews logger filmRoll (WorkingDirectory dir) =
+generatePreviews :: TimedFastLogger -> MVar a -> FilmRollSettings -> WorkingDirectory -> IO ()
+generatePreviews logger imageMVar filmRoll (WorkingDirectory dir) =
   for_ (sortOn iFilename (toList filmRoll)) $
     \settings -> do
+      -- Block till image is done processing
+      _ <- readMVar imageMVar
       let input = Text.unpack dir </> Text.unpack (iFilename settings)
           output = Text.unpack dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-      log_ logger $ "Generating preview for: " <> tshow input
+      log_ logger $ "Generating preview for: " <> iFilename settings
       ByteString.writeFile output
         =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
         <$> readImageFromDisk input
