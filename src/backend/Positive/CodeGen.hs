@@ -9,6 +9,7 @@ import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Pretty as Pretty
 import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
+import Positive.Api
 import Positive.Prelude
 import Positive.Server
 import Positive.Settings

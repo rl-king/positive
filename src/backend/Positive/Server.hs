@@ -1,32 +1,32 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
 
 module Positive.Server where
 
+import Control.Concurrent.Chan
 import Control.Concurrent.MVar
 import Control.Exception (evaluate)
 import Control.Monad.Reader (ReaderT, ask, asks, runReaderT)
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Data.Vector.Unboxed as Vector
 import qualified Graphics.Image as HIP
+import Network.Wai.EventSource
 import Network.Wai.Handler.Warp
+import Positive.Api
 import Positive.Flags
 import Positive.Image
 import Positive.Prelude hiding (ByteString)
 import Positive.Settings as Settings
 import qualified Positive.Static as Static
 import Servant
-import Servant.API.Generic
 import Servant.Server.Generic
 import System.Directory
 import System.FilePath.Posix ((</>))
@@ -41,48 +41,11 @@ type PositiveM =
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
     ePreviewMVar :: !(MVar FilmRollSettings),
+    eEventChan :: !(Chan ServerEvent),
     eDir :: !WorkingDirectory,
     eIsDev :: !Bool,
     eLogger :: !TimedFastLogger
   }
-
--- API
-
-data Api route = Api
-  { aSettingsApi :: route :- ToServantApi SettingsApi,
-    aImageApi :: route :- ToServantApi ImageApi
-  }
-  deriving (Generic)
-
-data ImageApi route = ImageApi
-  { iaImage ::
-      route :- "image"
-        :> QueryParam' '[Required, Strict] "preview-width" Int
-        :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
-        :> Get '[Image] ByteString,
-    iaRaw :: route :- Raw
-  }
-  deriving (Generic)
-
-data SettingsApi route = SettingsApi
-  { saSaveSettings ::
-      route :- "image" :> "settings"
-        :> ReqBody '[JSON] [ImageSettings]
-        :> Post '[JSON] [ImageSettings],
-    saGetSettings ::
-      route :- "image" :> "settings"
-        :> Get '[JSON] ([ImageSettings], (WorkingDirectory, Text)),
-    saGetSettingsHistogram ::
-      route :- "image" :> "settings" :> "histogram"
-        :> QueryParam' '[Required, Strict] "preview-width" Int
-        :> ReqBody '[JSON] ImageSettings
-        :> Post '[JSON] [Int],
-    saGenerateHighRes ::
-      route :- "image" :> "settings" :> "highres"
-        :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent
-  }
-  deriving (Generic)
 
 -- SERVER
 
@@ -93,23 +56,25 @@ server logger Flags {fDir, fIsDev} =
           setBeforeMainLoop
             (log_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
-      nt imageMVar previewMVar =
-        flip runReaderT (Env imageMVar previewMVar fDir fIsDev logger)
+      nt imageMVar previewMVar eventChan =
+        flip runReaderT (Env imageMVar previewMVar eventChan fDir fIsDev logger)
    in do
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         previewMVar <- newEmptyMVar
-        previewWorker logger imageMVar previewMVar fDir
-        runSettings settings (genericServeT (nt imageMVar previewMVar) (handlers fIsDev))
+        eventChan <- newChan
+        previewWorker logger imageMVar previewMVar eventChan fDir
+        runSettings settings (genericServeT (nt imageMVar previewMVar eventChan) (handlers fIsDev eventChan))
 
 -- HANDLERS
 
-handlers :: Bool -> Api (AsServerT PositiveM)
-handlers isDev =
+handlers :: Bool -> Chan ServerEvent -> Api (AsServerT PositiveM)
+handlers isDev chan =
   Api
     { aImageApi =
         genericServerT
           ImageApi
             { iaImage = handleImage,
+              iaEvents = pure $ eventSourceAppChan chan,
               iaRaw = Static.serve isDev
             },
       aSettingsApi =
@@ -216,8 +181,8 @@ getImage previewWidth path = do
 
 -- PREVIEW LOOP
 
-previewWorker :: TimedFastLogger -> MVar a -> MVar FilmRollSettings -> WorkingDirectory -> IO ()
-previewWorker logger imageMVar previewMVar dir =
+previewWorker :: TimedFastLogger -> MVar a -> MVar FilmRollSettings -> Chan ServerEvent -> WorkingDirectory -> IO ()
+previewWorker logger imageMVar previewMVar chan dir =
   void . forkIO . forever $ do
     let path = toFilePath dir </> "previews" </> "image-settings.json"
     queuedSettings <- takeMVar previewMVar
@@ -235,6 +200,7 @@ previewWorker logger imageMVar previewMVar dir =
         log_ logger $
           Text.unwords
             ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
+        writeChan chan (ServerEvent (Just "preview") Nothing [Builder.byteString . encodeUtf8 $ iFilename settings])
         void $ tryPutMVar previewMVar rest
 
 diffedPreviewSettings :: FilmRollSettings -> FilePath -> IO FilmRollSettings
@@ -251,12 +217,14 @@ insertPreviewSettings path settings = do
 
 log :: Text -> PositiveM ()
 log msg = do
-  Env {eLogger} <- ask
+  Env {eLogger, eEventChan} <- ask
+  liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
   liftIO . eLogger $ formatLog "info" msg
 
 logDebug :: Text -> PositiveM ()
 logDebug msg = do
-  Env {eIsDev, eLogger} <- ask
+  Env {eIsDev, eLogger, eEventChan} <- ask
+  liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
   when eIsDev . liftIO . eLogger $ formatLog "debug" msg
 
 log_ :: TimedFastLogger -> Text -> IO ()

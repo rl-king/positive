@@ -45,6 +45,7 @@ dependencies:
   - time
   - vector
   - wai
+  - wai-extra
   - wai-app-static
   - warp
   - unordered-containers

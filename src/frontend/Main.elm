@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Base64
 import Browser
@@ -33,6 +33,16 @@ import Url.Parser.Query
 
 
 
+-- PORTS
+
+
+port serverMessage : (String -> msg) -> Sub msg
+
+
+port previewReady : (String -> msg) -> Sub msg
+
+
+
 -- MAIN
 
 
@@ -55,7 +65,9 @@ main =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Sub.map ScrollToMsg <|
+        [ serverMessage OnServerMessage
+        , previewReady OnPreviewReady
+        , Sub.map ScrollToMsg <|
             ScrollTo.subscriptions model.scrollTo
         , Maybe.withDefault Sub.none <|
             Maybe.map
@@ -147,6 +159,7 @@ type alias Model =
     , scale : Float
     , previewColumns : Int
     , notifications : List String
+    , previewVersions : Dict String Int
     }
 
 
@@ -181,6 +194,7 @@ init _ url key =
       , scale = 1
       , previewColumns = 5
       , notifications = []
+      , previewVersions = Dict.empty
       }
     , Cmd.map GotFilmRollSettings Request.getImageSettings
     )
@@ -219,6 +233,7 @@ type Msg
     | GotHistogram (HttpResult (List Int))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
+    | RotatePreview String
     | OnImageSettingsChange ImageSettings
     | OnImageLoad ImageSettings Int
     | SaveSettings FilmRoll
@@ -234,6 +249,8 @@ type Msg
     | RemoveNotification
     | SetPreviewScale Int
     | AttemptSave (Key { saveKey : () }) FilmRoll
+    | OnServerMessage String
+    | OnPreviewReady String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -324,6 +341,24 @@ update msg model =
                     }
                 )
                 model
+            , Cmd.none
+            )
+
+        RotatePreview filename ->
+            ( { model
+                | filmRoll =
+                    Maybe.map
+                        (Zipper.map
+                            (\s ->
+                                if s.iFilename == filename then
+                                    { s | iRotate = fractionalModBy (degrees -360) (s.iRotate - degrees 90) }
+
+                                else
+                                    s
+                            )
+                        )
+                        model.filmRoll
+              }
             , Cmd.none
             )
 
@@ -441,6 +476,22 @@ update msg model =
                     Request.postImageSettings (Zipper.toList filmRoll)
                 )
 
+        OnServerMessage message ->
+            pushNotification message model
+
+        OnPreviewReady filename ->
+            let
+                f x =
+                    case x of
+                        Nothing ->
+                            Just 1
+
+                        Just y ->
+                            Just (y + 1)
+            in
+            pushNotification ("Preview ready: " ++ filename)
+                { model | previewVersions = Dict.update filename f model.previewVersions }
+
 
 type Key a
     = Key Int
@@ -513,7 +564,7 @@ view model =
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
                     , viewSettings filmRoll workingDirectory absolutePath model
-                    , viewFileBrowser workingDirectory model.previewColumns filmRoll
+                    , viewFileBrowser workingDirectory model.previewColumns model.previewVersions filmRoll
                     , viewNotification model.notifications
                     ]
                 ]
@@ -541,21 +592,21 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFileBrowser : WorkingDirectory -> Int -> FilmRoll -> Html Msg
-viewFileBrowser dir columns filmRoll =
+viewFileBrowser : WorkingDirectory -> Int -> Dict String Int -> FilmRoll -> Html Msg
+viewFileBrowser dir columns previewVersions filmRoll =
     section [ id "files" ]
         [ viewRangeInput (SetPreviewScale << floor) 1 ( 3, 12, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
-                [ List.map (viewFileLink False dir.unWorkingDirectory columns) (Zipper.before filmRoll)
-                , [ viewFileLink True dir.unWorkingDirectory columns (Zipper.current filmRoll) ]
-                , List.map (viewFileLink False dir.unWorkingDirectory columns) (Zipper.after filmRoll)
+                [ List.map (viewFileLink False dir.unWorkingDirectory columns previewVersions) (Zipper.before filmRoll)
+                , [ viewFileLink True dir.unWorkingDirectory columns previewVersions (Zipper.current filmRoll) ]
+                , List.map (viewFileLink False dir.unWorkingDirectory columns previewVersions) (Zipper.after filmRoll)
                 ]
         ]
 
 
-viewFileLink : Bool -> String -> Int -> ImageSettings -> Html Msg
-viewFileLink isCurrent dir columns settings =
+viewFileLink : Bool -> String -> Int -> Dict String Int -> ImageSettings -> Html Msg
+viewFileLink isCurrent dir columns previewVersions settings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
@@ -573,12 +624,15 @@ viewFileLink isCurrent dir columns settings =
                 [ src <|
                     Url.Builder.absolute
                         [ dir, "previews", previewExtension settings.iFilename ]
-                        []
+                        [ Url.Builder.int "v" <|
+                            Maybe.withDefault 0 (Dict.get settings.iFilename previewVersions)
+                        ]
                 ]
                 []
             ]
         , span []
             [ text settings.iFilename
+            , button [ onClick (RotatePreview settings.iFilename) ] [ text "rotate" ]
             , button [ onClick (CopySettings settings) ] [ text "copy settings" ]
             ]
         ]
