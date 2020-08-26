@@ -345,8 +345,8 @@ update msg model =
             )
 
         RotatePreview filename ->
-            ( { model
-                | filmRoll =
+            let
+                filmRoll =
                     Maybe.map
                         (Zipper.map
                             (\s ->
@@ -358,8 +358,15 @@ update msg model =
                             )
                         )
                         model.filmRoll
-              }
-            , Cmd.none
+            in
+            ( { model | filmRoll = filmRoll, saveKey = nextKey model.saveKey }
+            , Maybe.withDefault Cmd.none <|
+                Maybe.map
+                    (\filmRoll_ ->
+                        Task.perform (\_ -> AttemptSave (nextKey model.saveKey) filmRoll_) <|
+                            Process.sleep 2000
+                    )
+                    filmRoll
             )
 
         OnImageSettingsChange settings ->
@@ -595,7 +602,7 @@ viewLoading state =
 viewFileBrowser : WorkingDirectory -> Int -> Dict String Int -> FilmRoll -> Html Msg
 viewFileBrowser dir columns previewVersions filmRoll =
     section [ id "files" ]
-        [ viewRangeInput (SetPreviewScale << floor) 1 ( 3, 12, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
+        [ viewRangeInput (SetPreviewScale << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
                 [ List.map (viewFileLink False dir.unWorkingDirectory columns previewVersions) (Zipper.before filmRoll)
@@ -633,7 +640,7 @@ viewFileLink isCurrent dir columns previewVersions settings =
         , span []
             [ text settings.iFilename
             , button [ onClick (RotatePreview settings.iFilename) ] [ text "rotate" ]
-            , button [ onClick (CopySettings settings) ] [ text "copy settings" ]
+            , button [ onClick (CopySettings settings) ] [ text "copy" ]
             ]
         ]
 

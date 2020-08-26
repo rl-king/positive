@@ -224,8 +224,9 @@ log msg = do
 logDebug :: Text -> PositiveM ()
 logDebug msg = do
   Env {eIsDev, eLogger, eEventChan} <- ask
-  liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
-  when eIsDev . liftIO . eLogger $ formatLog "debug" msg
+  when eIsDev $ do
+    liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
+    liftIO . eLogger $ formatLog "debug" msg
 
 log_ :: TimedFastLogger -> Text -> IO ()
 log_ logger msg =
