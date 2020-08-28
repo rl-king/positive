@@ -14,9 +14,9 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
+import qualified Data.Massiv.Array.IO as Array
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
-import qualified Data.Vector.Unboxed as Vector
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
 import Network.Wai.Handler.Warp
@@ -39,7 +39,7 @@ type PositiveT m =
   ReaderT Env m
 
 data Env = Env
-  { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
+  { eImageMVar :: !(MVar (Text, MonochromeImage)),
     ePreviewMVar :: !(MVar FilmRollSettings),
     eEventChan :: !(Chan ServerEvent),
     eDir :: !WorkingDirectory,
@@ -96,14 +96,26 @@ handleImage previewWidth settings = do
   if eIsDev
     then do
       processed <- timed "Apply" $ processImage settings image
-      encoded <- timed "Encode" $ HIP.encode HIP.PNG [] $ HIP.exchange HIP.VS processed
+      encoded <- timed "Encode" =<< encode "_.png" processed
       liftIO putMVarBack
       pure encoded
     else do
       log $ "Apply settings and encode: " <> iFilename settings
-      let encoded = HIP.encode HIP.PNG [] . HIP.exchange HIP.VS $ processImage settings image
+      encoded <- encode "_.png" $ processImage settings image
       liftIO putMVarBack
       pure encoded
+
+encode ::
+  ( MonadIO m,
+    Array.ColorSpace (HIP.DefSpace cs) i e,
+    Array.ColorSpace (Array.BaseSpace (HIP.DefSpace cs)) i e
+  ) =>
+  FilePath ->
+  HIP.Image cs e ->
+  m ByteString
+encode path image =
+  liftIO . Array.encodeImageM Array.imageWriteAutoFormats path $
+    HIP.unImage (HIP.toDefSpace image)
 
 handleSaveSettings :: [ImageSettings] -> PositiveT Handler [ImageSettings]
 handleSaveSettings settings = do
@@ -132,11 +144,7 @@ handleGenerateHighRes settings = do
   let input = dir </> Text.unpack (iFilename settings)
       output = dir </> "highres" </> Text.unpack (iFilename settings)
   log $ "Generating highres version of: " <> Text.pack input
-  image <-
-    liftIO $
-      HIP.encode HIP.PNG [] . HIP.exchange HIP.VS . processImage settings
-        <$> readImageFromDisk input
-  liftIO $ ByteString.writeFile output image
+  liftIO $ HIP.writeImage output =<< processImage settings <$> readImageFromDisk input
   log $ "Wrote highres version of: " <> Text.pack input
   pure NoContent
 
@@ -150,8 +158,9 @@ handleGetSettingsHistogram previewWidth settings = do
       Text.pack (dir </> Text.unpack (iFilename settings))
   liftIO putMVarBack
   logDebug $ "Creating histogram for: " <> iFilename settings
-  pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
-    processImage settings image
+  -- pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
+  --   processImage settings image
+  pure []
 
 -- SETTINGS FILE
 
@@ -164,7 +173,7 @@ getSettingsFile = do
 
 -- IMAGE
 
-getImage :: Int -> Text -> PositiveT Handler (MonochromeImage HIP.VU, IO ())
+getImage :: Int -> Text -> PositiveT Handler (MonochromeImage, IO ())
 getImage previewWidth path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
@@ -195,9 +204,7 @@ previewWorker = do
       let input = dir </> Text.unpack (iFilename settings)
           output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
       liftIO $
-        ByteString.writeFile output
-          =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
-          <$> readImageFromDisk input
+        HIP.writeImage output =<< processImage settings . resizeImage 750 <$> readImageFromDisk input
       log $
         Text.unwords
           ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
