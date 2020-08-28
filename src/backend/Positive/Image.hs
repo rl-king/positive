@@ -1,40 +1,41 @@
 module Positive.Image where
 
 import GHC.Float (int2Double)
+import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
 import Positive.Prelude hiding (ByteString)
 import Positive.Settings as Settings
 
 -- IMAGE
 
-type MonochromeImage arr =
-  HIP.Image arr HIP.Y Double
+type MonochromeImage =
+  HIP.Image HIP.Y Double
 
 type MonochromePixel =
   HIP.Pixel HIP.Y Double
 
-readImageFromDisk :: String -> IO (MonochromeImage HIP.VU)
+readImageFromDisk :: String -> IO MonochromeImage
 readImageFromDisk =
-  HIP.readImageY HIP.VU
+  HIP.readImageY
 
-resizeImage :: Int -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
+resizeImage :: Int -> MonochromeImage -> MonochromeImage
 resizeImage targetWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
       preSize =
         if HIP.rows image - targetWidth > 3000
-          then HIP.resize (HIP.Bicubic 0.25) HIP.Edge (round (int2Double 2500 * mul), 2500)
+          then HIP.resize (HIP.Bicubic 0.25) HIP.Edge (HIP.Sz2 (round (int2Double 2500 * mul)) 2500)
           else id
-   in HIP.resize (HIP.Bicubic (-0.25)) HIP.Edge (round (int2Double targetWidth * mul), targetWidth) $
+   in HIP.resize (HIP.Bicubic (-0.25)) HIP.Edge (HIP.Sz2 (round (int2Double targetWidth * mul)) targetWidth) $
         preSize image
 
-processImage :: ImageSettings -> MonochromeImage HIP.VU -> MonochromeImage HIP.VU
+processImage :: ImageSettings -> MonochromeImage -> MonochromeImage
 processImage is image =
-  let (h, w) = HIP.dims image
-      cropOffset =
+  let HIP.Sz2 h w = HIP.dims image
+      (y, x) =
         ( floor $ int2Double h / 100 * icTop (iCrop is),
           floor $ int2Double w / 100 * icLeft (iCrop is)
         )
-      cropWidth = floor $ int2Double (w - snd cropOffset) * (icWidth (iCrop is) / 100)
+      cropWidth = floor $ int2Double (w - x) * (icWidth (iCrop is) / 100)
       cropHeight = floor $ int2Double cropWidth * mul
       mul = int2Double h / int2Double w
    in HIP.map
@@ -50,7 +51,7 @@ processImage is image =
         -- values vs the original size
         . HIP.normalize
         . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-0.25)) (HIP.Fill 0) (iRotate is))
-        $ HIP.crop cropOffset (cropHeight, cropWidth) image
+        $ HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
 
 -- FILTERS
 
