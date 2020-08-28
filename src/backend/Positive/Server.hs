@@ -35,8 +35,8 @@ import System.Log.FastLogger (FormattedTime, LogStr, TimedFastLogger, toLogStr)
 
 -- POSITIVE
 
-type PositiveM =
-  ReaderT Env Handler
+type PositiveT m =
+  ReaderT Env m
 
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage HIP.VU)),
@@ -56,18 +56,17 @@ server logger Flags {fDir, fIsDev} =
           setBeforeMainLoop
             (log_ logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
-      nt imageMVar previewMVar eventChan =
-        flip runReaderT (Env imageMVar previewMVar eventChan fDir fIsDev logger)
    in do
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         previewMVar <- newEmptyMVar
         eventChan <- newChan
-        previewWorker logger imageMVar previewMVar eventChan fDir
-        runSettings settings (genericServeT (nt imageMVar previewMVar eventChan) (handlers fIsDev eventChan))
+        let env = Env imageMVar previewMVar eventChan fDir fIsDev logger
+        void . forkIO . forever $ runReaderT previewWorker env
+        runSettings settings (genericServeT (`runReaderT` env) (handlers fIsDev eventChan))
 
 -- HANDLERS
 
-handlers :: Bool -> Chan ServerEvent -> Api (AsServerT PositiveM)
+handlers :: Bool -> Chan ServerEvent -> Api (AsServerT (PositiveT Handler))
 handlers isDev chan =
   Api
     { aImageApi =
@@ -87,7 +86,7 @@ handlers isDev chan =
             }
     }
 
-handleImage :: Int -> ImageSettings -> PositiveM ByteString
+handleImage :: Int -> ImageSettings -> PositiveT Handler ByteString
 handleImage previewWidth settings = do
   dir <- workingDirectory
   Env {eIsDev} <- ask
@@ -106,7 +105,7 @@ handleImage previewWidth settings = do
       liftIO putMVarBack
       pure encoded
 
-handleSaveSettings :: [ImageSettings] -> PositiveM [ImageSettings]
+handleSaveSettings :: [ImageSettings] -> PositiveT Handler [ImageSettings]
 handleSaveSettings settings = do
   Env {ePreviewMVar} <- ask
   dir <- workingDirectory
@@ -117,7 +116,7 @@ handleSaveSettings settings = do
   liftIO $ pSwapMVar ePreviewMVar =<< diffedPreviewSettings newSettings dir
   pure $ Settings.toList newSettings
 
-handleGetSettings :: PositiveM ([ImageSettings], (WorkingDirectory, Text))
+handleGetSettings :: PositiveT Handler ([ImageSettings], (WorkingDirectory, Text))
 handleGetSettings = do
   dir <- asks eDir
   path <- liftIO . makeAbsolute =<< workingDirectory
@@ -126,7 +125,7 @@ handleGetSettings = do
 
 -- GENERATE PREVIEWS
 
-handleGenerateHighRes :: ImageSettings -> PositiveM NoContent
+handleGenerateHighRes :: ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes settings = do
   dir <- workingDirectory
   liftIO $ createDirectoryIfMissing False (dir </> "highres")
@@ -143,7 +142,7 @@ handleGenerateHighRes settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Int -> ImageSettings -> PositiveM [Int]
+handleGetSettingsHistogram :: Int -> ImageSettings -> PositiveT Handler [Int]
 handleGetSettingsHistogram previewWidth settings = do
   dir <- workingDirectory
   (image, putMVarBack) <-
@@ -156,7 +155,7 @@ handleGetSettingsHistogram previewWidth settings = do
 
 -- SETTINGS FILE
 
-getSettingsFile :: PositiveM FilmRollSettings
+getSettingsFile :: PositiveT Handler FilmRollSettings
 getSettingsFile = do
   dir <- workingDirectory
   let path = dir </> "image-settings.json"
@@ -165,7 +164,7 @@ getSettingsFile = do
 
 -- IMAGE
 
-getImage :: Int -> Text -> PositiveM (MonochromeImage HIP.VU, IO ())
+getImage :: Int -> Text -> PositiveT Handler (MonochromeImage HIP.VU, IO ())
 getImage previewWidth path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
@@ -181,27 +180,29 @@ getImage previewWidth path = do
 
 -- PREVIEW LOOP
 
-previewWorker :: TimedFastLogger -> MVar a -> MVar FilmRollSettings -> Chan ServerEvent -> WorkingDirectory -> IO ()
-previewWorker logger imageMVar previewMVar chan dir =
-  void . forkIO . forever $ do
-    let path = toFilePath dir </> "previews" </> "image-settings.json"
-    queuedSettings <- takeMVar previewMVar
-    case grab queuedSettings of
-      Nothing -> pure ()
-      Just (settings, rest) -> do
-        -- Block till image is done processing
-        _ <- readMVar imageMVar
-        insertPreviewSettings path settings
-        let input = toFilePath dir </> Text.unpack (iFilename settings)
-            output = toFilePath dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+previewWorker :: PositiveT IO ()
+previewWorker = do
+  Env {eImageMVar, ePreviewMVar, eEventChan} <- ask
+  dir <- workingDirectory
+  let path = dir </> "previews" </> "image-settings.json"
+  queuedSettings <- liftIO $ takeMVar ePreviewMVar
+  case grab queuedSettings of
+    Nothing -> pure ()
+    Just (settings, rest) -> do
+      -- Block till image is done processing
+      _ <- liftIO $ readMVar eImageMVar
+      liftIO $ insertPreviewSettings path settings
+      let input = dir </> Text.unpack (iFilename settings)
+          output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
+      liftIO $
         ByteString.writeFile output
           =<< HIP.encode HIP.JPG [] . HIP.exchange HIP.VS . processImage settings . resizeImage 750
           <$> readImageFromDisk input
-        log_ logger $
-          Text.unwords
-            ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
-        writeChan chan (ServerEvent (Just "preview") Nothing [Builder.byteString . encodeUtf8 $ iFilename settings])
-        void $ tryPutMVar previewMVar rest
+      log $
+        Text.unwords
+          ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
+      liftIO $ writeChan eEventChan (ServerEvent (Just "preview") Nothing [Builder.byteString . encodeUtf8 $ iFilename settings])
+      liftIO . void $ tryPutMVar ePreviewMVar rest
 
 diffedPreviewSettings :: FilmRollSettings -> FilePath -> IO FilmRollSettings
 diffedPreviewSettings filmRoll dir = do
@@ -215,13 +216,13 @@ insertPreviewSettings path settings = do
 
 -- LOG
 
-log :: Text -> PositiveM ()
+log :: MonadIO m => Text -> PositiveT m ()
 log msg = do
   Env {eLogger, eEventChan} <- ask
   liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
   liftIO . eLogger $ formatLog "info" msg
 
-logDebug :: Text -> PositiveM ()
+logDebug :: MonadIO m => Text -> PositiveT m ()
 logDebug msg = do
   Env {eIsDev, eLogger, eEventChan} <- ask
   when eIsDev $ do
@@ -238,7 +239,7 @@ formatLog lvl msg time =
 
 -- PROFILE
 
-timed :: Text -> a -> PositiveM a
+timed :: Text -> a -> PositiveT Handler a
 timed name action = do
   logDebug $ name <> " - started"
   start <- liftIO Time.getCurrentTime
@@ -249,7 +250,7 @@ timed name action = do
 
 -- HELPERS
 
-workingDirectory :: PositiveM FilePath
+workingDirectory :: Monad m => PositiveT m FilePath
 workingDirectory =
   asks (toFilePath . eDir)
 

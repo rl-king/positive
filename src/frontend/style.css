@@ -118,9 +118,15 @@ a:hover {
     font-weight: 500;
 }
 
+#files li:hover button {
+    display: block;
+    animation: appear .5s forwards;
+}
+
 #files li button {
-    padding: 0;
+    padding: 0 1rem;
     margin: 0;
+    display: none;
     background: none;
 }
 
@@ -144,6 +150,12 @@ li {
 
 li.-current {
     border-bottom: 3px solid red;
+}
+
+li.-small span {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
 }
 
 #image-settings {

@@ -233,7 +233,7 @@ type Msg
     | GotHistogram (HttpResult (List Int))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
-    | RotatePreview String
+    | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
     | OnImageLoad ImageSettings Int
     | SaveSettings FilmRoll
@@ -344,14 +344,14 @@ update msg model =
             , Cmd.none
             )
 
-        RotatePreview filename ->
+        RotatePreview filename rotation ->
             let
                 filmRoll =
                     Maybe.map
                         (Zipper.map
                             (\s ->
                                 if s.iFilename == filename then
-                                    { s | iRotate = fractionalModBy (degrees -360) (s.iRotate - degrees 90) }
+                                    { s | iRotate = rotation }
 
                                 else
                                     s
@@ -621,8 +621,11 @@ viewFileLink isCurrent dir columns previewVersions settings =
         width =
             style "width" <|
                 interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
+
+        rotate deg =
+            fractionalModBy (degrees -360) (settings.iRotate - degrees deg)
     in
-    li [ classList [ ( "-current", isCurrent ) ], width ]
+    li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 5 ) ], width ]
         [ a
             [ href <|
                 toUrl settings.iFilename
@@ -639,7 +642,9 @@ viewFileLink isCurrent dir columns previewVersions settings =
             ]
         , span []
             [ text settings.iFilename
-            , button [ onClick (RotatePreview settings.iFilename) ] [ text "rotate" ]
+            , button [ onClick (RotatePreview settings.iFilename (rotate 270)) ] [ text "l" ]
+            , button [ onClick (RotatePreview settings.iFilename (rotate 180)) ] [ text "b" ]
+            , button [ onClick (RotatePreview settings.iFilename (rotate 90)) ] [ text "r" ]
             , button [ onClick (CopySettings settings) ] [ text "copy" ]
             ]
         ]

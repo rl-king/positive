@@ -1,8 +1,10 @@
 module Positive.Flags where
 
+import qualified Data.Text as Text
 import Options.Applicative
 import Positive.Prelude
 import Positive.Settings
+import System.FilePath.Posix (dropTrailingPathSeparator)
 
 -- FLAGS
 
@@ -25,7 +27,7 @@ parser =
 
 parseDir :: Parser WorkingDirectory
 parseDir =
-  WorkingDirectory
+  WorkingDirectory . Text.pack . dropTrailingPathSeparator
     <$> strOption
       ( long "dir"
           <> short 'd'
