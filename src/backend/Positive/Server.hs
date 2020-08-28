@@ -14,7 +14,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
-import qualified Data.Massiv.Array.IO as Array
+import qualified Data.Massiv.Array.IO as Massiv
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
@@ -107,14 +107,14 @@ handleImage previewWidth settings = do
 
 encode ::
   ( MonadIO m,
-    Array.ColorSpace (HIP.DefSpace cs) i e,
-    Array.ColorSpace (Array.BaseSpace (HIP.DefSpace cs)) i e
+    Massiv.ColorSpace (HIP.DefSpace cs) i e,
+    Massiv.ColorSpace (Massiv.BaseSpace (HIP.DefSpace cs)) i e
   ) =>
   FilePath ->
   HIP.Image cs e ->
   m ByteString
 encode path image =
-  liftIO . Array.encodeImageM Array.imageWriteAutoFormats path $
+  liftIO . Massiv.encodeImageM Massiv.imageWriteAutoFormats path $
     HIP.unImage (HIP.toDefSpace image)
 
 handleSaveSettings :: [ImageSettings] -> PositiveT Handler [ImageSettings]
