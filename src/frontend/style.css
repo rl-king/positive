@@ -140,11 +140,11 @@ a:hover {
 }
 
 .files-file-rotate button:nth-child(1) {
-    transform: translateY(-4rem) rotate(180deg);
+    transform: translateY(-6rem) rotate(180deg);
 }
 
 .files-file-rotate button:nth-child(3) {
-    transform: translateY(-4rem);
+    transform: translateY(-6rem);
 }
 
 .files-file-rotate button:nth-child(2) {
@@ -163,7 +163,7 @@ a:hover {
 }
 
 #files li button:hover {
-    color: yellow;
+    color: red;
 }
 
 #files .range-slider {
