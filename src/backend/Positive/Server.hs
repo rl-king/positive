@@ -204,7 +204,7 @@ previewWorker = do
       let input = dir </> Text.unpack (iFilename settings)
           output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
       liftIO $
-        HIP.writeImage output =<< processImage settings . resizeImage 750 <$> readImageFromDisk input
+        HIP.writeImage output <$> processImage settings . resizeImage 750 =<< readImageFromDisk input
       log $
         Text.unwords
           ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]

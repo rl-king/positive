@@ -129,25 +129,26 @@ a:hover {
     display: flex;
     justify-content: space-between;
     position: absolute;
-    top: 0;
     right: 0;
+    bottom: 0;
     transition: opacity .5s;
 }
 
 .files-file-rotate button {
     font-size: 2rem;
+    z-index: 1;
 }
 
 .files-file-rotate button:nth-child(1) {
-    transform: translateY(3rem) rotate(180deg);
+    transform: translateY(-4rem) rotate(180deg);
 }
 
 .files-file-rotate button:nth-child(3) {
-    transform: translateY(3rem);
+    transform: translateY(-4rem);
 }
 
 .files-file-rotate button:nth-child(2) {
-    transform: rotate(270deg);
+    transform: rotate(90deg);
 }
 
 #files li:hover .files-file-footer button,
