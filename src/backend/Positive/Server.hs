@@ -144,9 +144,14 @@ handleGenerateHighRes settings = do
   let input = dir </> Text.unpack (iFilename settings)
       output = dir </> "highres" </> Text.unpack (iFilename settings)
   log $ "Generating highres version of: " <> Text.pack input
-  liftIO $ HIP.writeImage output =<< processImage settings <$> readImageFromDisk input
-  log $ "Wrote highres version of: " <> Text.pack input
-  pure NoContent
+  maybeImage <- liftIO $ readImageFromDisk input
+  case maybeImage of
+    Left _ ->
+      log "Image read error" >> throwError err404
+    Right image -> do
+      liftIO . HIP.writeImage output $ processImage settings image
+      log $ "Wrote highres version of: " <> Text.pack input
+      pure NoContent
 
 -- HISTOGRAM
 
@@ -184,8 +189,12 @@ getImage previewWidth path = do
       pure (loadedImage, putMVar eImageMVar currentlyLoaded)
     else do
       logDebug "From disk"
-      image <- liftIO $ resizeImage previewWidth <$> readImageFromDisk (Text.unpack path)
-      pure (image, putMVar eImageMVar (path, image))
+      maybeImage <- liftIO $ readImageFromDisk (Text.unpack path)
+      case maybeImage of
+        Left _ -> log "Image read error" >> throwError err404
+        Right image ->
+          let resized = resizeImage previewWidth image
+           in pure (resized, putMVar eImageMVar (path, resized))
 
 -- PREVIEW LOOP
 
@@ -200,16 +209,24 @@ previewWorker = do
     Just (settings, rest) -> do
       -- Block till image is done processing
       _ <- liftIO $ readMVar eImageMVar
+      log $ "Generating preview for: " <> iFilename settings
       liftIO $ insertPreviewSettings path settings
       let input = dir </> Text.unpack (iFilename settings)
           output = dir </> "previews" </> Path.replaceExtension (Text.unpack (iFilename settings)) ".jpg"
-      liftIO $
-        HIP.writeImage output <$> processImage settings . resizeImage 750 =<< readImageFromDisk input
-      log $
-        Text.unwords
-          ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
-      liftIO $ writeChan eEventChan (ServerEvent (Just "preview") Nothing [Builder.byteString . encodeUtf8 $ iFilename settings])
-      liftIO . void $ tryPutMVar ePreviewMVar rest
+      maybeImage <- liftIO $ readImageFromDisk input
+      case maybeImage of
+        Left _ -> do
+          log $
+            Text.unwords
+              ["Error generating preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
+          liftIO . void $ tryPutMVar ePreviewMVar rest
+        Right image -> do
+          liftIO . HIP.writeImage output $ processImage settings (resizeImage 750 image)
+          log $
+            Text.unwords
+              ["Generated preview for:", iFilename settings, "/", tshow (length (Settings.toList rest)), "more in queue"]
+          liftIO $ writeChan eEventChan (ServerEvent (Just "preview") Nothing [Builder.byteString . encodeUtf8 $ iFilename settings])
+          liftIO . void $ tryPutMVar ePreviewMVar rest
 
 diffedPreviewSettings :: FilmRollSettings -> FilePath -> IO FilmRollSettings
 diffedPreviewSettings filmRoll dir = do

@@ -1,5 +1,6 @@
 module Positive.Image where
 
+import Control.Exception.Safe (IOException, tryIO)
 import GHC.Float (int2Double)
 import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
@@ -14,9 +15,9 @@ type MonochromeImage =
 type MonochromePixel =
   HIP.Pixel HIP.Y Double
 
-readImageFromDisk :: String -> IO MonochromeImage
-readImageFromDisk =
-  HIP.readImageY
+readImageFromDisk :: String -> IO (Either IOException MonochromeImage)
+readImageFromDisk path =
+  tryIO $ HIP.readImageY path
 
 resizeImage :: Int -> MonochromeImage -> MonochromeImage
 resizeImage targetWidth image =
