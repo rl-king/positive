@@ -8,7 +8,8 @@ import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings
     exposing
-        ( ImageCrop
+        ( Fs(..)
+        , ImageCrop
         , ImageSettings
         , WorkingDirectory
         )
@@ -146,6 +147,7 @@ withCtrl decoder =
 type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
+    , filmRolls : Dict String FilmRoll
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
     , canvasSize : Maybe Browser.Dom.Element
@@ -160,6 +162,7 @@ type alias Model =
     , previewColumns : Int
     , notifications : List String
     , previewVersions : Dict String Int
+    , fs : Fs
     }
 
 
@@ -181,6 +184,7 @@ init _ url key =
     in
     ( { imageProcessingState = Loading
       , filmRoll = Nothing
+      , filmRolls = Dict.empty
       , key = key
       , saveKey = Key 0
       , canvasSize = Nothing
@@ -195,8 +199,9 @@ init _ url key =
       , previewColumns = 5
       , notifications = []
       , previewVersions = Dict.empty
+      , fs = Dir "" []
       }
-    , Cmd.map GotFilmRollSettings Request.getImageSettings
+    , Cmd.map GotFs Request.getDirectory
     )
 
 
@@ -229,7 +234,7 @@ type Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotFilmRollSettings (HttpResult ( List ImageSettings, ( WorkingDirectory, String ) ))
     | GotGenerateHighres (HttpResult ())
-    | GotGeneratePreviews (HttpResult ())
+    | GotFs (HttpResult Fs)
     | GotHistogram (HttpResult (List Int))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
@@ -290,15 +295,6 @@ update msg model =
             let
                 sortedSettings =
                     List.sortBy .iFilename settings
-
-                redirect =
-                    case ( model.route.filename, sortedSettings ) of
-                        ( "", head :: _ ) ->
-                            Navigation.pushUrl model.key <|
-                                Url.Builder.absolute [] [ Url.Builder.string "filename" head.iFilename ]
-
-                        _ ->
-                            Cmd.none
             in
             ( { model
                 | workingDirectory = Just workingDirectory
@@ -306,11 +302,8 @@ update msg model =
                     Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == model.route.filename)) <|
                         Zipper.fromList sortedSettings
               }
-            , Cmd.batch
-                [ Task.attempt GotImageDimensions <|
-                    Browser.Dom.getElement "image-section"
-                , redirect
-                ]
+            , Task.attempt GotImageDimensions <|
+                Browser.Dom.getElement "image-section"
             )
 
         GotFilmRollSettings (Err err) ->
@@ -331,11 +324,11 @@ update msg model =
         GotGenerateHighres (Err _) ->
             pushNotification "Error generating highres" model
 
-        GotGeneratePreviews (Ok _) ->
-            pushNotification "Generating previews in the background" model
+        GotFs (Ok fs) ->
+            ( { model | fs = fs }, Cmd.none )
 
-        GotGeneratePreviews (Err _) ->
-            pushNotification "Error generating previews" model
+        GotFs (Err _) ->
+            pushNotification "Error getting directory list" model
 
         GotImageDimensions (Ok element) ->
             pushNotification
@@ -576,6 +569,7 @@ view model =
                 [ main_ []
                     [ div [ class "loading-spinner" ] []
                     , viewNotification model.notifications
+                    , viewFs model.fs
                     ]
                 ]
             }
@@ -588,6 +582,7 @@ view model =
                     , viewImage filmRoll model
                     , viewSettings filmRoll workingDirectory absolutePath model
                     , viewFileBrowser workingDirectory model.previewColumns model.previewVersions filmRoll
+                    , viewFs model.fs
                     , viewNotification model.notifications
                     ]
                 ]
@@ -613,6 +608,20 @@ viewLoading state =
 
 
 -- FILE BROWSER
+
+
+viewFs : Fs -> Html Msg
+viewFs fs =
+    case fs of
+        Dir name subdirs ->
+            div []
+                [ text name
+                , div [] <|
+                    List.map viewFs subdirs
+                ]
+
+        File name ->
+            div [] [ text name ]
 
 
 viewFileBrowser : WorkingDirectory -> Int -> Dict String Int -> FilmRoll -> Html Msg

@@ -158,17 +158,18 @@ data Fs
   | Dir Text [Fs]
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
 
-listPngs :: FilePath -> IO Fs
-listPngs start =
+listPreviews :: FilePath -> IO Fs
+listPreviews start =
   let list path current =
-        fmap (Dir (Text.pack current) . catMaybes) . traverse (check path) =<< listDirectory (path </> current)
-      check path current = doesDirectoryExist (path </> current) >>= \isDir ->
-        if isDir
-          then fmap Just (list path current)
-          else
-            if Path.isExtensionOf ".png" (path </> current)
-              then pure (Just (File (Text.pack current)))
-              else pure Nothing
+        fmap (Dir (Text.pack current) . catMaybes) . traverse (check (path </> current)) =<< listDirectory (path </> current)
+      check path current =
+        doesDirectoryExist (path </> current) >>= \isDir ->
+          if isDir
+            then fmap Just (list path current)
+            else
+              if Path.isExtensionOf ".jpg" current || current == "image-settings.json"
+                then pure (Just (File (Text.pack current)))
+                else pure Nothing
    in list start ""
 
 instance Elm.HasElmType Fs where

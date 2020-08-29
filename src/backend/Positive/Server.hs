@@ -173,7 +173,7 @@ handleGetSettingsHistogram previewWidth settings = do
 handleListDirectories :: PositiveT Handler Fs
 handleListDirectories = do
   dir <- workingDirectory
-  liftIO $ Settings.listPngs dir
+  liftIO $ Settings.listPreviews dir
 
 -- SETTINGS FILE
 
