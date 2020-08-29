@@ -92,29 +92,15 @@ instance FromHttpApiData ImageSettings where
 
 instance Elm.HasElmType ImageSettings where
   elmDefinition =
-    Just $
-      Elm.deriveElmTypeDefinition
-        @ImageSettings
-        Elm.defaultOptions
-        "Generated.Data.ImageSettings.ImageSettings"
+    Just $ Elm.deriveElmTypeDefinition @ImageSettings Elm.defaultOptions "Generated.Data.ImageSettings.ImageSettings"
 
 instance Elm.HasElmDecoder Aeson.Value ImageSettings where
   elmDecoderDefinition =
-    Just $
-      Elm.deriveElmJSONDecoder
-        @ImageSettings
-        Elm.defaultOptions
-        Aeson.defaultOptions
-        "Generated.Data.ImageSettings.decodeImageSettings"
+    Just $ Elm.deriveElmJSONDecoder @ImageSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeImageSettings"
 
 instance Elm.HasElmEncoder Aeson.Value ImageSettings where
   elmEncoderDefinition =
-    Just $
-      Elm.deriveElmJSONEncoder
-        @ImageSettings
-        Elm.defaultOptions
-        Aeson.defaultOptions
-        "Generated.Data.ImageSettings.encodeImageSettings"
+    Just $ Elm.deriveElmJSONEncoder @ImageSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeImageSettings"
 
 -- CROP
 
@@ -131,29 +117,15 @@ noCrop =
 
 instance Elm.HasElmType ImageCrop where
   elmDefinition =
-    Just $
-      Elm.deriveElmTypeDefinition
-        @ImageCrop
-        Elm.defaultOptions
-        "Generated.Data.ImageSettings.ImageCrop"
+    Just $ Elm.deriveElmTypeDefinition @ImageCrop Elm.defaultOptions "Generated.Data.ImageSettings.ImageCrop"
 
 instance Elm.HasElmDecoder Aeson.Value ImageCrop where
   elmDecoderDefinition =
-    Just $
-      Elm.deriveElmJSONDecoder
-        @ImageCrop
-        Elm.defaultOptions
-        Aeson.defaultOptions
-        "Generated.Data.ImageSettings.decodeImageCrop"
+    Just $ Elm.deriveElmJSONDecoder @ImageCrop Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeImageCrop"
 
 instance Elm.HasElmEncoder Aeson.Value ImageCrop where
   elmEncoderDefinition =
-    Just $
-      Elm.deriveElmJSONEncoder
-        @ImageCrop
-        Elm.defaultOptions
-        Aeson.defaultOptions
-        "Generated.Data.ImageSettings.encodeImageCrop"
+    Just $ Elm.deriveElmJSONEncoder @ImageCrop Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeImageCrop"
 
 -- DIR
 
@@ -166,26 +138,12 @@ toFilePath =
 
 instance Elm.HasElmType WorkingDirectory where
   elmDefinition =
-    Just $
-      Elm.deriveElmTypeDefinition
-        @WorkingDirectory
-        Elm.defaultOptions
-        "Generated.Data.ImageSettings.WorkingDirectory"
+    Just $ Elm.deriveElmTypeDefinition @WorkingDirectory Elm.defaultOptions "Generated.Data.ImageSettings.WorkingDirectory"
 
 instance Elm.HasElmDecoder Aeson.Value WorkingDirectory where
   elmDecoderDefinition =
-    Just $
-      Elm.deriveElmJSONDecoder
-        @WorkingDirectory
-        Elm.defaultOptions
-        Aeson.defaultOptions
-        "Generated.Data.ImageSettings.decodeWorkingDirectory"
+    Just $ Elm.deriveElmJSONDecoder @WorkingDirectory Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeWorkingDirectory"
 
 instance Elm.HasElmEncoder Aeson.Value WorkingDirectory where
   elmEncoderDefinition =
-    Just $
-      Elm.deriveElmJSONEncoder
-        @WorkingDirectory
-        Elm.defaultOptions
-        Aeson.defaultOptions
-        "Generated.Data.ImageSettings.encodeWorkingDirectory"
+    Just $ Elm.deriveElmJSONEncoder @WorkingDirectory Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeWorkingDirectory"
