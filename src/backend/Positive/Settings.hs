@@ -11,12 +11,15 @@ import qualified Data.ByteString.Base64 as Base64
 import Data.ByteString.Lazy (ByteString)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
+import Data.Maybe
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Network.HTTP.Media as Media
 import Positive.Prelude hiding (ByteString)
 import Servant
+import System.Directory
+import System.FilePath.Posix as Path
 
 -- IMAGE
 
@@ -147,3 +150,35 @@ instance Elm.HasElmDecoder Aeson.Value WorkingDirectory where
 instance Elm.HasElmEncoder Aeson.Value WorkingDirectory where
   elmEncoderDefinition =
     Just $ Elm.deriveElmJSONEncoder @WorkingDirectory Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeWorkingDirectory"
+
+-- FS
+
+data Fs
+  = File Text
+  | Dir Text [Fs]
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+listPngs :: FilePath -> IO Fs
+listPngs start =
+  let list path current =
+        fmap (Dir (Text.pack current) . catMaybes) . traverse (check path) =<< listDirectory (path </> current)
+      check path current = doesDirectoryExist (path </> current) >>= \isDir ->
+        if isDir
+          then fmap Just (list path current)
+          else
+            if Path.isExtensionOf ".png" (path </> current)
+              then pure (Just (File (Text.pack current)))
+              else pure Nothing
+   in list start ""
+
+instance Elm.HasElmType Fs where
+  elmDefinition =
+    Just $ Elm.deriveElmTypeDefinition @Fs Elm.defaultOptions "Generated.Data.ImageSettings.Fs"
+
+instance Elm.HasElmDecoder Aeson.Value Fs where
+  elmDecoderDefinition =
+    Just $ Elm.deriveElmJSONDecoder @Fs Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeFs"
+
+instance Elm.HasElmEncoder Aeson.Value Fs where
+  elmEncoderDefinition =
+    Just $ Elm.deriveElmJSONEncoder @Fs Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeFs"

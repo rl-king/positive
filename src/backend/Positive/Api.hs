@@ -45,6 +45,9 @@ data SettingsApi route = SettingsApi
     saGenerateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent
+        :> PostNoContent '[JSON] NoContent,
+    saListDirectories ::
+      route :- "directory"
+        :> Get '[JSON] Fs
   }
   deriving (Generic)

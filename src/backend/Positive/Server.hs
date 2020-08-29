@@ -82,7 +82,8 @@ handlers isDev chan =
             { saSaveSettings = handleSaveSettings,
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
-              saGenerateHighRes = handleGenerateHighRes
+              saGenerateHighRes = handleGenerateHighRes,
+              saListDirectories = handleListDirectories
             }
     }
 
@@ -166,6 +167,13 @@ handleGetSettingsHistogram previewWidth settings = do
   -- pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
   --   processImage settings image
   pure []
+
+-- LIST DIRECTORIES
+
+handleListDirectories :: PositiveT Handler Fs
+handleListDirectories = do
+  dir <- workingDirectory
+  liftIO $ Settings.listPngs dir
 
 -- SETTINGS FILE
 

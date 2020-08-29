@@ -1,4 +1,4 @@
-module Generated.Request exposing (getImageSettings, postImageSettings, postImageSettingsHighres, postImageSettingsHistogram)
+module Generated.Request exposing (getDirectory, getImageSettings, postImageSettings, postImageSettingsHighres, postImageSettingsHistogram)
 
 import Generated.Data.ImageSettings
 import Http
@@ -208,6 +208,56 @@ postImageSettingsHighres a =
                                         , body = d
                                         }
                                     )
+                )
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+getDirectory :
+    Cmd
+        (Result
+            ( Http.Error
+            , Maybe
+                { metadata : Http.Metadata
+                , body : String
+                }
+            )
+            Generated.Data.ImageSettings.Fs
+        )
+getDirectory =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url = "/directory"
+        , body = Http.emptyBody
+        , expect =
+            Http.expectStringResponse identity
+                (\a ->
+                    case a of
+                        Http.BadUrl_ b ->
+                            Err ( Http.BadUrl b, Nothing )
+
+                        Http.Timeout_ ->
+                            Err ( Http.Timeout, Nothing )
+
+                        Http.NetworkError_ ->
+                            Err ( Http.NetworkError, Nothing )
+
+                        Http.BadStatus_ b c ->
+                            Err ( Http.BadStatus b.statusCode, Just { metadata = b, body = c } )
+
+                        Http.GoodStatus_ b c ->
+                            Result.mapError
+                                (\d ->
+                                    ( Http.BadBody (Json.Decode.errorToString d)
+                                    , Just
+                                        { metadata = b
+                                        , body = c
+                                        }
+                                    )
+                                )
+                                (Json.Decode.decodeString Generated.Data.ImageSettings.decodeFs c)
                 )
         , timeout = Nothing
         , tracker = Nothing

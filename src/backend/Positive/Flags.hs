@@ -10,7 +10,8 @@ import System.FilePath.Posix (dropTrailingPathSeparator)
 
 data Flags = Flags
   { fDir :: !WorkingDirectory,
-    fIsDev :: !Bool
+    fIsDev :: !Bool,
+    fInit :: !Bool
   }
   deriving (Show, Eq)
 
@@ -24,6 +25,7 @@ parser =
   Flags
     <$> parseDir
     <*> flag False True (long "dev")
+    <*> flag False True (long "init")
 
 parseDir :: Parser WorkingDirectory
 parseDir =
