@@ -213,7 +213,10 @@ previewWorker = do
 
 diffedPreviewSettings :: FilmRollSettings -> FilePath -> IO FilmRollSettings
 diffedPreviewSettings filmRoll dir = do
-  Just current <- Aeson.decodeFileStrict $ dir </> "previews" </> "image-settings.json"
+  let path = dir </> "previews" </> "image-settings.json"
+  exists <- doesPathExist path
+  unless exists . ByteString.writeFile path . Aeson.encode $ fromList []
+  Just current <- Aeson.decodeFileStrict path
   pure $ Settings.difference filmRoll current
 
 insertPreviewSettings :: FilePath -> ImageSettings -> IO ()

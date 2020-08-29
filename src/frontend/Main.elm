@@ -287,14 +287,30 @@ update msg model =
             )
 
         GotFilmRollSettings (Ok ( settings, workingDirectory )) ->
+            let
+                sortedSettings =
+                    List.sortBy .iFilename settings
+
+                redirect =
+                    case ( model.route.filename, sortedSettings ) of
+                        ( "", head :: _ ) ->
+                            Navigation.pushUrl model.key <|
+                                Url.Builder.absolute [] [ Url.Builder.string "filename" head.iFilename ]
+
+                        _ ->
+                            Cmd.none
+            in
             ( { model
                 | workingDirectory = Just workingDirectory
                 , filmRoll =
                     Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == model.route.filename)) <|
-                        Zipper.fromList (List.sortBy .iFilename settings)
+                        Zipper.fromList sortedSettings
               }
-            , Task.attempt GotImageDimensions <|
-                Browser.Dom.getElement "image-section"
+            , Cmd.batch
+                [ Task.attempt GotImageDimensions <|
+                    Browser.Dom.getElement "image-section"
+                , redirect
+                ]
             )
 
         GotFilmRollSettings (Err err) ->
