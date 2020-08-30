@@ -14,6 +14,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as ByteString
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Massiv.Array.IO as Massiv
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
@@ -82,8 +83,7 @@ handlers isDev chan =
             { saSaveSettings = handleSaveSettings,
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
-              saGenerateHighRes = handleGenerateHighRes,
-              saListDirectories = handleListDirectories
+              saGenerateHighRes = handleGenerateHighRes
             }
     }
 
@@ -129,13 +129,6 @@ handleSaveSettings settings = do
   liftIO $ pSwapMVar ePreviewMVar =<< diffedPreviewSettings newSettings dir
   pure $ Settings.toList newSettings
 
-handleGetSettings :: PositiveT Handler ([ImageSettings], (WorkingDirectory, Text))
-handleGetSettings = do
-  dir <- asks eDir
-  path <- liftIO . makeAbsolute =<< workingDirectory
-  settings <- getSettingsFile
-  pure (Settings.toList settings, (dir, Text.pack path))
-
 -- GENERATE PREVIEWS
 
 handleGenerateHighRes :: ImageSettings -> PositiveT Handler NoContent
@@ -170,10 +163,9 @@ handleGetSettingsHistogram previewWidth settings = do
 
 -- LIST DIRECTORIES
 
-handleListDirectories :: PositiveT Handler Fs
-handleListDirectories = do
-  dir <- workingDirectory
-  liftIO $ Settings.listPreviews dir
+handleGetSettings :: PositiveT Handler [(Text, [ImageSettings])]
+handleGetSettings =
+  HashMap.toList . fmap toList <$> liftIO findImageSettings
 
 -- SETTINGS FILE
 

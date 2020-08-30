@@ -36,7 +36,7 @@ data SettingsApi route = SettingsApi
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image" :> "settings"
-        :> Get '[JSON] ([ImageSettings], (WorkingDirectory, Text)),
+        :> Get '[JSON] [(Text, [ImageSettings])],
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "preview-width" Int
@@ -45,9 +45,6 @@ data SettingsApi route = SettingsApi
     saGenerateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent,
-    saListDirectories ::
-      route :- "directory"
-        :> Get '[JSON] Fs
+        :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)

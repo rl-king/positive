@@ -29,6 +29,7 @@ dependencies:
   - filepath
   - file-embed
   - generics-sop
+  - Glob
   - haskeline
   - haskell-to-elm
   - hip

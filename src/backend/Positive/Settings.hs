@@ -9,7 +9,6 @@ import qualified Data.Aeson as Aeson
 import Data.Bifunctor
 import qualified Data.ByteString.Base64 as Base64
 import Data.ByteString.Lazy (ByteString)
-import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Maybe
 import qualified Data.Text as Text
@@ -18,7 +17,7 @@ import qualified Language.Haskell.To.Elm as Elm
 import qualified Network.HTTP.Media as Media
 import Positive.Prelude hiding (ByteString)
 import Servant
-import System.Directory
+import qualified System.FilePath.Glob as Glob
 import System.FilePath.Posix as Path
 
 -- IMAGE
@@ -153,33 +152,15 @@ instance Elm.HasElmEncoder Aeson.Value WorkingDirectory where
 
 -- FS
 
-data Fs
-  = File Text
-  | Dir Text [Fs]
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
-
-listPreviews :: FilePath -> IO Fs
-listPreviews start =
-  let list path current =
-        fmap (Dir (Text.pack current) . catMaybes) . traverse (check (path </> current)) =<< listDirectory (path </> current)
-      check path current =
-        doesDirectoryExist (path </> current) >>= \isDir ->
-          if isDir
-            then fmap Just (list path current)
-            else
-              if Path.isExtensionOf ".jpg" current || current == "image-settings.json"
-                then pure (Just (File (Text.pack current)))
-                else pure Nothing
-   in list start ""
-
-instance Elm.HasElmType Fs where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @Fs Elm.defaultOptions "Generated.Data.ImageSettings.Fs"
-
-instance Elm.HasElmDecoder Aeson.Value Fs where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @Fs Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeFs"
-
-instance Elm.HasElmEncoder Aeson.Value Fs where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @Fs Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeFs"
+findImageSettings :: IO (HashMap Text FilmRollSettings)
+findImageSettings = do
+  settingFiles <- Glob.glob "./**/[Roll]*/image-settings.json"
+  filmRollSettings <-
+    traverse
+      (\path -> (,) <$> pure (Text.pack (makeRelative "./" (takeDirectory path))) <*> Aeson.decodeFileStrict path)
+      settingFiles
+  pure $
+    foldr
+      (\(path, maybeSettings) acc -> maybe acc (\settings -> HashMap.insert path settings acc) maybeSettings)
+      mempty
+      filmRollSettings

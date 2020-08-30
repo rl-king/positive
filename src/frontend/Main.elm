@@ -8,8 +8,7 @@ import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings
     exposing
-        ( Fs(..)
-        , ImageCrop
+        ( ImageCrop
         , ImageSettings
         , WorkingDirectory
         )
@@ -24,6 +23,7 @@ import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
 import Process
 import ScrollTo
+import Set exposing (Set)
 import String.Interpolate exposing (interpolate)
 import Task
 import Time
@@ -147,7 +147,8 @@ withCtrl decoder =
 type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
-    , filmRolls : Dict String FilmRoll
+    , filmRolls : Dict String (List ImageSettings)
+    , visibleFilmRolls : Set String
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
     , canvasSize : Maybe Browser.Dom.Element
@@ -162,7 +163,6 @@ type alias Model =
     , previewColumns : Int
     , notifications : List String
     , previewVersions : Dict String Int
-    , fs : Fs
     }
 
 
@@ -185,6 +185,7 @@ init _ url key =
     ( { imageProcessingState = Loading
       , filmRoll = Nothing
       , filmRolls = Dict.empty
+      , visibleFilmRolls = Set.empty
       , key = key
       , saveKey = Key 0
       , canvasSize = Nothing
@@ -199,9 +200,8 @@ init _ url key =
       , previewColumns = 5
       , notifications = []
       , previewVersions = Dict.empty
-      , fs = Dir "" []
       }
-    , Cmd.map GotFs Request.getDirectory
+    , Cmd.map GotFilmRolls Request.getImageSettings
     )
 
 
@@ -232,11 +232,12 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
-    | GotFilmRollSettings (HttpResult ( List ImageSettings, ( WorkingDirectory, String ) ))
+    | EditFilmRoll ( String, List ImageSettings )
     | GotGenerateHighres (HttpResult ())
-    | GotFs (HttpResult Fs)
     | GotHistogram (HttpResult (List Int))
+    | GotFilmRolls (HttpResult (List ( String, List ImageSettings )))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
+    | ToggleFilmRollVisiblity String
     | Rotate
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
@@ -291,23 +292,26 @@ update msg model =
             , Cmd.map ScrollToMsg scrollToCmds
             )
 
-        GotFilmRollSettings (Ok ( settings, workingDirectory )) ->
-            let
-                sortedSettings =
-                    List.sortBy .iFilename settings
-            in
+        GotFilmRolls (Ok filmRolls) ->
             ( { model
-                | workingDirectory = Just workingDirectory
-                , filmRoll =
-                    Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == model.route.filename)) <|
-                        Zipper.fromList sortedSettings
+                | filmRolls =
+                    Dict.fromList <|
+                        List.map (Tuple.mapSecond (List.sortBy .iFilename)) filmRolls
+              }
+            , Cmd.none
+            )
+
+        GotFilmRolls (Err _) ->
+            pushNotification "Error gettings filmroll settings" model
+
+        EditFilmRoll ( dir, settings ) ->
+            ( { model
+                | workingDirectory = Just ( WorkingDirectory dir, "" )
+                , filmRoll = Zipper.fromList settings
               }
             , Task.attempt GotImageDimensions <|
                 Browser.Dom.getElement "image-section"
             )
-
-        GotFilmRollSettings (Err err) ->
-            pushNotification "Error getting filmroll settings" model
 
         GotHistogram result ->
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
@@ -324,12 +328,6 @@ update msg model =
         GotGenerateHighres (Err _) ->
             pushNotification "Error generating highres" model
 
-        GotFs (Ok fs) ->
-            ( { model | fs = fs }, Cmd.none )
-
-        GotFs (Err _) ->
-            pushNotification "Error getting directory list" model
-
         GotImageDimensions (Ok element) ->
             pushNotification
                 (interpolate "Got canvas dimensions: w:{0} h:{1}"
@@ -341,6 +339,13 @@ update msg model =
 
         GotImageDimensions (Err _) ->
             pushNotification "Error getting image dimensions from element" model
+
+        ToggleFilmRollVisiblity path ->
+            if Set.member path model.visibleFilmRolls then
+                ( { model | visibleFilmRolls = Set.remove path model.visibleFilmRolls }, Cmd.none )
+
+            else
+                ( { model | visibleFilmRolls = Set.insert path model.visibleFilmRolls }, Cmd.none )
 
         Rotate ->
             ( updateSettings
@@ -569,7 +574,7 @@ view model =
                 [ main_ []
                     [ div [ class "loading-spinner" ] []
                     , viewNotification model.notifications
-                    , viewFs model.fs
+                    , viewFilmRollBrowser model.visibleFilmRolls model.filmRolls
                     ]
                 ]
             }
@@ -581,8 +586,7 @@ view model =
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
                     , viewSettings filmRoll workingDirectory absolutePath model
-                    , viewFileBrowser workingDirectory model.previewColumns model.previewVersions filmRoll
-                    , viewFs model.fs
+                    , viewCurrentFilmRoll workingDirectory model.previewColumns model.previewVersions filmRoll
                     , viewNotification model.notifications
                     ]
                 ]
@@ -610,35 +614,79 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFs : Fs -> Html Msg
-viewFs fs =
-    case fs of
-        Dir name subdirs ->
-            div []
-                [ text name
-                , div [] <|
-                    List.map viewFs subdirs
-                ]
+viewFilmRollBrowser : Set String -> Dict String (List ImageSettings) -> Html Msg
+viewFilmRollBrowser visibleFilmRolls filmRolls =
+    let
+        down ( a, _ ) ( b, _ ) =
+            case compare a b of
+                GT ->
+                    LT
 
-        File name ->
-            div [] [ text name ]
+                EQ ->
+                    EQ
+
+                LT ->
+                    GT
+    in
+    section [ class "browser" ] <|
+        List.map (viewFilmRollBrowserRoll visibleFilmRolls 5) <|
+            List.sortWith down <|
+                Dict.toList filmRolls
 
 
-viewFileBrowser : WorkingDirectory -> Int -> Dict String Int -> FilmRoll -> Html Msg
-viewFileBrowser dir columns previewVersions filmRoll =
+viewFilmRollBrowserRoll : Set String -> Int -> ( String, List ImageSettings ) -> Html Msg
+viewFilmRollBrowserRoll visibleFilmRolls columns ( dir, filmRoll ) =
+    let
+        title =
+            Maybe.withDefault dir <|
+                List.head (List.reverse (String.split "/" dir))
+    in
+    section [ class "browser-filmroll" ]
+        [ button [ onClick (ToggleFilmRollVisiblity dir) ] [ h2 [] [ text title ] ]
+        , button [ onClick (EditFilmRoll ( dir, filmRoll )) ] [ text "edit" ]
+        , viewIf (Set.member dir visibleFilmRolls) <|
+            \_ ->
+                ul [] <|
+                    List.map (viewFilmRollBrowserImage 5 dir) filmRoll
+        ]
+
+
+viewFilmRollBrowserImage : Int -> String -> ImageSettings -> Html Msg
+viewFilmRollBrowserImage columns dir settings =
+    let
+        previewExtension x =
+            String.dropRight 3 x ++ "jpg"
+
+        width =
+            style "width" <|
+                interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
+    in
+    li [ classList [ ( "-small", columns > 5 ) ], width ]
+        [ img
+            [ src <|
+                Url.Builder.absolute
+                    [ dir, "previews", previewExtension settings.iFilename ]
+                    []
+            ]
+            []
+        ]
+
+
+viewCurrentFilmRoll : WorkingDirectory -> Int -> Dict String Int -> FilmRoll -> Html Msg
+viewCurrentFilmRoll dir columns previewVersions filmRoll =
     section [ id "files" ]
         [ viewRangeInput (SetPreviewScale << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
-                [ List.map (viewFileLink False dir.unWorkingDirectory columns previewVersions) (Zipper.before filmRoll)
-                , [ viewFileLink True dir.unWorkingDirectory columns previewVersions (Zipper.current filmRoll) ]
-                , List.map (viewFileLink False dir.unWorkingDirectory columns previewVersions) (Zipper.after filmRoll)
+                [ List.map (viewCurrentFilmRollLink False dir.unWorkingDirectory columns previewVersions) (Zipper.before filmRoll)
+                , [ viewCurrentFilmRollLink True dir.unWorkingDirectory columns previewVersions (Zipper.current filmRoll) ]
+                , List.map (viewCurrentFilmRollLink False dir.unWorkingDirectory columns previewVersions) (Zipper.after filmRoll)
                 ]
         ]
 
 
-viewFileLink : Bool -> String -> Int -> Dict String Int -> ImageSettings -> Html Msg
-viewFileLink isCurrent dir columns previewVersions settings =
+viewCurrentFilmRollLink : Bool -> String -> Int -> Dict String Int -> ImageSettings -> Html Msg
+viewCurrentFilmRollLink isCurrent dir columns previewVersions settings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"

@@ -1,4 +1,4 @@
-module Generated.Data.ImageSettings exposing (Fs(..), ImageCrop, ImageSettings, WorkingDirectory, decodeFs, decodeImageCrop, decodeImageSettings, decodeWorkingDirectory, encodeFs, encodeImageCrop, encodeImageSettings, encodeWorkingDirectory)
+module Generated.Data.ImageSettings exposing (ImageCrop, ImageSettings, WorkingDirectory, decodeImageCrop, decodeImageSettings, decodeWorkingDirectory, encodeImageCrop, encodeImageSettings, encodeWorkingDirectory)
 
 import Json.Decode
 import Json.Decode.Pipeline
@@ -81,51 +81,3 @@ decodeWorkingDirectory : Json.Decode.Decoder WorkingDirectory
 decodeWorkingDirectory =
     Json.Decode.succeed WorkingDirectory
         |> Json.Decode.Pipeline.required "unWorkingDirectory" Json.Decode.string
-
-
-type Fs
-    = File String
-    | Dir String (List Fs)
-
-
-encodeFs : Fs -> Json.Encode.Value
-encodeFs a =
-    case a of
-        File b ->
-            Json.Encode.object
-                [ ( "tag", Json.Encode.string "File" )
-                , ( "contents", Json.Encode.string b )
-                ]
-
-        Dir b c ->
-            Json.Encode.object
-                [ ( "tag", Json.Encode.string "Dir" )
-                , ( "contents"
-                  , Json.Encode.list identity
-                        [ Json.Encode.string b
-                        , Json.Encode.list encodeFs c
-                        ]
-                  )
-                ]
-
-
-decodeFs : Json.Decode.Decoder Fs
-decodeFs =
-    Json.Decode.field "tag" Json.Decode.string
-        |> Json.Decode.andThen
-            (\a ->
-                case a of
-                    "File" ->
-                        Json.Decode.succeed File
-                            |> Json.Decode.Pipeline.required "contents" Json.Decode.string
-
-                    "Dir" ->
-                        Json.Decode.field "contents"
-                            (Json.Decode.succeed Dir
-                                |> Json.Decode.Pipeline.custom (Json.Decode.index 0 Json.Decode.string)
-                                |> Json.Decode.Pipeline.custom (Json.Decode.index 1 (Json.Decode.list decodeFs))
-                            )
-
-                    _ ->
-                        Json.Decode.fail "No matching constructor"
-            )

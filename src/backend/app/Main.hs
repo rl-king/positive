@@ -10,7 +10,6 @@ import Positive.Flags
 import Positive.Prelude
 import Positive.Server
 import Positive.Settings
-import qualified System.Console.Haskeline as Haskeline
 import System.Directory
 import System.FilePath.Posix as Path
 import qualified System.Log.FastLogger as FastLogger
