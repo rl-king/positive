@@ -99,6 +99,7 @@ a:hover {
 
 #files {
     width: 100%;
+    padding-bottom: 6rem;
 }
 
 #files ul {
