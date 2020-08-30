@@ -271,29 +271,7 @@ update msg model =
             ( model, Navigation.load href )
 
         UrlChanged url ->
-            let
-                withFilmRoll route =
-                    Maybe.andThen (\{ dir } -> Dict.get dir model.filmRolls) (fromUrl url)
-                        |> Maybe.map2 Tuple.pair route
-            in
-            case withFilmRoll (fromUrl url) of
-                Nothing ->
-                    ( { model | filmRoll = Nothing, imageProcessingState = Ready, route = Nothing }
-                    , Cmd.none
-                    )
-
-                Just ( route, filmRoll ) ->
-                    ( { model
-                        | filmRoll = Zipper.findFirst (\x -> x.iFilename == route.filename) filmRoll
-                        , imageProcessingState = Loading
-                        , route = Just route
-                      }
-                    , Cmd.batch
-                        [ Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                        , Task.attempt GotImageDimensions <|
-                            Browser.Dom.getElement "image-section"
-                        ]
-                    )
+            onNavigation (fromUrl url) model
 
         ScrollToMsg scrollToMsg ->
             let
@@ -310,13 +288,12 @@ update msg model =
                     Zipper.fromList (List.sortBy .iFilename xs)
                         |> Maybe.map (Tuple.pair k)
             in
-            ( { model
-                | filmRolls =
-                    Dict.fromList <|
-                        List.filterMap toSortedZipper filmRolls
-              }
-            , Cmd.none
-            )
+            onNavigation model.route <|
+                { model
+                    | filmRolls =
+                        Dict.fromList <|
+                            List.filterMap toSortedZipper filmRolls
+                }
 
         GotFilmRolls (Err _) ->
             pushNotification "Error gettings filmroll settings" model
@@ -521,6 +498,33 @@ update msg model =
             in
             pushNotification ("Preview ready: " ++ filename)
                 { model | previewVersions = Dict.update filename f model.previewVersions }
+
+
+onNavigation : Maybe Route -> Model -> ( Model, Cmd Msg )
+onNavigation maybeRoute model =
+    let
+        withFilmRoll route =
+            Maybe.andThen (\{ dir } -> Dict.get dir model.filmRolls) maybeRoute
+                |> Maybe.map2 Tuple.pair route
+    in
+    case withFilmRoll maybeRoute of
+        Nothing ->
+            ( { model | filmRoll = Nothing, imageProcessingState = Ready, route = Nothing }
+            , Cmd.none
+            )
+
+        Just ( route, filmRoll ) ->
+            ( { model
+                | filmRoll = Zipper.findFirst (\x -> x.iFilename == route.filename) filmRoll
+                , imageProcessingState = Loading
+                , route = Just route
+              }
+            , Cmd.batch
+                [ Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                , Task.attempt GotImageDimensions <|
+                    Browser.Dom.getElement "image-section"
+                ]
+            )
 
 
 type Key a
