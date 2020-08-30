@@ -73,6 +73,14 @@ a {
     color: #fff;
 }
 
+h1 {
+    font-size: 4rem;
+}
+
+h2 {
+    font-size: 2rem;
+}
+
 button {
     padding: .5rem 1.5rem;
     margin: 0 .5rem .5rem 0;
@@ -97,16 +105,27 @@ a:hover {
     text-decoration: underline;
 }
 
+.browser {
+    padding: 2rem 0 4rem 0;
+    border-top: 3px solid #444;
+}
+
 .browser-filmroll button {
+    padding: 0;
+    border-bottom: 3px solid transparent;
     background-color: transparent;
 }
 
 .browser-filmroll button:hover {
-    background-color: #333;
+    border-bottom: 3px solid blue;
+}
+
+.browser-filmroll li:hover {
+    border-bottom: 3px solid blue;
 }
 
 .browser-filmroll ul {
-    padding: 2rem 0 10rem;
+    padding: 0 0 10rem;
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
@@ -394,6 +413,7 @@ img {
     position: fixed;
     bottom: 1rem;
     left: 1rem;
+    pointer-events: none;
 }
 
 .notifications span {
@@ -405,10 +425,6 @@ img {
     font-size: .875rem;
     background-color: #333;
     animation: slideup .35s, fadeout .5s 9.5s forwards;
-}
-
-.notifications span:hover {
-    opacity: 1;
 }
 
 .loading-spinner {

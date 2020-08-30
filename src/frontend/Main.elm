@@ -147,7 +147,7 @@ withCtrl decoder =
 type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
-    , filmRolls : Dict String FilmRoll
+    , filmRolls : FilmRolls
     , visibleFilmRolls : Set String
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
@@ -163,6 +163,10 @@ type alias Model =
     , notifications : List String
     , previewVersions : Dict String Int
     }
+
+
+type alias FilmRolls =
+    Dict String FilmRoll
 
 
 type alias FilmRoll =
@@ -240,6 +244,7 @@ type Msg
     | GotFilmRolls (HttpResult (List ( String, List ImageSettings )))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | ToggleFilmRollVisiblity String
+    | ToggleFilmRollVisiblityAll FilmRolls
     | Rotate
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
@@ -331,6 +336,13 @@ update msg model =
 
             else
                 ( { model | visibleFilmRolls = Set.insert path model.visibleFilmRolls }, Cmd.none )
+
+        ToggleFilmRollVisiblityAll all ->
+            if Set.isEmpty model.visibleFilmRolls then
+                ( { model | visibleFilmRolls = Set.fromList (Dict.keys all) }, Cmd.none )
+
+            else
+                ( { model | visibleFilmRolls = Set.empty }, Cmd.none )
 
         Rotate ->
             ( updateSettings
@@ -586,7 +598,7 @@ view model =
             , body =
                 [ main_ []
                     [ viewNotification model.notifications
-                    , viewFilmRollBrowser model.visibleFilmRolls model.filmRolls
+                    , viewFilmRollBrowser model.visibleFilmRolls model.previewColumns model.filmRolls
                     ]
                 ]
             }
@@ -599,7 +611,7 @@ view model =
                     , viewImage filmRoll route model
                     , viewSettings filmRoll route model
                     , viewCurrentFilmRoll route model.previewColumns model.previewVersions filmRoll
-                    , viewFilmRollBrowser model.visibleFilmRolls model.filmRolls
+                    , viewFilmRollBrowser model.visibleFilmRolls model.previewColumns model.filmRolls
                     , viewNotification model.notifications
                     ]
                 ]
@@ -610,8 +622,8 @@ view model =
 -- FILE BROWSER
 
 
-viewFilmRollBrowser : Set String -> Dict String FilmRoll -> Html Msg
-viewFilmRollBrowser visibleFilmRolls filmRolls =
+viewFilmRollBrowser : Set String -> Int -> FilmRolls -> Html Msg
+viewFilmRollBrowser visibleFilmRolls columns filmRolls =
     let
         down ( a, _ ) ( b, _ ) =
             case compare a b of
@@ -625,9 +637,14 @@ viewFilmRollBrowser visibleFilmRolls filmRolls =
                     GT
     in
     section [ class "browser" ] <|
-        List.map (viewFilmRollBrowserRoll visibleFilmRolls 5) <|
-            List.sortWith down <|
-                Dict.toList filmRolls
+        List.concat
+            [ [ h1 [] [ text "Browser" ]
+              , button [ onClick (ToggleFilmRollVisiblityAll filmRolls) ] [ text "Toggle all" ]
+              ]
+            , List.map (viewFilmRollBrowserRoll visibleFilmRolls columns) <|
+                List.sortWith down <|
+                    Dict.toList filmRolls
+            ]
 
 
 viewFilmRollBrowserRoll : Set String -> Int -> ( String, FilmRoll ) -> Html Msg
@@ -642,7 +659,7 @@ viewFilmRollBrowserRoll visibleFilmRolls columns ( dir, filmRoll ) =
         , viewIf (Set.member dir visibleFilmRolls) <|
             \_ ->
                 ul [] <|
-                    List.map (viewFilmRollBrowserImage 9 dir) <|
+                    List.map (viewFilmRollBrowserImage columns dir) <|
                         Zipper.toList filmRoll
         ]
 
