@@ -147,15 +147,14 @@ withCtrl decoder =
 type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
-    , filmRolls : Dict String (List ImageSettings)
+    , filmRolls : Dict String FilmRoll
     , visibleFilmRolls : Set String
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
     , canvasSize : Maybe Browser.Dom.Element
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
-    , route : { filename : String }
-    , workingDirectory : Maybe ( WorkingDirectory, String )
+    , route : Maybe Route
     , scrollTo : ScrollTo.State
     , histogram : List Int
     , undoState : List FilmRoll
@@ -170,6 +169,12 @@ type alias FilmRoll =
     Zipper ImageSettings
 
 
+type alias Route =
+    { filename : String
+    , dir : String
+    }
+
+
 type ImageProcessingState
     = Ready
     | Loading
@@ -182,7 +187,7 @@ init _ url key =
         route =
             fromUrl url
     in
-    ( { imageProcessingState = Loading
+    ( { imageProcessingState = Ready
       , filmRoll = Nothing
       , filmRolls = Dict.empty
       , visibleFilmRolls = Set.empty
@@ -192,7 +197,6 @@ init _ url key =
       , imageCropMode = Nothing
       , clipboard = Nothing
       , route = route
-      , workingDirectory = Nothing
       , scrollTo = ScrollTo.init
       , histogram = []
       , undoState = []
@@ -205,18 +209,17 @@ init _ url key =
     )
 
 
-fromUrl : Url -> { filename : String }
+fromUrl : Url -> Maybe Route
 fromUrl url =
-    -- FIXME: Don't default
-    Maybe.withDefault { filename = "" } <|
-        Maybe.andThen identity <|
-            Url.Parser.parse
-                (Url.Parser.query
-                    (Url.Parser.Query.map (Maybe.map (\a -> { filename = a }))
-                        (Url.Parser.Query.string "filename")
-                    )
+    Maybe.andThen identity <|
+        Url.Parser.parse
+            (Url.Parser.query
+                (Url.Parser.Query.map2 (Maybe.map2 Route)
+                    (Url.Parser.Query.string "filename")
+                    (Url.Parser.Query.string "dir")
                 )
-                url
+            )
+            url
 
 
 
@@ -232,7 +235,6 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
-    | EditFilmRoll ( String, List ImageSettings )
     | GotGenerateHighres (HttpResult ())
     | GotHistogram (HttpResult (List Int))
     | GotFilmRolls (HttpResult (List ( String, List ImageSettings )))
@@ -270,18 +272,28 @@ update msg model =
 
         UrlChanged url ->
             let
-                route =
-                    fromUrl url
+                withFilmRoll route =
+                    Maybe.andThen (\{ dir } -> Dict.get dir model.filmRolls) (fromUrl url)
+                        |> Maybe.map2 Tuple.pair route
             in
-            ( { model
-                | filmRoll =
-                    Maybe.andThen (Zipper.findFirst (\x -> x.iFilename == route.filename))
-                        model.filmRoll
-                , imageProcessingState = Loading
-                , route = route
-              }
-            , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-            )
+            case withFilmRoll (fromUrl url) of
+                Nothing ->
+                    ( { model | filmRoll = Nothing, imageProcessingState = Ready, route = Nothing }
+                    , Cmd.none
+                    )
+
+                Just ( route, filmRoll ) ->
+                    ( { model
+                        | filmRoll = Zipper.findFirst (\x -> x.iFilename == route.filename) filmRoll
+                        , imageProcessingState = Loading
+                        , route = Just route
+                      }
+                    , Cmd.batch
+                        [ Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                        , Task.attempt GotImageDimensions <|
+                            Browser.Dom.getElement "image-section"
+                        ]
+                    )
 
         ScrollToMsg scrollToMsg ->
             let
@@ -293,25 +305,21 @@ update msg model =
             )
 
         GotFilmRolls (Ok filmRolls) ->
+            let
+                toSortedZipper ( k, xs ) =
+                    Zipper.fromList (List.sortBy .iFilename xs)
+                        |> Maybe.map (Tuple.pair k)
+            in
             ( { model
                 | filmRolls =
                     Dict.fromList <|
-                        List.map (Tuple.mapSecond (List.sortBy .iFilename)) filmRolls
+                        List.filterMap toSortedZipper filmRolls
               }
             , Cmd.none
             )
 
         GotFilmRolls (Err _) ->
             pushNotification "Error gettings filmroll settings" model
-
-        EditFilmRoll ( dir, settings ) ->
-            ( { model
-                | workingDirectory = Just ( WorkingDirectory dir, "" )
-                , filmRoll = Zipper.fromList settings
-              }
-            , Task.attempt GotImageDimensions <|
-                Browser.Dom.getElement "image-section"
-            )
 
         GotHistogram result ->
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
@@ -567,7 +575,7 @@ updateSettings f model =
 
 view : Model -> Browser.Document Msg
 view model =
-    case Maybe.map2 Tuple.pair model.filmRoll model.workingDirectory of
+    case Maybe.map2 Tuple.pair model.filmRoll model.route of
         Nothing ->
             { title = "Positive"
             , body =
@@ -579,14 +587,14 @@ view model =
                 ]
             }
 
-        Just ( filmRoll, ( workingDirectory, absolutePath ) ) ->
-            { title = model.route.filename ++ " | Positive"
+        Just ( filmRoll, route ) ->
+            { title = route.filename ++ " | Positive"
             , body =
                 [ main_ []
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll model
-                    , viewSettings filmRoll workingDirectory absolutePath model
-                    , viewCurrentFilmRoll workingDirectory model.previewColumns model.previewVersions filmRoll
+                    , viewSettings filmRoll route model
+                    , viewCurrentFilmRoll route model.previewColumns model.previewVersions filmRoll
                     , viewNotification model.notifications
                     ]
                 ]
@@ -614,7 +622,7 @@ viewLoading state =
 -- FILE BROWSER
 
 
-viewFilmRollBrowser : Set String -> Dict String (List ImageSettings) -> Html Msg
+viewFilmRollBrowser : Set String -> Dict String FilmRoll -> Html Msg
 viewFilmRollBrowser visibleFilmRolls filmRolls =
     let
         down ( a, _ ) ( b, _ ) =
@@ -634,7 +642,7 @@ viewFilmRollBrowser visibleFilmRolls filmRolls =
                 Dict.toList filmRolls
 
 
-viewFilmRollBrowserRoll : Set String -> Int -> ( String, List ImageSettings ) -> Html Msg
+viewFilmRollBrowserRoll : Set String -> Int -> ( String, FilmRoll ) -> Html Msg
 viewFilmRollBrowserRoll visibleFilmRolls columns ( dir, filmRoll ) =
     let
         title =
@@ -643,11 +651,11 @@ viewFilmRollBrowserRoll visibleFilmRolls columns ( dir, filmRoll ) =
     in
     section [ class "browser-filmroll" ]
         [ button [ onClick (ToggleFilmRollVisiblity dir) ] [ h2 [] [ text title ] ]
-        , button [ onClick (EditFilmRoll ( dir, filmRoll )) ] [ text "edit" ]
         , viewIf (Set.member dir visibleFilmRolls) <|
             \_ ->
                 ul [] <|
-                    List.map (viewFilmRollBrowserImage 5 dir) filmRoll
+                    List.map (viewFilmRollBrowserImage 5 dir) <|
+                        Zipper.toList filmRoll
         ]
 
 
@@ -662,25 +670,27 @@ viewFilmRollBrowserImage columns dir settings =
                 interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
     in
     li [ classList [ ( "-small", columns > 5 ) ], width ]
-        [ img
-            [ src <|
-                Url.Builder.absolute
-                    [ dir, "previews", previewExtension settings.iFilename ]
-                    []
+        [ a [ href "" ]
+            [ img
+                [ src <|
+                    Url.Builder.absolute
+                        [ dir, "previews", previewExtension settings.iFilename ]
+                        []
+                ]
+                []
             ]
-            []
         ]
 
 
-viewCurrentFilmRoll : WorkingDirectory -> Int -> Dict String Int -> FilmRoll -> Html Msg
-viewCurrentFilmRoll dir columns previewVersions filmRoll =
+viewCurrentFilmRoll : Route -> Int -> Dict String Int -> FilmRoll -> Html Msg
+viewCurrentFilmRoll route columns previewVersions filmRoll =
     section [ id "files" ]
         [ viewRangeInput (SetPreviewScale << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
-                [ List.map (viewCurrentFilmRollLink False dir.unWorkingDirectory columns previewVersions) (Zipper.before filmRoll)
-                , [ viewCurrentFilmRollLink True dir.unWorkingDirectory columns previewVersions (Zipper.current filmRoll) ]
-                , List.map (viewCurrentFilmRollLink False dir.unWorkingDirectory columns previewVersions) (Zipper.after filmRoll)
+                [ List.map (viewCurrentFilmRollLink False route.dir columns previewVersions) (Zipper.before filmRoll)
+                , [ viewCurrentFilmRollLink True route.dir columns previewVersions (Zipper.current filmRoll) ]
+                , List.map (viewCurrentFilmRollLink False route.dir columns previewVersions) (Zipper.after filmRoll)
                 ]
         ]
 
@@ -734,8 +744,8 @@ toUrl filename =
 -- IMAGE SETTINGS
 
 
-viewSettings : FilmRoll -> WorkingDirectory -> String -> Model -> Html Msg
-viewSettings filmRoll workingDirectory absolutePath model =
+viewSettings : FilmRoll -> Route -> Model -> Html Msg
+viewSettings filmRoll route model =
     let
         settings =
             case model.imageProcessingState of
@@ -801,8 +811,9 @@ viewSettings filmRoll workingDirectory absolutePath model =
             [ text <|
                 interpolate "{0} | {1}/{2}"
                     [ settings.iFilename
-                    , absolutePath
-                    , workingDirectory.unWorkingDirectory
+
+                    -- , absolutePath
+                    -- , workingDirectory.unWorkingDirectory
                     ]
             ]
         ]
