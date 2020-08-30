@@ -131,24 +131,24 @@ instance Elm.HasElmEncoder Aeson.Value ImageCrop where
 
 -- DIR
 
-newtype WorkingDirectory = WorkingDirectory {unWorkingDirectory :: Text}
+newtype FilmRollDir = FilmRollDir {unFilmRollDirectory :: Text}
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
 
-toFilePath :: WorkingDirectory -> FilePath
+toFilePath :: FilmRollDir -> FilePath
 toFilePath =
-  Text.unpack . unWorkingDirectory
+  Text.unpack . unFilmRollDirectory
 
-instance Elm.HasElmType WorkingDirectory where
+instance Elm.HasElmType FilmRollDir where
   elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @WorkingDirectory Elm.defaultOptions "Generated.Data.ImageSettings.WorkingDirectory"
+    Just $ Elm.deriveElmTypeDefinition @FilmRollDir Elm.defaultOptions "Generated.Data.ImageSettings.FilmRollDir"
 
-instance Elm.HasElmDecoder Aeson.Value WorkingDirectory where
+instance Elm.HasElmDecoder Aeson.Value FilmRollDir where
   elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @WorkingDirectory Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeWorkingDirectory"
+    Just $ Elm.deriveElmJSONDecoder @FilmRollDir Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeFilmRollDirectory"
 
-instance Elm.HasElmEncoder Aeson.Value WorkingDirectory where
+instance Elm.HasElmEncoder Aeson.Value FilmRollDir where
   elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @WorkingDirectory Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeWorkingDirectory"
+    Just $ Elm.deriveElmJSONEncoder @FilmRollDir Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeFilmRollDirectory"
 
 -- FS
 

@@ -37,7 +37,7 @@ import Debug.Trace as X (traceShowM)
 import GHC.Generics as X (Generic, Generic1)
 import Numeric.Natural as X (Natural)
 import Text.Read as X (readMaybe)
-import Prelude as X hiding (error, log, undefined)
+import Prelude as X hiding (log, undefined)
 
 tshow :: Show a => a -> Text
 tshow =

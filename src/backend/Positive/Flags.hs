@@ -1,16 +1,12 @@
 module Positive.Flags where
 
-import qualified Data.Text as Text
 import Options.Applicative
 import Positive.Prelude
-import Positive.Settings
-import System.FilePath.Posix (dropTrailingPathSeparator)
 
 -- FLAGS
 
 data Flags = Flags
-  { fDir :: !WorkingDirectory,
-    fIsDev :: !Bool,
+  { fIsDev :: !Bool,
     fInit :: !Bool
   }
   deriving (Show, Eq)
@@ -22,19 +18,4 @@ parseArgs =
 
 parser :: Parser Flags
 parser =
-  Flags
-    <$> parseDir
-    <*> flag False True (long "dev")
-    <*> flag False True (long "init")
-
-parseDir :: Parser WorkingDirectory
-parseDir =
-  WorkingDirectory . Text.pack . dropTrailingPathSeparator
-    <$> strOption
-      ( long "dir"
-          <> short 'd'
-          <> showDefault
-          <> value "."
-          <> metavar "DIR"
-          <> help "Directory to use"
-      )
+  Flags <$> flag False True (long "dev") <*> flag False True (long "init")

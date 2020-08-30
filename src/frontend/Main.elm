@@ -10,7 +10,6 @@ import Generated.Data.ImageSettings as ImageSettings
     exposing
         ( ImageCrop
         , ImageSettings
-        , WorkingDirectory
         )
 import Generated.Request as Request
 import Html exposing (..)
@@ -71,19 +70,20 @@ subscriptions model =
         , Sub.map ScrollToMsg <|
             ScrollTo.subscriptions model.scrollTo
         , Maybe.withDefault Sub.none <|
-            Maybe.map
-                (\filmRoll ->
+            Maybe.map2
+                (\route filmRoll ->
                     Browser.Events.onKeyDown <|
                         Decode.oneOf
-                            [ matchKey "s" (SaveSettings filmRoll)
+                            [ matchKey "s" (SaveSettings route.dir filmRoll)
                             , matchKey "c" (CopySettings (Zipper.current filmRoll))
                             , matchKey "r" Rotate
-                            , matchKey "h" (PreviousImage filmRoll)
-                            , matchKey "l" (NextImage filmRoll)
+                            , matchKey "h" (PreviousImage route.dir filmRoll)
+                            , matchKey "l" (NextImage route.dir filmRoll)
                             , matchKey "8" (SetPreviewScale 8)
                             , matchKey "9" (SetPreviewScale 9)
                             ]
                 )
+                model.route
                 model.filmRoll
         , Maybe.withDefault Sub.none <|
             Maybe.map2
@@ -170,8 +170,8 @@ type alias FilmRoll =
 
 
 type alias Route =
-    { filename : String
-    , dir : String
+    { dir : String
+    , filename : String
     }
 
 
@@ -215,8 +215,8 @@ fromUrl url =
         Url.Parser.parse
             (Url.Parser.query
                 (Url.Parser.Query.map2 (Maybe.map2 Route)
-                    (Url.Parser.Query.string "filename")
                     (Url.Parser.Query.string "dir")
+                    (Url.Parser.Query.string "filename")
                 )
             )
             url
@@ -243,20 +243,20 @@ type Msg
     | Rotate
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
-    | OnImageLoad ImageSettings Int
-    | SaveSettings FilmRoll
-    | GenerateHighres ImageSettings
+    | OnImageLoad String ImageSettings Int
+    | SaveSettings String FilmRoll
+    | GenerateHighres String ImageSettings
     | CopySettings ImageSettings
     | ApplyCopyToAll FilmRoll
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
-    | PreviousImage FilmRoll
-    | NextImage FilmRoll
+    | PreviousImage String FilmRoll
+    | NextImage String FilmRoll
     | Undo
     | UpdateScale Float
     | RemoveNotification
     | SetPreviewScale Int
-    | AttemptSave (Key { saveKey : () }) FilmRoll
+    | AttemptSave String (Key { saveKey : () }) FilmRoll
     | OnServerMessage String
     | OnPreviewReady String
 
@@ -382,13 +382,14 @@ update msg model =
                         model.filmRoll
             in
             ( { model | filmRoll = filmRoll, saveKey = nextKey model.saveKey }
-            , Maybe.withDefault Cmd.none <|
-                Maybe.map
-                    (\filmRoll_ ->
-                        Task.perform (\_ -> AttemptSave (nextKey model.saveKey) filmRoll_) <|
-                            Process.sleep 2000
-                    )
-                    filmRoll
+              -- , Maybe.withDefault Cmd.none <|
+              --     Maybe.map
+              --         (\filmRoll_ ->
+              --             Task.perform (\_ -> AttemptSave dir (nextKey model.saveKey) filmRoll_) <|
+              --                 Process.sleep 2000
+              -- )
+              -- filmRoll
+            , Cmd.none
             )
 
         OnImageSettingsChange settings ->
@@ -409,11 +410,11 @@ update msg model =
             else
                 ( { model | filmRoll = Just filmRoll }, Cmd.none )
 
-        OnImageLoad settings canvasSize ->
+        OnImageLoad dir settings canvasSize ->
             let
                 getHistogram =
                     Cmd.map GotHistogram <|
-                        Request.postImageSettingsHistogram canvasSize settings
+                        Request.postImageSettingsHistogram (Url.percentEncode dir) canvasSize settings
             in
             case model.imageProcessingState of
                 Ready ->
@@ -429,18 +430,18 @@ update msg model =
                     else
                         ( { model | imageProcessingState = Loading, filmRoll = n }, Cmd.none )
 
-        SaveSettings filmRoll ->
+        SaveSettings dir filmRoll ->
             ( model
             , Cmd.map GotSaveImageSettings <|
-                Request.postImageSettings (Zipper.toList filmRoll)
+                Request.postImageSettings (Url.percentEncode dir) (Zipper.toList filmRoll)
             )
 
-        GenerateHighres settings ->
+        GenerateHighres dir settings ->
             pushNotification "Generating highres version" model
                 |> Tuple.mapSecond
                     (\cmds ->
                         Cmd.batch
-                            [ Cmd.map GotGenerateHighres (Request.postImageSettingsHighres settings)
+                            [ Cmd.map GotGenerateHighres (Request.postImageSettingsHighres (Url.percentEncode dir) settings)
                             , cmds
                             ]
                     )
@@ -454,24 +455,24 @@ update msg model =
             , Cmd.none
             )
 
-        PreviousImage filmRoll ->
+        PreviousImage dir filmRoll ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
-                    (toUrl << .iFilename << Zipper.current) <|
+                    (toUrl << Route dir << .iFilename << Zipper.current) <|
                         Maybe.withDefault (Zipper.last filmRoll) (Zipper.previous filmRoll)
-                , Task.perform (\_ -> AttemptSave (nextKey model.saveKey) filmRoll) <|
+                , Task.perform (\_ -> AttemptSave dir (nextKey model.saveKey) filmRoll) <|
                     Process.sleep 10000
                 ]
             )
 
-        NextImage filmRoll ->
+        NextImage dir filmRoll ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Cmd.batch
                 [ Navigation.pushUrl model.key <|
-                    (toUrl << .iFilename << Zipper.current) <|
+                    (toUrl << Route dir << .iFilename << Zipper.current) <|
                         Maybe.withDefault (Zipper.first filmRoll) (Zipper.next filmRoll)
-                , Task.perform (\_ -> AttemptSave (nextKey model.saveKey) filmRoll) <|
+                , Task.perform (\_ -> AttemptSave dir (nextKey model.saveKey) filmRoll) <|
                     Process.sleep 10000
                 ]
             )
@@ -495,14 +496,14 @@ update msg model =
         SetPreviewScale scale ->
             ( { model | previewColumns = scale }, Cmd.none )
 
-        AttemptSave key filmRoll ->
+        AttemptSave dir key filmRoll ->
             if key /= model.saveKey then
                 ( model, Cmd.none )
 
             else
                 ( model
                 , Cmd.map GotSaveImageSettings <|
-                    Request.postImageSettings (Zipper.toList filmRoll)
+                    Request.postImageSettings (Url.percentEncode dir) (Zipper.toList filmRoll)
                 )
 
         OnServerMessage message ->
@@ -580,8 +581,7 @@ view model =
             { title = "Positive"
             , body =
                 [ main_ []
-                    [ div [ class "loading-spinner" ] []
-                    , viewNotification model.notifications
+                    [ viewNotification model.notifications
                     , viewFilmRollBrowser model.visibleFilmRolls model.filmRolls
                     ]
                 ]
@@ -592,30 +592,14 @@ view model =
             , body =
                 [ main_ []
                     [ viewLoading model.imageProcessingState
-                    , viewImage filmRoll model
+                    , viewImage filmRoll route model
                     , viewSettings filmRoll route model
                     , viewCurrentFilmRoll route model.previewColumns model.previewVersions filmRoll
+                    , viewFilmRollBrowser model.visibleFilmRolls model.filmRolls
                     , viewNotification model.notifications
                     ]
                 ]
             }
-
-
-
--- NOTIFICATONS
-
-
-viewNotification : List String -> Html msg
-viewNotification notifications =
-    div [ class "notifications" ] <|
-        List.map (\x -> span [] [ text x ]) (List.reverse notifications)
-
-
-viewLoading : ImageProcessingState -> Html msg
-viewLoading state =
-    viewIf (state /= Ready) <|
-        \_ ->
-            div [ class "loading-spinner" ] []
 
 
 
@@ -654,7 +638,7 @@ viewFilmRollBrowserRoll visibleFilmRolls columns ( dir, filmRoll ) =
         , viewIf (Set.member dir visibleFilmRolls) <|
             \_ ->
                 ul [] <|
-                    List.map (viewFilmRollBrowserImage 5 dir) <|
+                    List.map (viewFilmRollBrowserImage 9 dir) <|
                         Zipper.toList filmRoll
         ]
 
@@ -670,7 +654,7 @@ viewFilmRollBrowserImage columns dir settings =
                 interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
     in
     li [ classList [ ( "-small", columns > 5 ) ], width ]
-        [ a [ href "" ]
+        [ a [ href (toUrl { dir = dir, filename = settings.iFilename }) ]
             [ img
                 [ src <|
                     Url.Builder.absolute
@@ -711,7 +695,7 @@ viewCurrentFilmRollLink isCurrent dir columns previewVersions settings =
     li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 5 ) ], width ]
         [ a
             [ href <|
-                toUrl settings.iFilename
+                toUrl { filename = settings.iFilename, dir = dir }
             ]
             [ img
                 [ src <|
@@ -735,9 +719,12 @@ viewCurrentFilmRollLink isCurrent dir columns previewVersions settings =
         ]
 
 
-toUrl : String -> String
-toUrl filename =
-    Url.Builder.absolute [] [ Url.Builder.string "filename" filename ]
+toUrl : Route -> String
+toUrl route =
+    Url.Builder.absolute []
+        [ Url.Builder.string "filename" route.filename
+        , Url.Builder.string "dir" route.dir
+        ]
 
 
 
@@ -794,18 +781,18 @@ viewSettings filmRoll route model =
                         ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (SaveSettings filmRoll) ] [ text "Save" ]
+            [ button [ onClick (SaveSettings route.dir filmRoll) ] [ text "Save" ]
             , button [ onClick (OnImageSettingsChange (resetAll settings)) ] [ text "Reset" ]
             , button [ onClick (OnImageSettingsChange (resetTone settings)) ] [ text "Reset tone" ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (GenerateHighres settings) ] [ text "Generate highres" ]
+            [ button [ onClick (GenerateHighres route.dir settings) ] [ text "Generate highres" ]
             , viewIf (not (List.isEmpty model.undoState)) <|
                 \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (PreviousImage filmRoll) ] [ text "⯇" ]
-            , button [ onClick (NextImage filmRoll) ] [ text "⯈" ]
+            [ button [ onClick (PreviousImage route.dir filmRoll) ] [ text "⯇" ]
+            , button [ onClick (NextImage route.dir filmRoll) ] [ text "⯈" ]
             ]
         , pre [ class "info" ]
             [ text <|
@@ -887,8 +874,8 @@ viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
         ]
 
 
-viewImage : FilmRoll -> Model -> Html Msg
-viewImage filmRoll model =
+viewImage : FilmRoll -> Route -> Model -> Html Msg
+viewImage filmRoll route model =
     let
         current =
             Zipper.current filmRoll
@@ -910,11 +897,12 @@ viewImage filmRoll model =
             [ viewMaybe model.canvasSize <|
                 \{ element } ->
                     img
-                        [ on "load" (Decode.succeed (OnImageLoad (Zipper.current filmRoll) (floor element.width)))
+                        [ on "load" (Decode.succeed (OnImageLoad route.dir (Zipper.current filmRoll) (floor element.width)))
                         , style "user-select" "none"
                         , src <|
                             Url.Builder.absolute [ "image" ]
                                 [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
+                                , Url.Builder.string "dir" route.dir
                                 , Url.Builder.int "preview-width" (floor element.width)
                                 ]
                         ]
@@ -954,6 +942,23 @@ viewHistogramBar index v =
         ]
         []
     )
+
+
+
+-- NOTIFICATONS
+
+
+viewNotification : List String -> Html msg
+viewNotification notifications =
+    div [ class "notifications" ] <|
+        List.map (\x -> span [] [ text x ]) (List.reverse notifications)
+
+
+viewLoading : ImageProcessingState -> Html msg
+viewLoading state =
+    viewIf (state /= Ready) <|
+        \_ ->
+            div [ class "loading-spinner" ] []
 
 
 

@@ -7,7 +7,8 @@ import Json.Encode
 
 
 postImageSettings :
-    List Generated.Data.ImageSettings.ImageSettings
+    String
+    -> List Generated.Data.ImageSettings.ImageSettings
     ->
         Cmd
             (Result
@@ -19,18 +20,18 @@ postImageSettings :
                 )
                 (List Generated.Data.ImageSettings.ImageSettings)
             )
-postImageSettings a =
+postImageSettings a b =
     Http.request
         { method = "POST"
         , headers = []
-        , url = "/image/settings"
-        , body = Http.jsonBody (Json.Encode.list Generated.Data.ImageSettings.encodeImageSettings a)
+        , url = "/image/settings?dir=" ++ a
+        , body = Http.jsonBody (Json.Encode.list Generated.Data.ImageSettings.encodeImageSettings b)
         , expect =
             Http.expectStringResponse identity
-                (\b ->
-                    case b of
-                        Http.BadUrl_ c ->
-                            Err ( Http.BadUrl c, Nothing )
+                (\c ->
+                    case c of
+                        Http.BadUrl_ d ->
+                            Err ( Http.BadUrl d, Nothing )
 
                         Http.Timeout_ ->
                             Err ( Http.Timeout, Nothing )
@@ -38,20 +39,20 @@ postImageSettings a =
                         Http.NetworkError_ ->
                             Err ( Http.NetworkError, Nothing )
 
-                        Http.BadStatus_ c d ->
-                            Err ( Http.BadStatus c.statusCode, Just { metadata = c, body = d } )
+                        Http.BadStatus_ d e ->
+                            Err ( Http.BadStatus d.statusCode, Just { metadata = d, body = e } )
 
-                        Http.GoodStatus_ c d ->
+                        Http.GoodStatus_ d e ->
                             Result.mapError
-                                (\e ->
-                                    ( Http.BadBody (Json.Decode.errorToString e)
+                                (\f ->
+                                    ( Http.BadBody (Json.Decode.errorToString f)
                                     , Just
-                                        { metadata = c
-                                        , body = d
+                                        { metadata = d
+                                        , body = e
                                         }
                                     )
                                 )
-                                (Json.Decode.decodeString (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings) d)
+                                (Json.Decode.decodeString (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings) e)
                 )
         , timeout = Nothing
         , tracker = Nothing
@@ -109,7 +110,8 @@ getImageSettings =
 
 
 postImageSettingsHistogram :
-    Int
+    String
+    -> Int
     -> Generated.Data.ImageSettings.ImageSettings
     ->
         Cmd
@@ -122,11 +124,70 @@ postImageSettingsHistogram :
                 )
                 (List Int)
             )
-postImageSettingsHistogram a b =
+postImageSettingsHistogram a b c =
     Http.request
         { method = "POST"
         , headers = []
-        , url = "/image/settings/histogram?preview-width=" ++ String.fromInt a
+        , url =
+            String.concat
+                [ "/image/settings/histogram?dir="
+                , a
+                , "&preview-width="
+                , String.fromInt b
+                ]
+        , body = Http.jsonBody (Generated.Data.ImageSettings.encodeImageSettings c)
+        , expect =
+            Http.expectStringResponse identity
+                (\d ->
+                    case d of
+                        Http.BadUrl_ e ->
+                            Err ( Http.BadUrl e, Nothing )
+
+                        Http.Timeout_ ->
+                            Err ( Http.Timeout, Nothing )
+
+                        Http.NetworkError_ ->
+                            Err ( Http.NetworkError, Nothing )
+
+                        Http.BadStatus_ e f ->
+                            Err ( Http.BadStatus e.statusCode, Just { metadata = e, body = f } )
+
+                        Http.GoodStatus_ e f ->
+                            Result.mapError
+                                (\g ->
+                                    ( Http.BadBody (Json.Decode.errorToString g)
+                                    , Just
+                                        { metadata = e
+                                        , body = f
+                                        }
+                                    )
+                                )
+                                (Json.Decode.decodeString (Json.Decode.list Json.Decode.int) f)
+                )
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+postImageSettingsHighres :
+    String
+    -> Generated.Data.ImageSettings.ImageSettings
+    ->
+        Cmd
+            (Result
+                ( Http.Error
+                , Maybe
+                    { metadata : Http.Metadata
+                    , body : String
+                    }
+                )
+                ()
+            )
+postImageSettingsHighres a b =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url = "/image/settings/highres?dir=" ++ a
         , body = Http.jsonBody (Generated.Data.ImageSettings.encodeImageSettings b)
         , expect =
             Http.expectStringResponse identity
@@ -145,67 +206,15 @@ postImageSettingsHistogram a b =
                             Err ( Http.BadStatus d.statusCode, Just { metadata = d, body = e } )
 
                         Http.GoodStatus_ d e ->
-                            Result.mapError
-                                (\f ->
-                                    ( Http.BadBody (Json.Decode.errorToString f)
-                                    , Just
-                                        { metadata = d
-                                        , body = e
-                                        }
-                                    )
-                                )
-                                (Json.Decode.decodeString (Json.Decode.list Json.Decode.int) e)
-                )
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-postImageSettingsHighres :
-    Generated.Data.ImageSettings.ImageSettings
-    ->
-        Cmd
-            (Result
-                ( Http.Error
-                , Maybe
-                    { metadata : Http.Metadata
-                    , body : String
-                    }
-                )
-                ()
-            )
-postImageSettingsHighres a =
-    Http.request
-        { method = "POST"
-        , headers = []
-        , url = "/image/settings/highres"
-        , body = Http.jsonBody (Generated.Data.ImageSettings.encodeImageSettings a)
-        , expect =
-            Http.expectStringResponse identity
-                (\b ->
-                    case b of
-                        Http.BadUrl_ c ->
-                            Err ( Http.BadUrl c, Nothing )
-
-                        Http.Timeout_ ->
-                            Err ( Http.Timeout, Nothing )
-
-                        Http.NetworkError_ ->
-                            Err ( Http.NetworkError, Nothing )
-
-                        Http.BadStatus_ c d ->
-                            Err ( Http.BadStatus c.statusCode, Just { metadata = c, body = d } )
-
-                        Http.GoodStatus_ c d ->
-                            if d == "" then
+                            if e == "" then
                                 Ok ()
 
                             else
                                 Err
                                     ( Http.BadBody "Expected the response body to be empty"
                                     , Just
-                                        { metadata = c
-                                        , body = d
+                                        { metadata = d
+                                        , body = e
                                         }
                                     )
                 )

@@ -21,19 +21,19 @@ main = do
   timeCache <- FastLogger.newTimeCache FastLogger.simpleTimeFormat
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
-      flags@Flags {fIsDev, fDir, fInit} <- parseArgs
-      let path = toFilePath fDir </> "image-settings.json"
+      flags@Flags {fIsDev, fInit} <- parseArgs
+      let path = "image-settings.json"
       if fInit
         then do
           exists <- doesPathExist path
           if exists
             then log_ logger "Found image-settings.json, doing nothing."
             else do
-              filenames <- fmap Text.pack . filter (Path.isExtensionOf ".png") <$> listDirectory (toFilePath fDir)
+              filenames <- fmap Text.pack . filter (Path.isExtensionOf ".png") <$> listDirectory "."
               let settings = fromFilenames filenames
               ByteString.writeFile path $ Aeson.encode settings
-              createDirectoryIfMissing False (toFilePath fDir </> "previews")
-              ByteString.writeFile (toFilePath fDir </> "previews" </> "image-settings.json") . Aeson.encode $ fromList []
+              createDirectoryIfMissing False "previews"
+              ByteString.writeFile ("previews" </> "image-settings.json") . Aeson.encode $ fromList []
               log_ logger "Wrote image-settings.json, and created previews dir"
         else do
           when fIsDev (codeGen logger)

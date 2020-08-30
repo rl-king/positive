@@ -97,6 +97,14 @@ a:hover {
     text-decoration: underline;
 }
 
+.browser-filmroll button {
+    background-color: transparent;
+}
+
+.browser-filmroll button:hover {
+    background-color: #333;
+}
+
 .browser-filmroll ul {
     padding: 2rem 0 10rem;
     display: flex;

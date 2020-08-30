@@ -21,6 +21,7 @@ data Api route = Api
 data ImageApi route = ImageApi
   { iaImage ::
       route :- "image"
+        :> QueryParam' '[Required, Strict] "dir" Text
         :> QueryParam' '[Required, Strict] "preview-width" Int
         :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
         :> Get '[Image] ByteString,
@@ -32,6 +33,7 @@ data ImageApi route = ImageApi
 data SettingsApi route = SettingsApi
   { saSaveSettings ::
       route :- "image" :> "settings"
+        :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] [ImageSettings]
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
@@ -39,11 +41,13 @@ data SettingsApi route = SettingsApi
         :> Get '[JSON] [(Text, [ImageSettings])],
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
+        :> QueryParam' '[Required, Strict] "dir" Text
         :> QueryParam' '[Required, Strict] "preview-width" Int
         :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
     saGenerateHighRes ::
       route :- "image" :> "settings" :> "highres"
+        :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent
   }
