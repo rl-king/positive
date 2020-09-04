@@ -24,9 +24,9 @@ resizeImage targetWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
       preSize =
         if HIP.rows image - targetWidth > 3000
-          then HIP.resize (HIP.Bicubic 0.25) HIP.Edge (HIP.Sz2 (round (int2Double 2500 * mul)) 2500)
+          then HIP.resizeDW (HIP.Bicubic 0.25) HIP.Edge (HIP.Sz2 (round (int2Double 2500 * mul)) 2500)
           else id
-   in HIP.resize (HIP.Bicubic (-0.25)) HIP.Edge (HIP.Sz2 (round (int2Double targetWidth * mul)) targetWidth) $
+   in HIP.resizeDW (HIP.Bicubic (-0.25)) HIP.Edge (HIP.Sz2 (round (int2Double targetWidth * mul)) targetWidth) $
         preSize image
 
 processImage :: ImageSettings -> MonochromeImage -> MonochromeImage
@@ -53,6 +53,28 @@ processImage is image =
         . HIP.normalize
         . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-0.25)) (HIP.Fill 0) (iRotate is))
         $ HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
+
+-- CONTACTS
+
+toContactSheet :: [FilePath] -> IO ()
+toContactSheet images = do
+  xs <- mapM toFilmStripRow (toColumns 6 images)
+  let targetWidth = maximum $ HIP.cols <$> xs
+  HIP.writeImage "test.jpg" . foldr1 HIP.topToBottom $
+    fmap (HIP.canvasSize (HIP.Fill 0) (\(HIP.Sz2 h _) -> (0 :. 0, HIP.Sz2 h targetWidth))) xs
+
+toFilmStripRow :: [FilePath] -> IO MonochromeImage
+toFilmStripRow images =
+  let mul i = int2Double (HIP.cols i) / int2Double (HIP.rows i)
+      resize i =
+        HIP.resizeDW (HIP.Bicubic (-0.25)) HIP.Edge (HIP.Sz2 350 (round (mul i * 350))) i
+   in foldr1 HIP.leftToRight <$> traverse (fmap resize . HIP.readImageY) images
+
+toColumns :: Int -> [a] -> [[a]]
+toColumns n xs =
+  case splitAt n xs of
+    (ys, zs@(_ : _)) -> ys : toColumns n zs
+    (ys, _) -> [ys]
 
 -- FILTERS
 

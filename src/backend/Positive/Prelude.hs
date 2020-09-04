@@ -8,7 +8,7 @@ import Control.Applicative as X ((<|>))
 import Control.Category as X ((>>>))
 import Control.Concurrent as X (forkIO, threadDelay)
 import Control.Exception.Safe as X (SomeException, catch, throwIO, try, tryAny)
-import Control.Monad as X (forever, guard, join, unless, when)
+import Control.Monad as X (foldM, forever, guard, join, unless, when)
 import Control.Monad.IO.Class as X
 import Data.Aeson as X (FromJSON, ToJSON)
 import Data.Bifoldable as X (biconcat)
