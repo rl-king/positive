@@ -17,6 +17,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Massiv.Array as Massiv
 import qualified Data.Massiv.Array.IO as Massiv
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
@@ -143,17 +144,19 @@ handleGenerateHighRes dir settings = do
 -- HISTOGRAM
 
 handleGetSettingsHistogram :: Text -> Int -> ImageSettings -> PositiveT Handler [Int]
-handleGetSettingsHistogram dir previewWidth settings = do
-  pure []
-
--- (image, putMVarBack) <-
---   getImage previewWidth $
---     Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
--- liftIO putMVarBack
--- logDebug $ "Creating histogram for: " <> iFilename settings
--- -- pure . Vector.toList . HIP.hBins . head . HIP.getHistograms $
---   processImage settings image
--- pure []
+handleGetSettingsHistogram dir previewWidth settings =
+  let bins = HashMap.fromList [(x, 0) :: (Word8, Int) | x <- [0 .. 255]]
+      adjust acc (HIP.PixelY x) = HashMap.adjust (+ 1) (floor (255 * x)) acc
+   in do
+        (image, putMVarBack) <-
+          getImage previewWidth $
+            Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
+        liftIO putMVarBack
+        logDebug $ "Creating histogram for: " <> iFilename settings
+        fmap (fmap snd . sortOn fst . HashMap.toList)
+          . Massiv.foldlP adjust bins (HashMap.unionWith (+)) bins
+          . HIP.unImage
+          $ processImage settings image
 
 -- LIST DIRECTORIES
 

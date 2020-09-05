@@ -35,6 +35,7 @@ dependencies:
   - hip
   - http-media
   - http-types
+  - massiv
   - massiv-io
   - mtl
   - optparse-applicative

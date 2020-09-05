@@ -944,7 +944,7 @@ viewHistogramBar index v =
     , span
         [ class "histogram-bar"
         , style "height" <|
-            interpolate "{0}px" [ String.fromFloat (toFloat v / 400) ]
+            interpolate "{0}px" [ String.fromFloat (toFloat v / 150) ]
         ]
         []
     )
