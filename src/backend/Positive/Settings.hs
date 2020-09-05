@@ -42,6 +42,10 @@ empty :: FilmRollSettings
 empty =
   FilmRollSettings mempty
 
+isEmpty :: FilmRollSettings -> Bool
+isEmpty =
+  (==) empty
+
 init :: ImageSettings -> FilmRollSettings
 init imageSettings =
   FilmRollSettings $ HashMap.insert (iFilename imageSettings) imageSettings mempty
@@ -172,3 +176,18 @@ findImageSettings = do
 findImageSettingFiles :: IO [FilePath]
 findImageSettingFiles =
   Glob.glob "./**/[Roll]*/image-settings.json"
+
+diffedPreviewSettings :: FilePath -> FilePath -> IO FilmRollSettings
+diffedPreviewSettings a b = do
+  xs <- Aeson.decodeFileStrict $ a </> "image-settings.json"
+  ys <- Aeson.decodeFileStrict $ b </> "image-settings.json"
+  maybe (fail "Something went wrong decoding the settings files") pure $
+    difference <$> xs <*> ys
+
+insertPreviewSettings :: FilePath -> ImageSettings -> IO ()
+insertPreviewSettings ps settings = do
+  previewSettings <- Aeson.decodeFileStrict ps
+  maybe
+    (fail "Something went wrong decoding the settings file")
+    (Aeson.encodeFile ps . insert settings)
+    previewSettings
