@@ -74,11 +74,12 @@ a {
 }
 
 h1 {
-    font-size: 4rem;
+    margin: 1rem 0 2rem;
+    font-size: 3rem;
 }
 
 h2 {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 500;
 }
 
@@ -107,11 +108,35 @@ a:hover {
 }
 
 .browser {
+    width: 100%;
     padding: 2rem 0 4rem 0;
-    border-top: 3px solid #444;
+}
+
+.browser-filmrolls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.browser-filmroll {
+    width: calc(50% - .5rem);
+}
+
+@media (min-width: 1024px) {
+    .browser-filmroll {
+        width: calc(33% - .5rem);
+    }
+}
+
+@media (min-width: 1440px) {
+    .browser-filmroll {
+        width: calc(25% - .5rem);
+    }
 }
 
 .browser-filmroll a {
+    width: 100%;
+    padding-bottom: 100%;
     display: block;
     position: relative;
     border-radius: 2px;
@@ -129,16 +154,26 @@ a:hover {
     background-size: cover;
 }
 
-#files {
+.files {
     width: 100%;
-    padding-bottom: 6rem;
+    padding-bottom: 2rem;
 }
 
-#files ul {
+.files img {
+    border-radius: 2px;
+}
+
+.files ul {
     padding: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
+}
+
+.files-file-rotate button,
+.files-file-footer,
+.files-file-footer button {
+    text-shadow: 3px 3px 25px black;
 }
 
 .files-file-footer {
@@ -181,25 +216,25 @@ a:hover {
 }
 
 .files-file-rotate button:nth-child(2) {
-    transform: rotate(90deg);
+    transform: translateY(-6rem) rotate(90deg);
 }
 
-#files li:hover .files-file-footer button,
-#files li:hover .files-file-rotate {
+.files li:hover .files-file-footer button,
+.files li:hover .files-file-rotate {
     opacity: 1;
 }
 
-#files li button {
+.files li button {
     padding: 0;
     margin: 0;
     background: none;
 }
 
-#files li button:hover {
+.files li button:hover {
     color: red;
 }
 
-#files .range-slider {
+.files .range-slider {
     width: 20rem;
     margin-right: 2rem;
     margin-left: auto;
@@ -223,7 +258,7 @@ li.-small span {
     justify-content: flex-start;
 }
 
-#image-settings {
+.image-settings {
     width: 20%;
     padding: 1rem;
     animation: appear 1s;

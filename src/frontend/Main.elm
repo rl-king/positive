@@ -480,10 +480,11 @@ update msg model =
                     List.drop (round (toFloat (List.length asList) * offset)) asList
                         |> List.head
                         |> Maybe.andThen (\x -> Zipper.findFirst ((==) x) filmRoll)
+                        |> Maybe.withDefault filmRoll
             in
             ( { model
                 | filmRolls =
-                    Dict.update id (Maybe.andThen (\x -> f x (Zipper.toList x))) model.filmRolls
+                    Dict.update id (Maybe.map (\x -> f x (Zipper.toList x))) model.filmRolls
               }
             , Cmd.none
             )
@@ -614,13 +615,12 @@ viewFilmRollBrowser columns filmRolls =
                     GT
     in
     section [ class "browser" ] <|
-        List.concat
-            [ [ h1 [] [ text "Browser" ]
-              ]
-            , List.map (viewFilmRollBrowserRoll columns) <|
+        [ h1 [] [ text "Browser" ]
+        , div [ class "browser-filmrolls" ] <|
+            List.map (viewFilmRollBrowserRoll columns) <|
                 List.sortWith down <|
                     Dict.toList filmRolls
-            ]
+        ]
 
 
 viewFilmRollBrowserRoll : Int -> ( String, FilmRoll ) -> Html Msg
@@ -632,15 +632,18 @@ viewFilmRollBrowserRoll columns ( dir, filmRoll ) =
 
         shortTitle =
             if String.length title > 30 then
-                interpolate "{0}...{1}" [ String.left 9 title, String.right 21 title ]
+                interpolate "{0} ... {1}"
+                    [ String.trim (String.left 9 title)
+                    , String.trim (String.right 21 title)
+                    ]
 
             else
                 title
     in
-    section [ class "browser-filmroll" ]
-        [ h2 [] [ text shortTitle ]
-        , viewFilmRollBrowserImage columns dir <|
+    div [ class "browser-filmroll" ]
+        [ viewFilmRollBrowserImage columns dir <|
             Zipper.current filmRoll
+        , h2 [] [ text shortTitle ]
         ]
 
 
@@ -650,9 +653,6 @@ viewFilmRollBrowserImage columns dir settings =
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
 
-        width =
-            interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // 2) ]
-
         onMousemove =
             on "mousemove" <|
                 Decode.map2 (\a b -> OnFilmRollMove dir (a / b))
@@ -661,8 +661,6 @@ viewFilmRollBrowserImage columns dir settings =
     in
     a
         [ classList [ ( "-small", columns > 5 ) ]
-        , style "width" width
-        , style "padding-top" width
         , onMousemove
         , href (toUrl { dir = dir, filename = settings.iFilename })
         ]
@@ -680,7 +678,7 @@ viewFilmRollBrowserImage columns dir settings =
 
 viewCurrentFilmRoll : Route -> Int -> FilmRoll -> Html Msg
 viewCurrentFilmRoll route columns filmRoll =
-    section [ id "files" ]
+    section [ class "files" ]
         [ viewRangeInput (SetPreviewScale << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
@@ -752,7 +750,7 @@ viewSettings filmRoll route model =
                 _ ->
                     Zipper.current filmRoll
     in
-    section [ id "image-settings" ]
+    section [ class "image-settings" ]
         [ viewSettingsGroup
             [ viewHistogram model.histogram ]
         , viewSettingsGroup <|
