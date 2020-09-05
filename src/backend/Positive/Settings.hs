@@ -38,6 +38,10 @@ newtype FilmRollSettings = FilmRollSettings
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
 
+empty :: FilmRollSettings
+empty =
+  FilmRollSettings mempty
+
 init :: ImageSettings -> FilmRollSettings
 init imageSettings =
   FilmRollSettings $ HashMap.insert (iFilename imageSettings) imageSettings mempty
@@ -154,7 +158,7 @@ instance Elm.HasElmEncoder Aeson.Value FilmRollDir where
 
 findImageSettings :: IO (HashMap Text FilmRollSettings)
 findImageSettings = do
-  settingFiles <- Glob.glob "./**/[Roll]*/image-settings.json"
+  settingFiles <- findImageSettingFiles
   filmRollSettings <-
     traverse
       (\path -> (,) <$> pure (Text.pack (makeRelative "./" (takeDirectory path))) <*> Aeson.decodeFileStrict path)
@@ -164,3 +168,7 @@ findImageSettings = do
       (\(path, maybeSettings) acc -> maybe acc (\settings -> HashMap.insert path settings acc) maybeSettings)
       mempty
       filmRollSettings
+
+findImageSettingFiles :: IO [FilePath]
+findImageSettingFiles =
+  Glob.glob "./**/[Roll]*/image-settings.json"

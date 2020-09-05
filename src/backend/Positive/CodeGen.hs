@@ -24,8 +24,8 @@ import qualified System.Process as Process
 
 -- CODEGEN
 
-codeGen :: TimedFastLogger -> IO ()
-codeGen logger = do
+run :: TimedFastLogger -> IO ()
+run logger = do
   let endpointDefinitions =
         fmap (Servant.To.Elm.elmEndpointDefinition (Expression.String "") ["Generated", "Request"]) $
           Servant.To.Elm.elmEndpoints @(ToServantApi SettingsApi)
