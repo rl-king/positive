@@ -4,7 +4,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Positive.Server where
+module Positive.Server
+  ( run,
+  )
+where
 
 import Control.Concurrent.Chan
 import Control.Concurrent.MVar
@@ -19,10 +22,11 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
-import Network.Wai.Handler.Warp
+import Network.Wai.Handler.Warp hiding (run)
 import Positive.Api
 import Positive.Flags
 import Positive.Image
+import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
 import Positive.Settings as Settings
 import qualified Positive.Static as Static
@@ -30,7 +34,6 @@ import Servant
 import Servant.Server.Generic
 import System.Directory
 import System.FilePath.Posix ((</>))
-import System.Log.FastLogger (FormattedTime, LogStr, TimedFastLogger, toLogStr)
 
 -- POSITIVE
 
@@ -41,17 +44,17 @@ data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage)),
     eEventChan :: !(Chan ServerEvent),
     eIsDev :: !Bool,
-    eLogger :: !TimedFastLogger
+    eLogger :: !Log.TimedFastLogger
   }
 
 -- SERVER
 
-server :: TimedFastLogger -> Flags -> IO ()
-server logger Flags {fIsDev} =
+run :: Log.TimedFastLogger -> Flags -> IO ()
+run logger Flags {fIsDev} =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
-            (log_ logger ("listening on port " <> tshow @Int 8080))
+            (Log.log logger ("listening on port " <> tshow @Int 8080))
             defaultSettings
    in do
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
@@ -192,22 +195,14 @@ log :: MonadIO m => Text -> PositiveT m ()
 log msg = do
   Env {eLogger, eEventChan} <- ask
   liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
-  liftIO . eLogger $ formatLog "info" msg
+  liftIO . eLogger $ Log.format "info" msg
 
 logDebug :: MonadIO m => Text -> PositiveT m ()
 logDebug msg = do
   Env {eIsDev, eLogger, eEventChan} <- ask
   when eIsDev $ do
     liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
-    liftIO . eLogger $ formatLog "debug" msg
-
-log_ :: TimedFastLogger -> Text -> IO ()
-log_ logger msg =
-  logger (formatLog "info" msg)
-
-formatLog :: Text -> Text -> FormattedTime -> LogStr
-formatLog lvl msg time =
-  toLogStr time <> " [" <> toLogStr lvl <> "] " <> toLogStr msg <> "\n"
+    liftIO . eLogger $ Log.format "debug" msg
 
 -- PROFILE
 

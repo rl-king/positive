@@ -2,7 +2,6 @@ module Positive.Contacts where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import qualified Graphics.Image as HIP
 import Positive.Image
 import Positive.Prelude hiding (ByteString)
@@ -12,11 +11,11 @@ import System.FilePath.Posix
 
 -- CONTACT
 
-run :: IO ()
-run = do
+run :: (Text -> IO ()) -> IO ()
+run log = do
   missing <- findMissingContacts
-  Text.putStrLn $ Text.unwords ["Found", tshow $ length missing, "missing contacts"]
-  generateContacts missing
+  log $ Text.unwords ["Found", tshow $ length missing, "missing contacts"]
+  generateContacts log missing
 
 -- FIND
 
@@ -30,8 +29,8 @@ findMissingContacts =
 
 -- WRITE
 
-generateContacts :: [FilePath] -> IO ()
-generateContacts dirs =
+generateContacts :: (Text -> IO ()) -> [FilePath] -> IO ()
+generateContacts log dirs =
   let total = length dirs
    in for_ (zip dirs [1 .. total]) $ \(dir, index) -> do
         let output = dir </> "contacts" </> "contacts.jpg"
@@ -41,6 +40,6 @@ generateContacts dirs =
             <$> listDirectory (dir </> "previews")
         HIP.writeImage output =<< toContacts filenames
         Aeson.encodeFile imageContactSettings empty
-        Text.putStrLn $
+        log $
           Text.unwords
             ["Generated contacts", Text.pack output, "|", tshow index, "of", tshow total]

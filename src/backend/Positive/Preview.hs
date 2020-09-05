@@ -1,7 +1,6 @@
 module Positive.Preview where
 
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import qualified Graphics.Image as HIP
 import Positive.Image
 import Positive.Prelude hiding (ByteString)
@@ -10,11 +9,11 @@ import System.FilePath.Posix
 
 -- PREVIEW
 
-run :: IO ()
-run = do
+run :: (Text -> IO ()) -> IO ()
+run log = do
   missing <- findMissingPreviews
-  Text.putStrLn $ Text.unwords ["Found", tshow $ length missing, "missing previews"]
-  generatePreviews missing
+  log $ Text.unwords ["Found", tshow $ length missing, "missing previews"]
+  generatePreviews log missing
 
 -- FIND
 
@@ -29,8 +28,8 @@ prependDir dir settings =
 
 -- WRITE
 
-generatePreviews :: [(FilePath, ImageSettings)] -> IO ()
-generatePreviews iss =
+generatePreviews :: (Text -> IO ()) -> [(FilePath, ImageSettings)] -> IO ()
+generatePreviews log iss =
   let total = length iss
    in for_ (zip iss [1 .. total]) $ \((input, is), index) -> do
         let dir = dropFileName input
@@ -38,11 +37,8 @@ generatePreviews iss =
         maybeImage <- readImageFromDisk input
         case maybeImage of
           Left _ ->
-            Text.putStrLn $
-              Text.unwords ["Error generating preview", Text.pack output, "|", tshow index, "of", tshow total]
+            log $ Text.unwords ["Error generating preview", Text.pack output, "|", tshow index, "of", tshow total]
           Right image -> do
             HIP.writeImage output $ processImage is (resizeImage 750 image)
             insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
-            Text.putStrLn $
-              Text.unwords
-                ["Generated preview", Text.pack output, "|", tshow index, "of", tshow total]
+            log $ Text.unwords ["Generated preview", Text.pack output, "|", tshow index, "of", tshow total]

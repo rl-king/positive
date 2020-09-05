@@ -7,9 +7,10 @@ import qualified Positive.Contacts as Contacts
 import Positive.Flags (Flags (..))
 import qualified Positive.Flags as Flags
 import qualified Positive.Init as Init
+import qualified Positive.Log as Log
 import Positive.Prelude
 import qualified Positive.Preview as Preview
-import Positive.Server
+import qualified Positive.Server as Server
 import qualified System.Log.FastLogger as FastLogger
 
 -- MAIN
@@ -20,12 +21,13 @@ main = do
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
       flags@Flags {fIsDev, fMode, fHard} <- Flags.parseArgs
+      let log = Log.log logger
       case fMode of
         Flags.Init ->
-          Init.run fHard >> Preview.run >> Contacts.run
+          Init.run fHard >> Preview.run log >> Contacts.run log
         Flags.Previews ->
-          Preview.run
+          Preview.run log
         Flags.Contacts ->
-          Contacts.run
+          Contacts.run log
         Flags.Server ->
-          when fIsDev (CodeGen.run logger) >> server logger flags
+          when fIsDev (CodeGen.run log) >> Server.run logger flags
