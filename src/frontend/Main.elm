@@ -804,11 +804,9 @@ viewSettings filmRoll route model =
             ]
         , pre [ class "info" ]
             [ text <|
-                interpolate "{0} | {1}/{2}"
+                interpolate "{0} | {1}"
                     [ settings.iFilename
-
-                    -- , absolutePath
-                    -- , workingDirectory.unWorkingDirectory
+                    , route.dir
                     ]
             ]
         ]
