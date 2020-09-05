@@ -6,6 +6,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Text as Text
 import qualified Positive.CodeGen as CodeGen
+import qualified Positive.ContactSheet as ContactSheet
 import Positive.Flags (Flags (..))
 import qualified Positive.Flags as Flags
 import Positive.Prelude
@@ -40,8 +41,8 @@ main = do
         Flags.Previews ->
           Preview.run
         Flags.ContactSheet ->
-          Preview.run
+          ContactSheet.run
         Flags.Server -> do
-          when fIsDev (CodeGen.run logger)
-          log_ logger (tshow flags)
+          when fIsDev $ CodeGen.run logger
+          log_ logger $ tshow flags
           server logger flags
