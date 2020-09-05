@@ -8,7 +8,8 @@ import Browser.Navigation as Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings
     exposing
-        ( ImageCrop
+        ( FilmRollSettings
+        , ImageCrop
         , ImageSettings
         )
 import Generated.Request as Request
@@ -233,7 +234,7 @@ type Msg
     | GotSaveImageSettings (HttpResult (List ImageSettings))
     | GotGenerateHighres (HttpResult ())
     | GotHistogram (HttpResult (List Int))
-    | GotFilmRolls (HttpResult (List ( String, List ImageSettings )))
+    | GotFilmRolls (HttpResult (List ( String, FilmRollSettings )))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
     | RotatePreview String Float
@@ -279,8 +280,8 @@ update msg model =
 
         GotFilmRolls (Ok filmRolls) ->
             let
-                toSortedZipper ( k, xs ) =
-                    Zipper.fromList (List.sortBy .iFilename xs)
+                toSortedZipper ( k, { frsSettings } ) =
+                    Zipper.fromList (List.sortBy .iFilename (Dict.values frsSettings))
                         |> Maybe.map (Tuple.pair k)
             in
             onNavigation model.route <|
