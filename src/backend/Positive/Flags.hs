@@ -7,15 +7,15 @@ import Positive.Prelude
 
 data Flags = Flags
   { fIsDev :: !Bool,
+    fHard :: !Bool,
     fMode :: !Mode
   }
   deriving (Show, Eq)
 
 data Mode
   = Init
-  | Reset
   | Previews
-  | ContactSheet
+  | Contacts
   | Server
   deriving (Show, Eq)
 
@@ -28,9 +28,9 @@ parser :: Parser Flags
 parser =
   Flags
     <$> flag False True (long "dev")
+    <*> flag False True (long "hard")
     <*> ( flag' Init (long "init" <> short 'i')
-            <|> flag' Reset (long "reset" <> short 'r')
             <|> flag' Previews (long "previews" <> short 'p')
-            <|> flag' ContactSheet (long "contactsheet" <> short 'c')
+            <|> flag' Contacts (long "contacts" <> short 'c')
             <|> pure Server
         )

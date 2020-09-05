@@ -56,11 +56,11 @@ processImage is image =
 
 -- CONTACTS
 
-toContactSheet :: [FilePath] -> IO ()
-toContactSheet images = do
+toContacts :: [FilePath] -> IO MonochromeImage
+toContacts images = do
   xs <- mapM toFilmStripRow (toColumns 6 images)
   let targetWidth = maximum $ HIP.cols <$> xs
-  HIP.writeImage "test.jpg" . foldr1 HIP.topToBottom $
+  pure . foldr1 HIP.topToBottom $
     fmap (HIP.canvasSize (HIP.Fill 0) (\(HIP.Sz2 h _) -> (0 :. 0, HIP.Sz2 h targetWidth))) xs
 
 toFilmStripRow :: [FilePath] -> IO MonochromeImage
