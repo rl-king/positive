@@ -144,7 +144,6 @@ type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
     , filmRolls : FilmRolls
-    , visibleFilmRolls : Set String
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
     , canvasSize : Maybe Browser.Dom.Element
@@ -189,7 +188,6 @@ init _ url key =
     ( { imageProcessingState = Ready
       , filmRoll = Nothing
       , filmRolls = Dict.empty
-      , visibleFilmRolls = Set.empty
       , key = key
       , saveKey = Key 0
       , canvasSize = Nothing
@@ -237,8 +235,6 @@ type Msg
     | GotHistogram (HttpResult (List Int))
     | GotFilmRolls (HttpResult (List ( String, List ImageSettings )))
     | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
-    | ToggleFilmRollVisiblity String
-    | ToggleFilmRollVisiblityAll FilmRolls
     | Rotate
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
@@ -322,20 +318,6 @@ update msg model =
 
         GotImageDimensions (Err _) ->
             pushNotification "Error getting image dimensions from element" model
-
-        ToggleFilmRollVisiblity path ->
-            if Set.member path model.visibleFilmRolls then
-                ( { model | visibleFilmRolls = Set.remove path model.visibleFilmRolls }, Cmd.none )
-
-            else
-                ( { model | visibleFilmRolls = Set.insert path model.visibleFilmRolls }, Cmd.none )
-
-        ToggleFilmRollVisiblityAll all ->
-            if Set.isEmpty model.visibleFilmRolls then
-                ( { model | visibleFilmRolls = Set.fromList (Dict.keys all) }, Cmd.none )
-
-            else
-                ( { model | visibleFilmRolls = Set.empty }, Cmd.none )
 
         Rotate ->
             ( updateSettings
@@ -578,7 +560,7 @@ view model =
             , body =
                 [ main_ []
                     [ viewNotification model.notifications
-                    , viewFilmRollBrowser model.visibleFilmRolls model.previewColumns model.filmRolls
+                    , viewFilmRollBrowser model.previewColumns model.filmRolls
                     ]
                 ]
             }
@@ -591,7 +573,7 @@ view model =
                     , viewImage filmRoll route model
                     , viewSettings filmRoll route model
                     , viewCurrentFilmRoll route model.previewColumns filmRoll
-                    , viewFilmRollBrowser model.visibleFilmRolls model.previewColumns model.filmRolls
+                    , viewFilmRollBrowser model.previewColumns model.filmRolls
                     , viewNotification model.notifications
                     ]
                 ]
@@ -602,8 +584,8 @@ view model =
 -- FILE BROWSER
 
 
-viewFilmRollBrowser : Set String -> Int -> FilmRolls -> Html Msg
-viewFilmRollBrowser visibleFilmRolls columns filmRolls =
+viewFilmRollBrowser : Int -> FilmRolls -> Html Msg
+viewFilmRollBrowser columns filmRolls =
     let
         down ( a, _ ) ( b, _ ) =
             case compare a b of
@@ -619,28 +601,25 @@ viewFilmRollBrowser visibleFilmRolls columns filmRolls =
     section [ class "browser" ] <|
         List.concat
             [ [ h1 [] [ text "Browser" ]
-              , button [ onClick (ToggleFilmRollVisiblityAll filmRolls) ] [ text "Toggle all" ]
               ]
-            , List.map (viewFilmRollBrowserRoll visibleFilmRolls columns) <|
+            , List.map (viewFilmRollBrowserRoll columns) <|
                 List.sortWith down <|
                     Dict.toList filmRolls
             ]
 
 
-viewFilmRollBrowserRoll : Set String -> Int -> ( String, FilmRoll ) -> Html Msg
-viewFilmRollBrowserRoll visibleFilmRolls columns ( dir, filmRoll ) =
+viewFilmRollBrowserRoll : Int -> ( String, FilmRoll ) -> Html Msg
+viewFilmRollBrowserRoll columns ( dir, filmRoll ) =
     let
         title =
             Maybe.withDefault dir <|
                 List.head (List.reverse (String.split "/" dir))
     in
     section [ class "browser-filmroll" ]
-        [ button [ onClick (ToggleFilmRollVisiblity dir) ] [ h2 [] [ text title ] ]
-        , viewIf (Set.member dir visibleFilmRolls) <|
-            \_ ->
-                ul [] <|
-                    List.map (viewFilmRollBrowserImage columns dir) <|
-                        Zipper.toList filmRoll
+        [ h2 [] [ text title ]
+        , ul [] <|
+            List.map (viewFilmRollBrowserImage columns dir) <|
+                Zipper.toList filmRoll
         ]
 
 
