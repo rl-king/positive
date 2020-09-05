@@ -13,6 +13,7 @@ data Flags = Flags
 
 data Mode
   = Init
+  | Reset
   | Previews
   | ContactSheet
   | Server
@@ -28,6 +29,7 @@ parser =
   Flags
     <$> flag False True (long "dev")
     <*> ( flag' Init (long "init" <> short 'i')
+            <|> flag' Reset (long "reset" <> short 'r')
             <|> flag' Previews (long "previews" <> short 'p')
             <|> flag' ContactSheet (long "contactsheet" <> short 'c')
             <|> pure Server

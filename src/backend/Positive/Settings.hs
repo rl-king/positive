@@ -175,7 +175,9 @@ findImageSettings = do
 
 findImageSettingFiles :: IO [FilePath]
 findImageSettingFiles =
-  Glob.glob "./**/[Roll]*/image-settings.json"
+  (++)
+    <$> Glob.glob "./**/[Roll]*/image-settings.json"
+    <*> Glob.glob "./image-settings.json"
 
 diffedPreviewSettings :: FilePath -> FilePath -> IO FilmRollSettings
 diffedPreviewSettings a b = do

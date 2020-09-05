@@ -22,11 +22,12 @@ main = do
       flags@Flags {fIsDev, fMode} <- Flags.parseArgs
       case fMode of
         Flags.Init ->
-          Init.run "."
+          Init.run False >> Preview.run >> ContactSheet.run
+        Flags.Reset ->
+          Init.run True >> Preview.run >> ContactSheet.run
         Flags.Previews ->
           Preview.run
         Flags.ContactSheet ->
           ContactSheet.run
-        Flags.Server -> do
-          when fIsDev $ CodeGen.run logger
-          server logger flags
+        Flags.Server ->
+          when fIsDev (CodeGen.run logger) >> server logger flags
