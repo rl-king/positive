@@ -161,14 +161,6 @@ handleGetSettings :: PositiveT Handler [(Text, [ImageSettings])]
 handleGetSettings =
   HashMap.toList . fmap toList <$> liftIO findImageSettings
 
--- SETTINGS FILE
-
-getSettingsFile :: Text -> PositiveT Handler FilmRollSettings
-getSettingsFile dir = do
-  let path = Text.unpack dir </> "image-settings.json"
-  either (\e -> log (tshow e) >> throwError err404) pure
-    =<< liftIO (Aeson.eitherDecodeFileStrict path)
-
 -- IMAGE
 
 getImage :: Int -> Text -> PositiveT Handler (MonochromeImage, IO ())
@@ -214,10 +206,3 @@ timed name action = do
   done <- liftIO Time.getCurrentTime
   logDebug $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a
-
--- HELPERS
-
-pSwapMVar :: MVar a -> a -> IO ()
-pSwapMVar mvar a = do
-  success <- tryPutMVar mvar a
-  unless success (void $ swapMVar mvar a)
