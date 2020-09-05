@@ -39,9 +39,6 @@ import Url.Parser.Query
 port serverMessage : (String -> msg) -> Sub msg
 
 
-port previewReady : (String -> msg) -> Sub msg
-
-
 
 -- MAIN
 
@@ -66,7 +63,6 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ serverMessage OnServerMessage
-        , previewReady OnPreviewReady
         , Sub.map ScrollToMsg <|
             ScrollTo.subscriptions model.scrollTo
         , Maybe.withDefault Sub.none <|
@@ -161,7 +157,6 @@ type alias Model =
     , scale : Float
     , previewColumns : Int
     , notifications : List String
-    , previewVersions : Dict String Int
     }
 
 
@@ -207,7 +202,6 @@ init _ url key =
       , scale = 1
       , previewColumns = 5
       , notifications = []
-      , previewVersions = Dict.empty
       }
     , Cmd.map GotFilmRolls Request.getImageSettings
     )
@@ -263,7 +257,6 @@ type Msg
     | SetPreviewScale Int
     | AttemptSave String (Key { saveKey : () }) FilmRoll
     | OnServerMessage String
-    | OnPreviewReady String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -498,19 +491,6 @@ update msg model =
         OnServerMessage message ->
             pushNotification message model
 
-        OnPreviewReady filename ->
-            let
-                f x =
-                    case x of
-                        Nothing ->
-                            Just 1
-
-                        Just y ->
-                            Just (y + 1)
-            in
-            pushNotification ("Preview ready: " ++ filename)
-                { model | previewVersions = Dict.update filename f model.previewVersions }
-
 
 onNavigation : Maybe Route -> Model -> ( Model, Cmd Msg )
 onNavigation maybeRoute model =
@@ -610,7 +590,7 @@ view model =
                     [ viewLoading model.imageProcessingState
                     , viewImage filmRoll route model
                     , viewSettings filmRoll route model
-                    , viewCurrentFilmRoll route model.previewColumns model.previewVersions filmRoll
+                    , viewCurrentFilmRoll route model.previewColumns filmRoll
                     , viewFilmRollBrowser model.visibleFilmRolls model.previewColumns model.filmRolls
                     , viewNotification model.notifications
                     ]
@@ -687,21 +667,21 @@ viewFilmRollBrowserImage columns dir settings =
         ]
 
 
-viewCurrentFilmRoll : Route -> Int -> Dict String Int -> FilmRoll -> Html Msg
-viewCurrentFilmRoll route columns previewVersions filmRoll =
+viewCurrentFilmRoll : Route -> Int -> FilmRoll -> Html Msg
+viewCurrentFilmRoll route columns filmRoll =
     section [ id "files" ]
         [ viewRangeInput (SetPreviewScale << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
-                [ List.map (viewCurrentFilmRollLink False route.dir columns previewVersions) (Zipper.before filmRoll)
-                , [ viewCurrentFilmRollLink True route.dir columns previewVersions (Zipper.current filmRoll) ]
-                , List.map (viewCurrentFilmRollLink False route.dir columns previewVersions) (Zipper.after filmRoll)
+                [ List.map (viewCurrentFilmRollLink False route.dir columns) (Zipper.before filmRoll)
+                , [ viewCurrentFilmRollLink True route.dir columns (Zipper.current filmRoll) ]
+                , List.map (viewCurrentFilmRollLink False route.dir columns) (Zipper.after filmRoll)
                 ]
         ]
 
 
-viewCurrentFilmRollLink : Bool -> String -> Int -> Dict String Int -> ImageSettings -> Html Msg
-viewCurrentFilmRollLink isCurrent dir columns previewVersions settings =
+viewCurrentFilmRollLink : Bool -> String -> Int -> ImageSettings -> Html Msg
+viewCurrentFilmRollLink isCurrent dir columns settings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
@@ -722,9 +702,7 @@ viewCurrentFilmRollLink isCurrent dir columns previewVersions settings =
                 [ src <|
                     Url.Builder.absolute
                         [ dir, "previews", previewExtension settings.iFilename ]
-                        [ Url.Builder.int "v" <|
-                            Maybe.withDefault 0 (Dict.get settings.iFilename previewVersions)
-                        ]
+                        []
                 ]
                 []
             ]
