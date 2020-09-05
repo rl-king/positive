@@ -253,6 +253,7 @@ type Msg
     | SetPreviewScale Int
     | AttemptSave String (Key { saveKey : () }) FilmRoll
     | OnServerMessage String
+    | OnFilmRollMove String Float
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -473,6 +474,20 @@ update msg model =
         OnServerMessage message ->
             pushNotification message model
 
+        OnFilmRollMove id offset ->
+            let
+                f filmRoll asList =
+                    List.drop (round (toFloat (List.length asList) * offset)) asList
+                        |> List.head
+                        |> Maybe.andThen (\x -> Zipper.findFirst ((==) x) filmRoll)
+            in
+            ( { model
+                | filmRolls =
+                    Dict.update id (Maybe.andThen (\x -> f x (Zipper.toList x))) model.filmRolls
+              }
+            , Cmd.none
+            )
+
 
 onNavigation : Maybe Route -> Model -> ( Model, Cmd Msg )
 onNavigation maybeRoute model =
@@ -614,12 +629,18 @@ viewFilmRollBrowserRoll columns ( dir, filmRoll ) =
         title =
             Maybe.withDefault dir <|
                 List.head (List.reverse (String.split "/" dir))
+
+        shortTitle =
+            if String.length title > 30 then
+                interpolate "{0}...{1}" [ String.left 9 title, String.right 21 title ]
+
+            else
+                title
     in
     section [ class "browser-filmroll" ]
-        [ h2 [] [ text title ]
-        , ul [] <|
-            List.map (viewFilmRollBrowserImage columns dir) <|
-                Zipper.toList filmRoll
+        [ h2 [] [ text shortTitle ]
+        , viewFilmRollBrowserImage columns dir <|
+            Zipper.current filmRoll
         ]
 
 
@@ -630,19 +651,30 @@ viewFilmRollBrowserImage columns dir settings =
             String.dropRight 3 x ++ "jpg"
 
         width =
-            style "width" <|
-                interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
+            interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // 2) ]
+
+        onMousemove =
+            on "mousemove" <|
+                Decode.map2 (\a b -> OnFilmRollMove dir (a / b))
+                    (Decode.field "offsetX" Decode.float)
+                    (Decode.at [ "target", "offsetWidth" ] Decode.float)
     in
-    li [ classList [ ( "-small", columns > 5 ) ], width ]
-        [ a [ href (toUrl { dir = dir, filename = settings.iFilename }) ]
-            [ img
-                [ src <|
-                    Url.Builder.absolute
+    a
+        [ classList [ ( "-small", columns > 5 ) ]
+        , style "width" width
+        , style "padding-top" width
+        , onMousemove
+        , href (toUrl { dir = dir, filename = settings.iFilename })
+        ]
+        [ span
+            [ style "background-image" <|
+                interpolate "url('{0}')" <|
+                    [ Url.Builder.absolute
                         [ dir, "previews", previewExtension settings.iFilename ]
                         []
-                ]
-                []
+                    ]
             ]
+            []
         ]
 
 
