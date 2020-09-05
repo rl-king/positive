@@ -10,8 +10,8 @@ import qualified Language.Elm.Pretty as Pretty
 import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Api
+import Positive.ImageSettings
 import Positive.Prelude
-import Positive.Settings
 import Servant.API.Generic (ToServantApi)
 import qualified Servant.To.Elm
 import qualified System.Directory as Directory
@@ -31,6 +31,7 @@ run log = do
         Elm.jsonDefinitions @ImageSettings
           <> Elm.jsonDefinitions @ImageCrop
           <> Elm.jsonDefinitions @FilmRollDir
+          <> Elm.jsonDefinitions @FilmRollSettings
       modules =
         Pretty.modules $
           Simplification.simplifyDefinition

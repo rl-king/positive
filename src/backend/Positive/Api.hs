@@ -5,8 +5,8 @@
 module Positive.Api where
 
 import Data.ByteString.Lazy (ByteString)
+import Positive.ImageSettings
 import Positive.Prelude hiding (ByteString)
-import Positive.Settings
 import Servant
 import Servant.API.Generic
 
@@ -38,7 +38,7 @@ data SettingsApi route = SettingsApi
         :> Post '[JSON] [ImageSettings],
     saGetSettings ::
       route :- "image" :> "settings"
-        :> Get '[JSON] [(Text, [ImageSettings])],
+        :> Get '[JSON] [(Text, FilmRollSettings)],
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "dir" Text

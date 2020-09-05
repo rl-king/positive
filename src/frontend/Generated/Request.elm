@@ -68,7 +68,7 @@ getImageSettings :
                 , body : String
                 }
             )
-            (List ( String, List Generated.Data.ImageSettings.ImageSettings ))
+            (List ( String, Generated.Data.ImageSettings.FilmRollSettings ))
         )
 getImageSettings =
     Http.request
@@ -102,7 +102,7 @@ getImageSettings =
                                         }
                                     )
                                 )
-                                (Json.Decode.decodeString (Json.Decode.list (Json.Decode.map2 Tuple.pair (Json.Decode.index 0 Json.Decode.string) (Json.Decode.index 1 (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings)))) c)
+                                (Json.Decode.decodeString (Json.Decode.list (Json.Decode.map2 Tuple.pair (Json.Decode.index 0 Json.Decode.string) (Json.Decode.index 1 Generated.Data.ImageSettings.decodeFilmRollSettings))) c)
                 )
         , timeout = Nothing
         , tracker = Nothing

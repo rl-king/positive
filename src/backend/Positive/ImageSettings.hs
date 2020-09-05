@@ -1,10 +1,15 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Positive.Settings where
+module Positive.ImageSettings where
 
+import Data.Aeson ((.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
 import Data.Bifunctor
 import qualified Data.ByteString.Base64 as Base64
@@ -13,6 +18,8 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.Maybe
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
+import qualified Language.Elm.Expression as Expression
+import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Network.HTTP.Media as Media
 import Positive.Prelude hiding (ByteString)
@@ -33,14 +40,29 @@ instance MimeRender Image ByteString where
 
 -- FILMROLLSETTINGS
 
-newtype FilmRollSettings = FilmRollSettings
-  { unFilmRollSettings :: HashMap Text ImageSettings
+data FilmRollSettings = FilmRollSettings
+  { frsPoster :: Maybe Text,
+    frsSettings :: HashMap Text ImageSettings
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq)
+
+instance Aeson.FromJSON FilmRollSettings where
+  parseJSON =
+    Aeson.withObject "FilmRollSettings" $ \o -> do
+      poster <- o .:? "frsPoster"
+      settings <- o .: "unFilmRollSettings" <|> o .: "frsSettings"
+      pure (FilmRollSettings poster settings)
+
+instance Aeson.ToJSON FilmRollSettings where
+  toJSON (FilmRollSettings poster settings) =
+    Aeson.object
+      [ "frsPoster" .= poster,
+        "frsSettings" .= settings
+      ]
 
 empty :: FilmRollSettings
 empty =
-  FilmRollSettings mempty
+  FilmRollSettings Nothing mempty
 
 isEmpty :: FilmRollSettings -> Bool
 isEmpty =
@@ -48,36 +70,54 @@ isEmpty =
 
 init :: ImageSettings -> FilmRollSettings
 init imageSettings =
-  FilmRollSettings $ HashMap.insert (iFilename imageSettings) imageSettings mempty
+  FilmRollSettings Nothing $ HashMap.insert (iFilename imageSettings) imageSettings mempty
 
 insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
-insert imageSettings =
-  FilmRollSettings . HashMap.insert (iFilename imageSettings) imageSettings . unFilmRollSettings
+insert imageSettings (FilmRollSettings poster settings) =
+  FilmRollSettings poster $ HashMap.insert (iFilename imageSettings) imageSettings settings
 
 fromList :: [ImageSettings] -> FilmRollSettings
 fromList =
-  FilmRollSettings . HashMap.fromList . fmap (\is -> (iFilename is, is))
+  FilmRollSettings Nothing . HashMap.fromList . fmap (\is -> (iFilename is, is))
 
 fromFilenames :: [Text] -> FilmRollSettings
 fromFilenames =
-  FilmRollSettings
+  FilmRollSettings Nothing
     . HashMap.fromList
     . fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 1))
 
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
-  HashMap.elems . unFilmRollSettings
-
-grab :: FilmRollSettings -> Maybe (ImageSettings, FilmRollSettings)
-grab filmRoll =
-  case sortOn (Down . iFilename) (toList filmRoll) of
-    [] -> Nothing
-    x : xs -> Just (x, fromList xs)
+  HashMap.elems . frsSettings
 
 difference :: FilmRollSettings -> FilmRollSettings -> FilmRollSettings
-difference (FilmRollSettings a) (FilmRollSettings b) =
-  FilmRollSettings $
+difference (FilmRollSettings pa a) (FilmRollSettings pb b) =
+  FilmRollSettings (pa <|> pb) $
     HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b
+
+instance Elm.HasElmType FilmRollSettings where
+  elmDefinition =
+    Just $ Elm.deriveElmTypeDefinition @FilmRollSettings Elm.defaultOptions "Generated.Data.ImageSettings.FilmRollSettings"
+
+instance Elm.HasElmDecoder Aeson.Value FilmRollSettings where
+  elmDecoderDefinition =
+    Just $ Elm.deriveElmJSONDecoder @FilmRollSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeFilmRollSettings"
+
+instance Elm.HasElmEncoder Aeson.Value FilmRollSettings where
+  elmEncoderDefinition =
+    Just $ Elm.deriveElmJSONEncoder @FilmRollSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeFilmRollSettings"
+
+instance Elm.HasElmType a => Elm.HasElmType (HashMap Text a) where
+  elmType =
+    Type.apps "Dict.Dict" [Elm.elmType @Text, Elm.elmType @a]
+
+instance Elm.HasElmEncoder Aeson.Value a => Elm.HasElmEncoder Aeson.Value (HashMap Text a) where
+  elmEncoder =
+    Expression.apps "Json.Encode.dict" [Elm.elmEncoder @Text @Text, Elm.elmEncoder @Aeson.Value @a]
+
+instance Elm.HasElmDecoder Aeson.Value a => Elm.HasElmDecoder Aeson.Value (HashMap Text a) where
+  elmDecoder =
+    Expression.App "Json.Decode.dict" (Elm.elmDecoder @Aeson.Value @a)
 
 -- IMAGESETTINGS
 

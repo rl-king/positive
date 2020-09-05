@@ -2,8 +2,8 @@ module Positive.Init where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Text as Text
+import Positive.ImageSettings as ImageSettings
 import Positive.Prelude hiding (ByteString)
-import Positive.Settings as Settings
 import System.Directory
 import System.FilePath.Posix
 

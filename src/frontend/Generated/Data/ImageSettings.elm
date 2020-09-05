@@ -1,8 +1,10 @@
-module Generated.Data.ImageSettings exposing (FilmRollDir, ImageCrop, ImageSettings, decodeFilmRollDirectory, decodeImageCrop, decodeImageSettings, encodeFilmRollDirectory, encodeImageCrop, encodeImageSettings)
+module Generated.Data.ImageSettings exposing (FilmRollDir, FilmRollSettings, ImageCrop, ImageSettings, decodeFilmRollDirectory, decodeFilmRollSettings, decodeImageCrop, decodeImageSettings, encodeFilmRollDirectory, encodeFilmRollSettings, encodeImageCrop, encodeImageSettings)
 
+import Dict
 import Json.Decode
 import Json.Decode.Pipeline
 import Json.Encode
+import Maybe.Extra
 
 
 type alias ImageSettings =
@@ -81,3 +83,22 @@ decodeFilmRollDirectory : Json.Decode.Decoder FilmRollDir
 decodeFilmRollDirectory =
     Json.Decode.succeed FilmRollDir
         |> Json.Decode.Pipeline.required "unFilmRollDirectory" Json.Decode.string
+
+
+type alias FilmRollSettings =
+    { frsPoster : Maybe String, frsSettings : Dict.Dict String ImageSettings }
+
+
+encodeFilmRollSettings : FilmRollSettings -> Json.Encode.Value
+encodeFilmRollSettings a =
+    Json.Encode.object
+        [ ( "frsPoster", Maybe.Extra.unwrap Json.Encode.null Json.Encode.string a.frsPoster )
+        , ( "frsSettings", Json.Encode.dict identity encodeImageSettings a.frsSettings )
+        ]
+
+
+decodeFilmRollSettings : Json.Decode.Decoder FilmRollSettings
+decodeFilmRollSettings =
+    Json.Decode.succeed FilmRollSettings
+        |> Json.Decode.Pipeline.required "frsPoster" (Json.Decode.nullable Json.Decode.string)
+        |> Json.Decode.Pipeline.required "frsSettings" (Json.Decode.dict decodeImageSettings)

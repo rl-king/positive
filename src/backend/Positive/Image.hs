@@ -4,8 +4,8 @@ import Control.Exception.Safe (IOException, tryIO)
 import GHC.Float (int2Double)
 import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
+import Positive.ImageSettings as ImageSettings
 import Positive.Prelude hiding (ByteString)
-import Positive.Settings as Settings
 
 -- IMAGE
 

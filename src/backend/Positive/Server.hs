@@ -27,9 +27,9 @@ import Network.Wai.Handler.Warp hiding (run)
 import Positive.Api
 import Positive.Flags
 import Positive.Image
+import Positive.ImageSettings
 import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
-import Positive.Settings as Settings
 import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
@@ -118,11 +118,11 @@ encode path image =
 handleSaveSettings :: Text -> [ImageSettings] -> PositiveT Handler [ImageSettings]
 handleSaveSettings dir settings = do
   log dir
-  let newSettings = Settings.fromList settings
+  let newSettings = fromList settings
       path = Text.unpack dir </> "image-settings.json"
   liftIO $ Aeson.encodeFile path newSettings
   logDebug "Wrote settings"
-  pure $ Settings.toList newSettings
+  pure $ toList newSettings
 
 -- GENERATE PREVIEWS
 
@@ -160,9 +160,9 @@ handleGetSettingsHistogram dir previewWidth settings =
 
 -- LIST DIRECTORIES
 
-handleGetSettings :: PositiveT Handler [(Text, [ImageSettings])]
+handleGetSettings :: PositiveT Handler [(Text, FilmRollSettings)]
 handleGetSettings =
-  HashMap.toList . fmap toList <$> liftIO findImageSettings
+  HashMap.toList <$> liftIO findImageSettings
 
 -- IMAGE
 

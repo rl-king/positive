@@ -3,8 +3,8 @@ module Positive.Preview where
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
 import Positive.Image
+import Positive.ImageSettings as ImageSettings
 import Positive.Prelude hiding (ByteString)
-import Positive.Settings as Settings
 import System.FilePath.Posix
 
 -- PREVIEW
