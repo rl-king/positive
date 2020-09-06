@@ -30,6 +30,7 @@ import Positive.Image
 import Positive.ImageSettings
 import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
+import qualified Positive.Preview as Preview
 import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
@@ -43,6 +44,7 @@ type PositiveT m =
 
 data Env = Env
   { eImageMVar :: !(MVar (Text, MonochromeImage)),
+    ePreviewMVar :: !(MVar ()),
     eEventChan :: !(Chan ServerEvent),
     eIsDev :: !Bool,
     eLogger :: !Log.TimedFastLogger
@@ -59,8 +61,10 @@ run logger Flags {fIsDev} =
             defaultSettings
    in do
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
+        previewMVar <- newEmptyMVar
         eventChan <- newChan
-        let env = Env imageMVar eventChan fIsDev logger
+        let env = Env imageMVar previewMVar eventChan fIsDev logger
+        Preview.loop previewMVar (Log.log logger)
         runSettings settings (genericServeT (`runReaderT` env) (handlers fIsDev eventChan))
 
 -- HANDLERS
@@ -119,6 +123,8 @@ handleSaveSettings :: Text -> FilmRollSettings -> PositiveT Handler FilmRollSett
 handleSaveSettings dir newSettings = do
   liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
   logDebug "Wrote settings"
+  Env {ePreviewMVar} <- ask
+  void . liftIO $ tryPutMVar ePreviewMVar ()
   pure newSettings
 
 -- GENERATE PREVIEWS
@@ -164,11 +170,11 @@ handleGetSettings =
 -- IMAGE
 
 getImage :: Int -> Text -> PositiveT Handler (MonochromeImage, IO ())
-getImage previewWidth path = do
+getImage _previewWidth path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
   logDebug $ "MVar: " <> tshow currentlyLoaded
-  if path == loadedPath && HIP.cols loadedImage == previewWidth
+  if path == loadedPath
     then do
       logDebug "From cache"
       pure (loadedImage, putMVar eImageMVar currentlyLoaded)
@@ -178,7 +184,7 @@ getImage previewWidth path = do
       case maybeImage of
         Left err -> log ("Image read error: " <> tshow err) >> throwError err404
         Right image ->
-          let resized = resizeImage previewWidth image
+          let resized = resizeImage 1440 image
            in pure (resized, putMVar eImageMVar (path, resized))
 
 -- LOG

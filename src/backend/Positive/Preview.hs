@@ -1,5 +1,8 @@
+{-# LANGUAGE NumericUnderscores #-}
+
 module Positive.Preview where
 
+import Control.Concurrent.MVar
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
 import Positive.Image
@@ -14,6 +17,11 @@ run log = do
   missing <- findMissingPreviews
   log $ Text.unwords ["Found", tshow $ length missing, "missing previews"]
   generatePreviews log missing
+
+loop :: MVar () -> (Text -> IO ()) -> IO ()
+loop mvar log =
+  void . forkIO . forever $
+    takeMVar mvar >> threadDelay 3000_000_0 >> run log -- wait 30secs
 
 -- FIND
 

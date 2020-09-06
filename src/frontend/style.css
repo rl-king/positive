@@ -130,7 +130,13 @@ a:hover {
 
 @media (min-width: 1440px) {
     .browser-filmroll {
-        width: calc(25% - .5rem);
+        width: calc(25% - 1rem);
+    }
+}
+
+@media (min-width: 1920px) {
+    .browser-filmroll {
+        width: calc(20% - 1rem);
     }
 }
 

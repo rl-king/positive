@@ -638,19 +638,19 @@ viewFilmRollBrowser columns filmRollHover posters filmRolls =
 viewFilmRollBrowserRoll : Int -> Maybe ( String, Float ) -> Posters -> ( String, FilmRoll ) -> Html Msg
 viewFilmRollBrowserRoll columns filmRollHover posters ( dir, filmRoll ) =
     let
-        title =
+        name =
             Maybe.withDefault dir <|
                 List.head (List.reverse (String.split "/" dir))
 
         shortTitle =
-            if String.length title > 30 then
+            if String.length name > 30 then
                 interpolate "{0} ... {1}"
-                    [ String.trim (String.left 9 title)
-                    , String.trim (String.right 21 title)
+                    [ String.trim (String.left 9 name)
+                    , String.trim (String.right 21 name)
                     ]
 
             else
-                title
+                name
 
         setFocus xs =
             case Maybe.map (Tuple.mapFirst ((==) dir)) filmRollHover of
@@ -662,7 +662,7 @@ viewFilmRollBrowserRoll columns filmRollHover posters ( dir, filmRoll ) =
                         |> Maybe.andThen (\x -> Zipper.findFirst ((==) x << .iFilename) xs)
                         |> Maybe.withDefault xs
     in
-    div [ class "browser-filmroll" ]
+    div [ class "browser-filmroll", title dir ]
         [ viewFilmRollBrowserImage columns dir <|
             Zipper.current (setFocus filmRoll)
         , h2 [] [ text shortTitle ]
@@ -692,7 +692,7 @@ viewFilmRollBrowserImage columns dir settings =
         ]
         [ span
             [ style "background-image" <|
-                interpolate "url('{0}')" <|
+                interpolate "url(\"{0}\")" <|
                     [ Url.Builder.absolute
                         [ dir, "previews", previewExtension settings.iFilename ]
                         []
@@ -970,7 +970,7 @@ viewHistogramBar index v =
     , span
         [ class "histogram-bar"
         , style "height" <|
-            interpolate "{0}px" [ String.fromFloat (toFloat v / 150) ]
+            interpolate "{0}px" [ String.fromFloat (toFloat v / 300) ]
         ]
         []
     )
