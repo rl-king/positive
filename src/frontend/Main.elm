@@ -70,7 +70,7 @@ subscriptions model =
             Maybe.map2
                 (\filmRoll ( dir, offset ) ->
                     Browser.Events.onKeyDown <|
-                        matchKey "s" (SetPoster dir (focusWithOffset offset filmRoll))
+                        matchKey "p" (SetPoster dir (focusWithOffset offset filmRoll))
                 )
                 (Maybe.andThen (\( k, _ ) -> Dict.get k model.filmRolls) model.filmRollHover)
                 model.filmRollHover
@@ -571,15 +571,30 @@ view model =
             { title = route.filename ++ " | Positive"
             , body =
                 [ main_ []
-                    [ viewLoading model.imageProcessingState
+                    [ viewNav route
+                    , viewLoading model.imageProcessingState
                     , viewImage filmRoll route model
                     , viewSettings filmRoll route model
                     , viewCurrentFilmRoll route model.previewColumns filmRoll
-                    , viewFilmRollBrowser model.previewColumns model.filmRollHover model.posters model.filmRolls
                     , viewNotification model.notifications
                     ]
                 ]
             }
+
+
+
+-- NAV
+
+
+viewNav : Route -> Html Msg
+viewNav route =
+    nav []
+        [ a [ href "/" ] [ text "browser" ]
+        , text "/"
+        , text route.dir
+        , text "/"
+        , text route.filename
+        ]
 
 
 
@@ -802,13 +817,14 @@ viewSettings filmRoll route model =
             [ button [ onClick (PreviousImage route.dir filmRoll) ] [ text "⯇" ]
             , button [ onClick (NextImage route.dir filmRoll) ] [ text "⯈" ]
             ]
-        , pre [ class "info" ]
-            [ text <|
-                interpolate "{0} | {1}"
-                    [ settings.iFilename
-                    , route.dir
-                    ]
-            ]
+
+        -- , pre [ class "info" ]
+        --     [ text <|
+        --         interpolate "{0} | {1}"
+        --             [ settings.iFilename
+        --             , route.dir
+        --             ]
+        -- ]
         ]
 
 
