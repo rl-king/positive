@@ -15,13 +15,13 @@ import System.FilePath.Posix
 run :: (Text -> IO ()) -> IO ()
 run log = do
   missing <- findMissingPreviews
-  log $ Text.unwords ["Found", tshow $ length missing, "missing previews"]
+  log $ Text.unwords ["Found", tshow $ length missing, "outdated preview(s)"]
   generatePreviews log missing
 
 loop :: MVar () -> (Text -> IO ()) -> IO ()
 loop mvar log =
   void . forkIO . forever $
-    takeMVar mvar >> threadDelay 3000_000_0 >> run log -- wait 30secs
+    takeMVar mvar >> threadDelay 2000_000_0 >> whenM (isEmptyMVar mvar) (run log) -- run if nothing happened in after 20 secs
 
 -- FIND
 
