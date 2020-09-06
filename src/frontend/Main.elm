@@ -1101,7 +1101,7 @@ matchKey key msg =
     Decode.field "key" Decode.string
         |> Decode.andThen
             (\s ->
-                if Debug.log "" <| key == s then
+                if key == s then
                     Decode.succeed msg
 
                 else
