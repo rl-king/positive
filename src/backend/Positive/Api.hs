@@ -22,7 +22,6 @@ data ImageApi route = ImageApi
   { iaImage ::
       route :- "image"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> QueryParam' '[Required, Strict] "preview-width" Int
         :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
         :> Get '[Image] ByteString,
     iaEvents :: route :- "events" :> Raw,
@@ -42,7 +41,6 @@ data SettingsApi route = SettingsApi
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> QueryParam' '[Required, Strict] "preview-width" Int
         :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
     saGenerateHighRes ::

@@ -89,11 +89,11 @@ handlers isDev chan =
             }
     }
 
-handleImage :: Text -> Int -> ImageSettings -> PositiveT Handler ByteString
-handleImage dir previewWidth settings = do
+handleImage :: Text -> ImageSettings -> PositiveT Handler ByteString
+handleImage dir settings = do
   Env {eIsDev} <- ask
   (image, putMVarBack) <-
-    getImage previewWidth $
+    getImage $
       Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
   if eIsDev
     then do
@@ -146,13 +146,13 @@ handleGenerateHighRes dir settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Text -> Int -> ImageSettings -> PositiveT Handler [Int]
-handleGetSettingsHistogram dir previewWidth settings =
+handleGetSettingsHistogram :: Text -> ImageSettings -> PositiveT Handler [Int]
+handleGetSettingsHistogram dir settings =
   let bins = HashMap.fromList [(x, 0) :: (Word8, Int) | x <- [0 .. 255]]
       adjust acc (HIP.PixelY x) = HashMap.adjust (+ 1) (floor (255 * x)) acc
    in do
         (image, putMVarBack) <-
-          getImage previewWidth $
+          getImage $
             Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
         liftIO putMVarBack
         logDebug $ "Creating histogram for: " <> iFilename settings
@@ -169,8 +169,8 @@ handleGetSettings =
 
 -- IMAGE
 
-getImage :: Int -> Text -> PositiveT Handler (MonochromeImage, IO ())
-getImage _previewWidth path = do
+getImage :: Text -> PositiveT Handler (MonochromeImage, IO ())
+getImage path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
   logDebug $ "MVar: " <> tshow currentlyLoaded

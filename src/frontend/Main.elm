@@ -130,7 +130,6 @@ type alias Model =
     , posters : Posters
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
-    , canvasSize : Maybe Browser.Dom.Element
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , route : Maybe Route
@@ -180,7 +179,6 @@ init _ url key =
       , posters = Dict.empty
       , key = key
       , saveKey = Key 0
-      , canvasSize = Nothing
       , imageCropMode = Nothing
       , clipboard = Nothing
       , route = route
@@ -225,11 +223,10 @@ type Msg
     | GotGenerateHighres (HttpResult ())
     | GotHistogram (HttpResult (List Int))
     | GotFilmRolls (HttpResult (List ( String, FilmRollSettings )))
-    | GotImageDimensions (Result Browser.Dom.Error Browser.Dom.Element)
     | Rotate
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
-    | OnImageLoad String ImageSettings Int
+    | OnImageLoad String ImageSettings
     | SaveSettings String FilmRoll
     | GenerateHighres String ImageSettings
     | CopySettings ImageSettings
@@ -307,18 +304,6 @@ update msg model =
         GotGenerateHighres (Err _) ->
             pushNotification "Error generating highres" model
 
-        GotImageDimensions (Ok element) ->
-            pushNotification
-                (interpolate "Got canvas dimensions: w:{0} h:{1}"
-                    [ String.fromInt (floor element.element.width)
-                    , String.fromInt (floor element.element.height)
-                    ]
-                )
-                { model | canvasSize = Just element }
-
-        GotImageDimensions (Err _) ->
-            pushNotification "Error getting image dimensions from element" model
-
         Rotate ->
             ( updateSettings
                 (\s ->
@@ -346,13 +331,6 @@ update msg model =
                         model.filmRoll
             in
             ( { model | filmRoll = filmRoll, saveKey = nextKey model.saveKey }
-              -- , Maybe.withDefault Cmd.none <|
-              --     Maybe.map
-              --         (\filmRoll_ ->
-              --             Task.perform (\_ -> AttemptSave dir (nextKey model.saveKey) filmRoll_) <|
-              --                 Process.sleep 2000
-              -- )
-              -- filmRoll
             , Cmd.none
             )
 
@@ -374,11 +352,11 @@ update msg model =
             else
                 ( { model | filmRoll = Just filmRoll }, Cmd.none )
 
-        OnImageLoad dir settings canvasSize ->
+        OnImageLoad dir settings ->
             let
                 getHistogram =
                     Cmd.map GotHistogram <|
-                        Request.postImageSettingsHistogram (Url.percentEncode dir) canvasSize settings
+                        Request.postImageSettingsHistogram (Url.percentEncode dir) settings
             in
             case model.imageProcessingState of
                 Ready ->
@@ -513,11 +491,7 @@ onNavigation maybeRoute model =
                 , imageProcessingState = Loading
                 , route = Just route
               }
-            , Cmd.batch
-                [ Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                , Task.attempt GotImageDimensions <|
-                    Browser.Dom.getElement "image-section"
-                ]
+            , Cmd.map ScrollToMsg ScrollTo.scrollToTop
             )
 
 
@@ -926,19 +900,16 @@ viewImage filmRoll route model =
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper", scale ]
-            [ viewMaybe model.canvasSize <|
-                \{ element } ->
-                    img
-                        [ on "load" (Decode.succeed (OnImageLoad route.dir (Zipper.current filmRoll) (floor element.width)))
-                        , style "user-select" "none"
-                        , src <|
-                            Url.Builder.absolute [ "image" ]
-                                [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
-                                , Url.Builder.string "dir" route.dir
-                                , Url.Builder.int "preview-width" (floor element.width)
-                                ]
+            [ img
+                [ on "load" (Decode.succeed (OnImageLoad route.dir (Zipper.current filmRoll)))
+                , style "user-select" "none"
+                , src <|
+                    Url.Builder.absolute [ "image" ]
+                        [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
+                        , Url.Builder.string "dir" route.dir
                         ]
-                        []
+                ]
+                []
             , viewMaybe model.imageCropMode <|
                 \imageCrop ->
                     div
