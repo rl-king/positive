@@ -30,7 +30,6 @@ run log = do
       jsonDefinitions =
         Elm.jsonDefinitions @ImageSettings
           <> Elm.jsonDefinitions @ImageCrop
-          <> Elm.jsonDefinitions @FilmRollDir
           <> Elm.jsonDefinitions @FilmRollSettings
       modules =
         Pretty.modules $

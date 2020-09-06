@@ -34,8 +34,8 @@ data SettingsApi route = SettingsApi
   { saSaveSettings ::
       route :- "image" :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] [ImageSettings]
-        :> Post '[JSON] [ImageSettings],
+        :> ReqBody '[JSON] FilmRollSettings
+        :> Post '[JSON] FilmRollSettings,
     saGetSettings ::
       route :- "image" :> "settings"
         :> Get '[JSON] [(Text, FilmRollSettings)],

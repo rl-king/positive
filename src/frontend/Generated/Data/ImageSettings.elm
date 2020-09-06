@@ -1,4 +1,4 @@
-module Generated.Data.ImageSettings exposing (FilmRollDir, FilmRollSettings, ImageCrop, ImageSettings, decodeFilmRollDirectory, decodeFilmRollSettings, decodeImageCrop, decodeImageSettings, encodeFilmRollDirectory, encodeFilmRollSettings, encodeImageCrop, encodeImageSettings)
+module Generated.Data.ImageSettings exposing (FilmRollSettings, ImageCrop, ImageSettings, decodeFilmRollSettings, decodeImageCrop, decodeImageSettings, encodeFilmRollSettings, encodeImageCrop, encodeImageSettings)
 
 import Dict
 import Json.Decode
@@ -68,21 +68,6 @@ decodeImageCrop =
         |> Json.Decode.Pipeline.required "icTop" Json.Decode.float
         |> Json.Decode.Pipeline.required "icLeft" Json.Decode.float
         |> Json.Decode.Pipeline.required "icWidth" Json.Decode.float
-
-
-type alias FilmRollDir =
-    { unFilmRollDirectory : String }
-
-
-encodeFilmRollDirectory : FilmRollDir -> Json.Encode.Value
-encodeFilmRollDirectory a =
-    Json.Encode.object [ ( "unFilmRollDirectory", Json.Encode.string a.unFilmRollDirectory ) ]
-
-
-decodeFilmRollDirectory : Json.Decode.Decoder FilmRollDir
-decodeFilmRollDirectory =
-    Json.Decode.succeed FilmRollDir
-        |> Json.Decode.Pipeline.required "unFilmRollDirectory" Json.Decode.string
 
 
 type alias FilmRollSettings =

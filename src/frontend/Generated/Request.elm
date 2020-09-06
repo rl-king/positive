@@ -3,12 +3,11 @@ module Generated.Request exposing (getImageSettings, postImageSettings, postImag
 import Generated.Data.ImageSettings
 import Http
 import Json.Decode
-import Json.Encode
 
 
 postImageSettings :
     String
-    -> List Generated.Data.ImageSettings.ImageSettings
+    -> Generated.Data.ImageSettings.FilmRollSettings
     ->
         Cmd
             (Result
@@ -18,14 +17,14 @@ postImageSettings :
                     , body : String
                     }
                 )
-                (List Generated.Data.ImageSettings.ImageSettings)
+                Generated.Data.ImageSettings.FilmRollSettings
             )
 postImageSettings a b =
     Http.request
         { method = "POST"
         , headers = []
         , url = "/image/settings?dir=" ++ a
-        , body = Http.jsonBody (Json.Encode.list Generated.Data.ImageSettings.encodeImageSettings b)
+        , body = Http.jsonBody (Generated.Data.ImageSettings.encodeFilmRollSettings b)
         , expect =
             Http.expectStringResponse identity
                 (\c ->
@@ -52,7 +51,7 @@ postImageSettings a b =
                                         }
                                     )
                                 )
-                                (Json.Decode.decodeString (Json.Decode.list Generated.Data.ImageSettings.decodeImageSettings) e)
+                                (Json.Decode.decodeString Generated.Data.ImageSettings.decodeFilmRollSettings e)
                 )
         , timeout = Nothing
         , tracker = Nothing

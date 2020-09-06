@@ -177,27 +177,6 @@ instance Elm.HasElmEncoder Aeson.Value ImageCrop where
   elmEncoderDefinition =
     Just $ Elm.deriveElmJSONEncoder @ImageCrop Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeImageCrop"
 
--- DIR
-
-newtype FilmRollDir = FilmRollDir {unFilmRollDirectory :: Text}
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
-
-toFilePath :: FilmRollDir -> FilePath
-toFilePath =
-  Text.unpack . unFilmRollDirectory
-
-instance Elm.HasElmType FilmRollDir where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @FilmRollDir Elm.defaultOptions "Generated.Data.ImageSettings.FilmRollDir"
-
-instance Elm.HasElmDecoder Aeson.Value FilmRollDir where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @FilmRollDir Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeFilmRollDirectory"
-
-instance Elm.HasElmEncoder Aeson.Value FilmRollDir where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @FilmRollDir Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeFilmRollDirectory"
-
 -- FS
 
 findImageSettings :: IO (HashMap Text FilmRollSettings)

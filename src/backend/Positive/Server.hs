@@ -115,14 +115,11 @@ encode path image =
   liftIO . Massiv.encodeImageM Massiv.imageWriteAutoFormats path $
     HIP.unImage (HIP.toDefSpace image)
 
-handleSaveSettings :: Text -> [ImageSettings] -> PositiveT Handler [ImageSettings]
-handleSaveSettings dir settings = do
-  log dir
-  let newSettings = fromList settings
-      path = Text.unpack dir </> "image-settings.json"
-  liftIO $ Aeson.encodeFile path newSettings
+handleSaveSettings :: Text -> FilmRollSettings -> PositiveT Handler FilmRollSettings
+handleSaveSettings dir newSettings = do
+  liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
   logDebug "Wrote settings"
-  pure $ toList newSettings
+  pure newSettings
 
 -- GENERATE PREVIEWS
 

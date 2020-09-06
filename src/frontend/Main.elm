@@ -68,6 +68,14 @@ subscriptions model =
             ScrollTo.subscriptions model.scrollTo
         , Maybe.withDefault Sub.none <|
             Maybe.map2
+                (\filmRoll ( dir, offset ) ->
+                    Browser.Events.onKeyDown <|
+                        matchKey "s" (SetPoster dir (focusWithOffset offset filmRoll))
+                )
+                (Maybe.andThen (\( k, _ ) -> Dict.get k model.filmRolls) model.filmRollHover)
+                model.filmRollHover
+        , Maybe.withDefault Sub.none <|
+            Maybe.map2
                 (\route filmRoll ->
                     Browser.Events.onKeyDown <|
                         Decode.oneOf
@@ -111,32 +119,6 @@ subscriptions model =
         ]
 
 
-matchKey : String -> msg -> Decode.Decoder msg
-matchKey key msg =
-    Decode.field "key" Decode.string
-        |> Decode.andThen
-            (\s ->
-                if key == s then
-                    Decode.succeed msg
-
-                else
-                    Decode.fail "Not an match"
-            )
-
-
-withCtrl : Decode.Decoder a -> Decode.Decoder a
-withCtrl decoder =
-    Decode.field "ctrlKey" Decode.bool
-        |> Decode.andThen
-            (\ctrlPressed ->
-                if ctrlPressed then
-                    decoder
-
-                else
-                    Decode.fail "No ctrl pressed"
-            )
-
-
 
 -- MODEL
 
@@ -145,6 +127,7 @@ type alias Model =
     { imageProcessingState : ImageProcessingState
     , filmRoll : Maybe FilmRoll
     , filmRolls : FilmRolls
+    , posters : Posters
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
     , canvasSize : Maybe Browser.Dom.Element
@@ -157,6 +140,7 @@ type alias Model =
     , scale : Float
     , previewColumns : Int
     , notifications : List String
+    , filmRollHover : Maybe ( String, Float )
     }
 
 
@@ -166,6 +150,10 @@ type alias FilmRolls =
 
 type alias FilmRoll =
     Zipper ImageSettings
+
+
+type alias Posters =
+    Dict String String
 
 
 type alias Route =
@@ -189,6 +177,7 @@ init _ url key =
     ( { imageProcessingState = Ready
       , filmRoll = Nothing
       , filmRolls = Dict.empty
+      , posters = Dict.empty
       , key = key
       , saveKey = Key 0
       , canvasSize = Nothing
@@ -201,6 +190,7 @@ init _ url key =
       , scale = 1
       , previewColumns = 5
       , notifications = []
+      , filmRollHover = Nothing
       }
     , Cmd.map GotFilmRolls Request.getImageSettings
     )
@@ -231,7 +221,7 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
-    | GotSaveImageSettings (HttpResult (List ImageSettings))
+    | GotSaveImageSettings String (HttpResult FilmRollSettings)
     | GotGenerateHighres (HttpResult ())
     | GotHistogram (HttpResult (List Int))
     | GotFilmRolls (HttpResult (List ( String, FilmRollSettings )))
@@ -254,7 +244,10 @@ type Msg
     | SetPreviewScale Int
     | AttemptSave String (Key { saveKey : () }) FilmRoll
     | OnServerMessage String
-    | OnFilmRollMove String Float
+    | OnFilmRollHoverStart String Float
+    | OnFilmRollHoverMove Float
+    | OnFilmRollHoverEnd
+    | SetPoster String FilmRoll
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -280,13 +273,17 @@ update msg model =
 
         GotFilmRolls (Ok filmRolls) ->
             let
-                toSortedZipper ( k, { frsSettings } ) =
-                    Zipper.fromList (List.sortBy .iFilename (Dict.values frsSettings))
-                        |> Maybe.map (Tuple.pair k)
+                toSortedZipper ( k, filmRoll ) =
+                    Zipper.fromList (List.sortBy .iFilename (Dict.values filmRoll.frsSettings))
+                        |> Maybe.map (\x -> ( k, x ))
             in
             onNavigation model.route <|
                 { model
-                    | filmRolls =
+                    | posters =
+                        Dict.fromList <|
+                            List.filterMap (\( k, filmRoll ) -> Maybe.map (Tuple.pair k) filmRoll.frsPoster)
+                                filmRolls
+                    , filmRolls =
                         Dict.fromList <|
                             List.filterMap toSortedZipper filmRolls
                 }
@@ -297,10 +294,11 @@ update msg model =
         GotHistogram result ->
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
 
-        GotSaveImageSettings (Ok _) ->
-            pushNotification "Saved settings" model
+        GotSaveImageSettings dir (Ok { frsPoster }) ->
+            pushNotification "Saved settings"
+                { model | posters = Dict.update dir (always frsPoster) model.posters }
 
-        GotSaveImageSettings (Err _) ->
+        GotSaveImageSettings _ (Err _) ->
             pushNotification "Error saving settings" model
 
         GotGenerateHighres (Ok _) ->
@@ -398,8 +396,9 @@ update msg model =
 
         SaveSettings dir filmRoll ->
             ( model
-            , Cmd.map GotSaveImageSettings <|
-                Request.postImageSettings (Url.percentEncode dir) (Zipper.toList filmRoll)
+            , Cmd.map (GotSaveImageSettings dir) <|
+                Request.postImageSettings (Url.percentEncode dir) <|
+                    fromZipper (Dict.get dir model.posters) filmRoll
             )
 
         GenerateHighres dir settings ->
@@ -468,26 +467,30 @@ update msg model =
 
             else
                 ( model
-                , Cmd.map GotSaveImageSettings <|
-                    Request.postImageSettings (Url.percentEncode dir) (Zipper.toList filmRoll)
+                , Cmd.map (GotSaveImageSettings dir) <|
+                    Request.postImageSettings (Url.percentEncode dir) <|
+                        fromZipper (Dict.get dir model.posters) filmRoll
                 )
 
         OnServerMessage message ->
             pushNotification message model
 
-        OnFilmRollMove id offset ->
-            let
-                f filmRoll asList =
-                    List.drop (round (toFloat (List.length asList) * offset)) asList
-                        |> List.head
-                        |> Maybe.andThen (\x -> Zipper.findFirst ((==) x) filmRoll)
-                        |> Maybe.withDefault filmRoll
-            in
-            ( { model
-                | filmRolls =
-                    Dict.update id (Maybe.map (\x -> f x (Zipper.toList x))) model.filmRolls
-              }
+        OnFilmRollHoverStart id offset ->
+            ( { model | filmRollHover = Just ( id, offset ) }, Cmd.none )
+
+        OnFilmRollHoverMove offset ->
+            ( { model | filmRollHover = Maybe.map (Tuple.mapSecond (always offset)) model.filmRollHover }
             , Cmd.none
+            )
+
+        OnFilmRollHoverEnd ->
+            ( { model | filmRollHover = Nothing }, Cmd.none )
+
+        SetPoster dir filmRoll ->
+            ( model
+            , Cmd.map (GotSaveImageSettings dir) <|
+                Request.postImageSettings (Url.percentEncode dir) <|
+                    fromZipper (Just (.iFilename (Zipper.current filmRoll))) filmRoll
             )
 
 
@@ -565,6 +568,14 @@ updateSettings f model =
             }
 
 
+fromZipper : Maybe String -> FilmRoll -> FilmRollSettings
+fromZipper poster =
+    FilmRollSettings poster
+        << Dict.fromList
+        << List.map (\x -> ( x.iFilename, x ))
+        << Zipper.toList
+
+
 
 -- VIEW
 
@@ -577,7 +588,7 @@ view model =
             , body =
                 [ main_ []
                     [ viewNotification model.notifications
-                    , viewFilmRollBrowser model.previewColumns model.filmRolls
+                    , viewFilmRollBrowser model.previewColumns model.filmRollHover model.posters model.filmRolls
                     ]
                 ]
             }
@@ -590,7 +601,7 @@ view model =
                     , viewImage filmRoll route model
                     , viewSettings filmRoll route model
                     , viewCurrentFilmRoll route model.previewColumns filmRoll
-                    , viewFilmRollBrowser model.previewColumns model.filmRolls
+                    , viewFilmRollBrowser model.previewColumns model.filmRollHover model.posters model.filmRolls
                     , viewNotification model.notifications
                     ]
                 ]
@@ -601,8 +612,8 @@ view model =
 -- FILE BROWSER
 
 
-viewFilmRollBrowser : Int -> FilmRolls -> Html Msg
-viewFilmRollBrowser columns filmRolls =
+viewFilmRollBrowser : Int -> Maybe ( String, Float ) -> Posters -> FilmRolls -> Html Msg
+viewFilmRollBrowser columns filmRollHover posters filmRolls =
     let
         down ( a, _ ) ( b, _ ) =
             case compare a b of
@@ -618,14 +629,14 @@ viewFilmRollBrowser columns filmRolls =
     section [ class "browser" ] <|
         [ h1 [] [ text "Browser" ]
         , div [ class "browser-filmrolls" ] <|
-            List.map (viewFilmRollBrowserRoll columns) <|
+            List.map (viewFilmRollBrowserRoll columns filmRollHover posters) <|
                 List.sortWith down <|
                     Dict.toList filmRolls
         ]
 
 
-viewFilmRollBrowserRoll : Int -> ( String, FilmRoll ) -> Html Msg
-viewFilmRollBrowserRoll columns ( dir, filmRoll ) =
+viewFilmRollBrowserRoll : Int -> Maybe ( String, Float ) -> Posters -> ( String, FilmRoll ) -> Html Msg
+viewFilmRollBrowserRoll columns filmRollHover posters ( dir, filmRoll ) =
     let
         title =
             Maybe.withDefault dir <|
@@ -640,10 +651,20 @@ viewFilmRollBrowserRoll columns ( dir, filmRoll ) =
 
             else
                 title
+
+        setFocus xs =
+            case Maybe.map (Tuple.mapFirst ((==) dir)) filmRollHover of
+                Just ( True, offset ) ->
+                    focusWithOffset offset xs
+
+                _ ->
+                    Dict.get dir posters
+                        |> Maybe.andThen (\x -> Zipper.findFirst ((==) x << .iFilename) xs)
+                        |> Maybe.withDefault xs
     in
     div [ class "browser-filmroll" ]
         [ viewFilmRollBrowserImage columns dir <|
-            Zipper.current filmRoll
+            Zipper.current (setFocus filmRoll)
         , h2 [] [ text shortTitle ]
         ]
 
@@ -654,15 +675,19 @@ viewFilmRollBrowserImage columns dir settings =
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
 
-        onMousemove =
-            on "mousemove" <|
-                Decode.map2 (\a b -> OnFilmRollMove dir (a / b))
-                    (Decode.field "offsetX" Decode.float)
-                    (Decode.at [ "target", "offsetWidth" ] Decode.float)
+        decodeOffset f =
+            Decode.map2 (\a b -> f (a / b))
+                (Decode.field "offsetX" Decode.float)
+                (Decode.at [ "target", "offsetWidth" ] Decode.float)
     in
     a
         [ classList [ ( "-small", columns > 5 ) ]
-        , onMousemove
+        , on "mouseover" <|
+            decodeOffset (OnFilmRollHoverStart dir)
+        , on "mousemove" <|
+            decodeOffset OnFilmRollHoverMove
+        , on "mouseleave" <|
+            Decode.succeed OnFilmRollHoverEnd
         , href (toUrl { dir = dir, filename = settings.iFilename })
         ]
         [ span
@@ -1017,6 +1042,18 @@ viewZoneBar value zone =
 -- HELPERS
 
 
+focusWithOffset : Float -> FilmRoll -> FilmRoll
+focusWithOffset offset xs =
+    let
+        ys =
+            Zipper.toList xs
+    in
+    List.drop (round (toFloat (List.length ys) * offset)) ys
+        |> List.head
+        |> Maybe.andThen (\x -> Zipper.findFirst ((==) x) xs)
+        |> Maybe.withDefault xs
+
+
 resetAll : ImageSettings -> ImageSettings
 resetAll current =
     ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 0 0 0 0 1
@@ -1057,3 +1094,29 @@ viewMaybe maybe html =
 fractionalModBy : Float -> Float -> Float
 fractionalModBy m v =
     v - m * Basics.toFloat (Basics.floor (v / m))
+
+
+matchKey : String -> msg -> Decode.Decoder msg
+matchKey key msg =
+    Decode.field "key" Decode.string
+        |> Decode.andThen
+            (\s ->
+                if Debug.log "" <| key == s then
+                    Decode.succeed msg
+
+                else
+                    Decode.fail "Not an match"
+            )
+
+
+withCtrl : Decode.Decoder a -> Decode.Decoder a
+withCtrl decoder =
+    Decode.field "ctrlKey" Decode.bool
+        |> Decode.andThen
+            (\ctrlPressed ->
+                if ctrlPressed then
+                    decoder
+
+                else
+                    Decode.fail "No ctrl pressed"
+            )
