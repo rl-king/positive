@@ -219,6 +219,7 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
+    | CancelScroll
     | GotSaveImageSettings String (HttpResult FilmRollSettings)
     | GotGenerateHighres (HttpResult ())
     | GotHistogram (HttpResult (List Int))
@@ -266,6 +267,11 @@ update msg model =
             in
             ( { model | scrollTo = scrollToModel }
             , Cmd.map ScrollToMsg scrollToCmds
+            )
+
+        CancelScroll ->
+            ( { model | scrollTo = ScrollTo.cancel model.scrollTo }
+            , Cmd.none
             )
 
         GotFilmRolls (Ok filmRolls) ->
@@ -577,6 +583,7 @@ view model =
                     , viewSettings filmRoll route model
                     , viewCurrentFilmRoll route model.previewColumns filmRoll
                     , viewNotification model.notifications
+                    , viewCancelScroll model.scrollTo
                     ]
                 ]
             }
@@ -595,6 +602,18 @@ viewNav route =
         , text "/"
         , text route.filename
         ]
+
+
+viewCancelScroll : ScrollTo.State -> Html Msg
+viewCancelScroll scrollTo =
+    viewIf (ScrollTo.isScrolling scrollTo) <|
+        \_ ->
+            span
+                [ on "wheel" (Decode.succeed CancelScroll)
+                , on "touchstart" (Decode.succeed CancelScroll)
+                , class "scroll-cancel-overlay"
+                ]
+                []
 
 
 
@@ -689,6 +708,10 @@ viewFilmRollBrowserImage columns dir settings =
             ]
             []
         ]
+
+
+
+-- FILES
 
 
 viewCurrentFilmRoll : Route -> Int -> FilmRoll -> Html Msg
