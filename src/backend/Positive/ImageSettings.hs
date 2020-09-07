@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -42,8 +43,8 @@ instance MimeRender Image ByteString where
 
 data FilmRollSettings = FilmRollSettings
   { frsPoster :: Maybe Text,
-    frsSettings :: HashMap Text ImageSettings,
-    frsStarred :: HashSet Text
+    frsStarred :: HashSet Text,
+    frsSettings :: HashMap Text ImageSettings
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq)
 
@@ -51,16 +52,21 @@ instance Aeson.FromJSON FilmRollSettings where
   parseJSON =
     Aeson.withObject "FilmRollSettings" $ \o -> do
       poster <- o .:? "frsPoster"
-      settings <- o .: "unFilmRollSettings" <|> o .: "frsSettings"
       starred <- o .:? "frsStarred" .!= mempty
-      pure (FilmRollSettings poster settings starred)
+      settings <- o .: "unFilmRollSettings" <|> o .: "frsSettings"
+      pure $
+        FilmRollSettings
+          { frsPoster = poster,
+            frsStarred = starred,
+            frsSettings = settings
+          }
 
 instance Aeson.ToJSON FilmRollSettings where
-  toJSON (FilmRollSettings poster settings starred) =
+  toJSON FilmRollSettings {frsPoster, frsStarred, frsSettings} =
     Aeson.object
-      [ "frsPoster" .= poster,
-        "frsSettings" .= settings,
-        "frsStarred" .= starred
+      [ "frsPoster" .= frsPoster,
+        "frsSettings" .= frsSettings,
+        "frsStarred" .= frsStarred
       ]
 
 empty :: FilmRollSettings
@@ -73,33 +79,33 @@ isEmpty =
 
 init :: ImageSettings -> FilmRollSettings
 init imageSettings =
-  FilmRollSettings Nothing (HashMap.insert (iFilename imageSettings) imageSettings mempty) mempty
+  FilmRollSettings Nothing mempty (HashMap.insert (iFilename imageSettings) imageSettings mempty)
 
 insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
-insert imageSettings (FilmRollSettings poster settings starred) =
-  FilmRollSettings poster (HashMap.insert (iFilename imageSettings) imageSettings settings) starred
+insert imageSettings FilmRollSettings {frsPoster, frsStarred, frsSettings} =
+  FilmRollSettings frsPoster frsStarred (HashMap.insert (iFilename imageSettings) imageSettings frsSettings)
 
 fromList :: [ImageSettings] -> FilmRollSettings
 fromList settings =
-  FilmRollSettings Nothing (HashMap.fromList $ fmap (\is -> (iFilename is, is)) settings) mempty
+  FilmRollSettings Nothing mempty (HashMap.fromList $ fmap (\is -> (iFilename is, is)) settings)
 
 fromFilenames :: [Text] -> FilmRollSettings
 fromFilenames xs =
   FilmRollSettings
     Nothing
-    (HashMap.fromList $ fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 1)) xs)
     mempty
+    (HashMap.fromList $ fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 1)) xs)
 
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
   HashMap.elems . frsSettings
 
 difference :: FilmRollSettings -> FilmRollSettings -> FilmRollSettings
-difference (FilmRollSettings pa a sa) (FilmRollSettings pb b sb) =
+difference (FilmRollSettings pa sa a) (FilmRollSettings pb sb b) =
   FilmRollSettings
     (pa <|> pb)
-    (HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b)
     (sa <> sb)
+    (HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b)
 
 instance Elm.HasElmType FilmRollSettings where
   elmDefinition =

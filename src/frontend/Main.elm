@@ -128,6 +128,7 @@ type alias Model =
     , filmRoll : Maybe FilmRoll
     , filmRolls : FilmRolls
     , posters : Posters
+    , starred : Starred
     , key : Navigation.Key
     , saveKey : Key { saveKey : () }
     , imageCropMode : Maybe ImageCrop
@@ -155,6 +156,10 @@ type alias Posters =
     Dict String String
 
 
+type alias Starred =
+    Dict String (Set String)
+
+
 type alias Route =
     { dir : String
     , filename : String
@@ -177,6 +182,7 @@ init _ url key =
       , filmRoll = Nothing
       , filmRolls = Dict.empty
       , posters = Dict.empty
+      , starred = Dict.empty
       , key = key
       , saveKey = Key 0
       , imageCropMode = Nothing
@@ -286,6 +292,9 @@ update msg model =
                         Dict.fromList <|
                             List.filterMap (\( k, filmRoll ) -> Maybe.map (Tuple.pair k) filmRoll.frsPoster)
                                 filmRolls
+                    , starred =
+                        Dict.fromList <|
+                            List.map (Tuple.mapSecond .frsStarred) filmRolls
                     , filmRolls =
                         Dict.fromList <|
                             List.filterMap toSortedZipper filmRolls
@@ -297,9 +306,12 @@ update msg model =
         GotHistogram result ->
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
 
-        GotSaveImageSettings dir (Ok { frsPoster }) ->
+        GotSaveImageSettings dir (Ok { frsPoster, frsStarred }) ->
             pushNotification "Saved settings"
-                { model | posters = Dict.update dir (always frsPoster) model.posters }
+                { model
+                    | posters = Dict.update dir (always frsPoster) model.posters
+                    , starred = Dict.insert dir frsStarred model.starred
+                }
 
         GotSaveImageSettings _ (Err _) ->
             pushNotification "Error saving settings" model
@@ -382,7 +394,7 @@ update msg model =
             ( model
             , Cmd.map (GotSaveImageSettings dir) <|
                 Request.postImageSettings (Url.percentEncode dir) <|
-                    fromZipper (Dict.get dir model.posters) filmRoll
+                    fromZipper (Dict.get dir model.posters) (Dict.get dir model.starred) filmRoll
             )
 
         GenerateHighres dir settings ->
@@ -453,7 +465,7 @@ update msg model =
                 ( model
                 , Cmd.map (GotSaveImageSettings dir) <|
                     Request.postImageSettings (Url.percentEncode dir) <|
-                        fromZipper (Dict.get dir model.posters) filmRoll
+                        fromZipper (Dict.get dir model.posters) (Dict.get dir model.starred) filmRoll
                 )
 
         OnServerMessage message ->
@@ -474,7 +486,7 @@ update msg model =
             ( model
             , Cmd.map (GotSaveImageSettings dir) <|
                 Request.postImageSettings (Url.percentEncode dir) <|
-                    fromZipper (Just (.iFilename (Zipper.current filmRoll))) filmRoll
+                    fromZipper (Just (.iFilename (Zipper.current filmRoll))) (Dict.get dir model.starred) filmRoll
             )
 
 
@@ -548,9 +560,9 @@ updateSettings f model =
             }
 
 
-fromZipper : Maybe String -> FilmRoll -> FilmRollSettings
-fromZipper poster =
-    FilmRollSettings poster
+fromZipper : Maybe String -> Maybe (Set String) -> FilmRoll -> FilmRollSettings
+fromZipper poster starred =
+    FilmRollSettings poster (Maybe.withDefault Set.empty starred)
         << Dict.fromList
         << List.map (\x -> ( x.iFilename, x ))
         << Zipper.toList
