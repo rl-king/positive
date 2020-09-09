@@ -8,8 +8,6 @@ module Page.Editor exposing
     )
 
 import Base64
-import Browser
-import Browser.Dom
 import Browser.Events
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
@@ -29,15 +27,11 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
 import Process
-import ScrollTo
 import Set exposing (Set)
 import String.Interpolate exposing (interpolate)
 import Task
-import Time
 import Url exposing (Url)
 import Url.Builder
-import Url.Parser
-import Url.Parser.Query
 import Util exposing (..)
 
 

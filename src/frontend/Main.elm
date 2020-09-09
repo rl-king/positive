@@ -1,36 +1,23 @@
 port module Main exposing (main)
 
-import Base64
 import Browser
-import Browser.Dom
-import Browser.Events
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
-import Generated.Data.ImageSettings as ImageSettings
-    exposing
-        ( FilmRollSettings
-        , ImageCrop
-        , ImageSettings
-        )
+import Generated.Data.ImageSettings exposing (FilmRollSettings)
 import Generated.Request as Request
 import Html exposing (..)
-import Html.Attributes as Attributes exposing (..)
+import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Html.Keyed
 import Http
 import Json.Decode as Decode
-import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
 import Page.Browser
 import Page.Editor
 import Process
 import ScrollTo
-import Set exposing (Set)
 import String.Interpolate exposing (interpolate)
 import Task
-import Time
 import Url exposing (Url)
-import Url.Builder
 import Url.Parser
 import Url.Parser.Query
 import Util exposing (..)
