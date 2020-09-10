@@ -208,6 +208,7 @@ onNavigation maybeRoute model =
     let
         toSortedZipper filmRoll =
             Zipper.fromList (List.sortBy .iFilename (Dict.values filmRoll.frsSettings))
+                |> Maybe.map (\x -> ( x, filmRoll.frsStarred, filmRoll.frsPoster ))
 
         toFilmRoll filmRolls =
             Maybe.andThen (\{ dir } -> Dict.get dir filmRolls) maybeRoute
@@ -233,8 +234,8 @@ onNavigation maybeRoute model =
                     , Cmd.none
                     )
 
-                Just ( route, filmRoll ) ->
-                    ( { model | page = Editor (Page.Editor.init route filmRoll) }
+                Just ( route, ( filmRoll, starred, poster ) ) ->
+                    ( { model | page = Editor (Page.Editor.init route filmRoll starred poster) }
                     , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                     )
 

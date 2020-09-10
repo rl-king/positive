@@ -50,11 +50,11 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
     Sub.batch
         [ Browser.Events.onKeyDown <|
             Decode.oneOf
-                [ matchKey "s" (SaveSettings route.dir filmRoll)
-                , matchKey "c" (CopySettings (Zipper.current filmRoll))
+                [ matchKey "s" SaveSettings
+                , matchKey "c" (CopySettings current)
                 , matchKey "r" Rotate
-                , matchKey "h" (PreviousImage route.dir filmRoll)
-                , matchKey "l" (NextImage route.dir filmRoll)
+                , matchKey "h" PreviousImage
+                , matchKey "l" NextImage
                 , matchKey "8" (SetPreviewScale 8)
                 , matchKey "9" (SetPreviewScale 9)
                 ]
@@ -88,6 +88,8 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
 
 type alias Model =
     { imageProcessingState : ImageProcessingState
+    , starred : Set String
+    , poster : Maybe String
     , filmRoll : FilmRoll
     , saveKey : Key { saveKey : () }
     , imageCropMode : Maybe ImageCrop
@@ -111,9 +113,11 @@ type ImageProcessingState
     | Queued FilmRoll
 
 
-init : Route -> FilmRoll -> Model
-init route filmRoll =
+init : Route -> FilmRoll -> Set String -> Maybe String -> Model
+init route filmRoll starred poster =
     { imageProcessingState = Ready
+    , starred = starred
+    , poster = poster
     , filmRoll = filmRoll
     , saveKey = Key 0
     , imageCropMode = Nothing
@@ -138,14 +142,14 @@ type Msg
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
     | OnImageLoad String ImageSettings
-    | SaveSettings String FilmRoll
-    | GenerateHighres String ImageSettings
+    | SaveSettings
+    | GenerateHighres
     | CopySettings ImageSettings
     | ApplyCopyToAll FilmRoll
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
-    | PreviousImage String FilmRoll
-    | NextImage String FilmRoll
+    | PreviousImage
+    | NextImage
     | Undo
     | UpdateScale Float
     | SetPreviewScale Int
@@ -210,7 +214,7 @@ update key msg model =
         ApplyCopyToAll filmRoll ->
             let
                 isLoading =
-                    (\f -> Zipper.current f /= Zipper.current filmRoll) model.filmRoll
+                    Zipper.current model.filmRoll /= Zipper.current filmRoll
             in
             if isLoading then
                 ( { model | imageProcessingState = Processing, filmRoll = filmRoll }, Cmd.none )
@@ -238,24 +242,21 @@ update key msg model =
                     else
                         ( { model | imageProcessingState = Processing, filmRoll = n }, Cmd.none )
 
-        SaveSettings dir filmRoll ->
+        SaveSettings ->
             ( model
-              -- , Cmd.map (GotSaveImageSettings dir) <|
-              --     Request.postImageSettings (Url.percentEncode dir) <|
-              --         fromZipper (Dict.get dir model.posters) (Dict.get dir model.starred) filmRoll
-            , Cmd.none
+            , saveSettings model
             )
 
-        GenerateHighres dir settings ->
-            -- pushNotification RemoveNotification "Generating highres version" model
-            --     |> Tuple.mapSecond
-            --         (\cmds ->
-            --             Cmd.batch
-            --                 [ Cmd.map GotGenerateHighres (Request.postImageSettingsHighres (Url.percentEncode dir) settings)
-            --                 , cmds
-            --                 ]
-            --         )
-            ( model, Cmd.none )
+        GenerateHighres ->
+            pushNotification RemoveNotification "Generating highres version" model
+                |> Tuple.mapSecond
+                    (\cmds ->
+                        Cmd.batch
+                            [ Cmd.map GotGenerateHighres
+                                (Request.postImageSettingsHighres (Url.percentEncode model.route.dir) (Zipper.current model.filmRoll))
+                            , cmds
+                            ]
+                    )
 
         UpdateImageCropMode mode ->
             ( { model | imageCropMode = mode }, Cmd.none )
@@ -266,24 +267,24 @@ update key msg model =
             , Cmd.none
             )
 
-        PreviousImage dir filmRoll ->
+        PreviousImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Cmd.batch
                 [ Navigation.pushUrl key <|
-                    (Util.toUrl << Route dir << .iFilename << Zipper.current) <|
-                        Maybe.withDefault (Zipper.last filmRoll) (Zipper.previous filmRoll)
-                , Task.perform (\_ -> AttemptSave dir (nextKey model.saveKey) filmRoll) <|
+                    (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
+                        Maybe.withDefault (Zipper.last model.filmRoll) (Zipper.previous model.filmRoll)
+                , Task.perform (\_ -> AttemptSave model.route.dir (nextKey model.saveKey) model.filmRoll) <|
                     Process.sleep 10000
                 ]
             )
 
-        NextImage dir filmRoll ->
+        NextImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Cmd.batch
                 [ Navigation.pushUrl key <|
-                    (Util.toUrl << Route dir << .iFilename << Zipper.current) <|
-                        Maybe.withDefault (Zipper.first filmRoll) (Zipper.next filmRoll)
-                , Task.perform (\_ -> AttemptSave dir (nextKey model.saveKey) filmRoll) <|
+                    (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
+                        Maybe.withDefault (Zipper.first model.filmRoll) (Zipper.next model.filmRoll)
+                , Task.perform (\_ -> AttemptSave model.route.dir (nextKey model.saveKey) model.filmRoll) <|
                     Process.sleep 10000
                 ]
             )
@@ -310,10 +311,7 @@ update key msg model =
 
             else
                 ( model
-                  -- , Cmd.map (GotSaveImageSettings dir) <|
-                  --     Request.postImageSettings (Url.percentEncode dir) <|
-                  --         fromZipper (Dict.get dir model.posters) (Dict.get dir model.starred) filmRoll
-                , Cmd.none
+                , saveSettings model
                 )
 
         ToggleStar dir filename filmRoll ->
@@ -343,6 +341,13 @@ nextKey (Key k) =
     Key (k + 1)
 
 
+saveSettings : Model -> Cmd Msg
+saveSettings model =
+    Cmd.map (GotSaveImageSettings model.route.dir) <|
+        Request.postImageSettings (Url.percentEncode model.route.dir) <|
+            fromZipper model.poster model.starred model.filmRoll
+
+
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
     case model.imageProcessingState of
@@ -366,9 +371,9 @@ updateSettings f model =
             }
 
 
-fromZipper : Maybe String -> Maybe (Set String) -> FilmRoll -> FilmRollSettings
+fromZipper : Maybe String -> Set String -> FilmRoll -> FilmRollSettings
 fromZipper poster starred =
-    FilmRollSettings poster (Maybe.withDefault Set.empty starred)
+    FilmRollSettings poster starred
         << Dict.fromList
         << List.map (\x -> ( x.iFilename, x ))
         << Zipper.toList
@@ -516,18 +521,18 @@ viewSettings filmRoll route model =
                         ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (SaveSettings route.dir filmRoll) ] [ text "Save" ]
+            [ button [ onClick SaveSettings ] [ text "Save" ]
             , button [ onClick (OnImageSettingsChange (resetAll settings)) ] [ text "Reset" ]
             , button [ onClick (OnImageSettingsChange (resetTone settings)) ] [ text "Reset tone" ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (GenerateHighres route.dir settings) ] [ text "Generate highres" ]
+            [ button [ onClick GenerateHighres ] [ text "Generate highres" ]
             , viewIf (not (List.isEmpty model.undoState)) <|
                 \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (PreviousImage route.dir filmRoll) ] [ text "⯇" ]
-            , button [ onClick (NextImage route.dir filmRoll) ] [ text "⯈" ]
+            [ button [ onClick PreviousImage ] [ text "⯇" ]
+            , button [ onClick NextImage ] [ text "⯈" ]
             ]
         ]
 
