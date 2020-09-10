@@ -54,6 +54,8 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ serverMessage OnServerMessage
+        , Sub.map ScrollToMsg <|
+            ScrollTo.subscriptions model.scrollTo
         , case model.page of
             Browser m ->
                 Sub.map BrowserMsg <|
@@ -215,29 +217,48 @@ onNavigation maybeRoute model =
                 |> Maybe.andThen toSortedZipper
                 |> Maybe.map2 Tuple.pair maybeRoute
     in
-    case model.filmRolls of
-        Requested ->
-            ( model, Cmd.none )
+    checkScrollPosition model.page <|
+        case model.filmRolls of
+            Requested ->
+                ( model, Cmd.none )
 
-        Error _ ->
-            ( model, Cmd.none )
+            Error _ ->
+                pushNotification RemoveNotification "Error loading filmrolls" model
 
-        Unknown ->
-            ( { model | filmRolls = Requested }
-            , Cmd.map (GotFilmRolls maybeRoute) Request.getImageSettings
-            )
+            Unknown ->
+                ( { model | filmRolls = Requested }
+                , Cmd.map (GotFilmRolls maybeRoute) Request.getImageSettings
+                )
 
-        Success filmRolls ->
-            case toFilmRoll filmRolls of
-                Nothing ->
-                    ( { model | page = Browser (Page.Browser.init filmRolls) }
-                    , Cmd.none
-                    )
+            Success filmRolls ->
+                case toFilmRoll filmRolls of
+                    Nothing ->
+                        ( { model | page = Browser (Page.Browser.init filmRolls) }
+                        , Cmd.none
+                        )
 
-                Just ( route, ( filmRoll, starred, poster ) ) ->
-                    ( { model | page = Editor (Page.Editor.init route filmRoll starred poster) }
-                    , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                    )
+                    Just ( route, ( filmRoll, starred, poster ) ) ->
+                        ( { model | page = Editor (Page.Editor.init route filmRoll starred poster) }
+                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                        )
+
+
+
+-- SCROLLTO
+
+
+checkScrollPosition : Page -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+checkScrollPosition previousPage ( model, cmd ) =
+    case ( previousPage, model.page ) of
+        ( Editor m1, Editor m2 ) ->
+            if m1.route /= m2.route then
+                ( model, Cmd.batch [ cmd, Cmd.map ScrollToMsg ScrollTo.scrollToTop ] )
+
+            else
+                ( model, cmd )
+
+        _ ->
+            ( model, Cmd.batch [ cmd, Cmd.map ScrollToMsg ScrollTo.scrollToTop ] )
 
 
 
@@ -265,7 +286,7 @@ view model =
             }
 
         Editor m ->
-            { title = "Editor"
+            { title = m.route.filename ++ " | " ++ m.route.dir ++ " | Editor"
             , body =
                 [ Html.map EditorMsg <|
                     Page.Editor.view m model.notifications

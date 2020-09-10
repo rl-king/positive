@@ -31,7 +31,7 @@ pushNotification : msg -> String -> { a | notifications : List String } -> ( { a
 pushNotification clearMsg notification model =
     ( { model | notifications = notification :: model.notifications }
     , Task.perform (\_ -> clearMsg) <|
-        Process.sleep 10000
+        Process.sleep 5000
     )
 
 

@@ -118,7 +118,9 @@ init route filmRoll starred poster =
     { imageProcessingState = Ready
     , starred = starred
     , poster = poster
-    , filmRoll = filmRoll
+    , filmRoll =
+        Maybe.withDefault filmRoll <|
+            Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
     , saveKey = Key 0
     , imageCropMode = Nothing
     , clipboard = Nothing

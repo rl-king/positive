@@ -473,7 +473,7 @@ img {
     border-radius: 2px;
     font-size: .875rem;
     background-color: #333;
-    animation: slideup .35s, fadeout .5s 9.5s forwards;
+    animation: slideup .35s;
 }
 
 .loading-spinner {
