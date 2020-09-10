@@ -15,6 +15,7 @@ import Generated.Data.ImageSettings
         , ImageCrop
         , ImageSettings
         )
+import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -37,7 +38,7 @@ subscriptions model =
         Maybe.map2
             (\filmRoll ( dir, offset ) ->
                 Browser.Events.onKeyDown <|
-                    matchKey "p" (SetPoster dir { filmRoll | settings = focusWithOffset offset filmRoll.settings })
+                    matchKey "p" (SetPoster dir (focusWithOffset offset filmRoll.frsSettings))
             )
             (Maybe.andThen (\( k, _ ) -> Dict.get k model.filmRolls) model.filmRollHover)
             model.filmRollHover
@@ -54,48 +55,12 @@ type alias Model =
 
 
 type alias FilmRolls =
-    Dict String FilmRoll
+    Dict String FilmRollSettings
 
 
-type alias FilmRoll =
-    { settings : Zipper ImageSettings
-    , poster : Maybe String
-    , starred : Starred
-    }
-
-
-type alias Starred =
-    Set String
-
-
-type alias Route =
-    { dir : String
-    , filename : String
-    }
-
-
-init : Dict String FilmRollSettings -> Model
+init : FilmRolls -> Model
 init filmRolls =
-    let
-        toSortedZipper ( k, filmRoll ) =
-            Zipper.fromList (List.sortBy .iFilename (Dict.values filmRoll.frsSettings))
-                |> Maybe.map
-                    (\x ->
-                        ( k
-                        , { settings =
-                                Maybe.withDefault x <|
-                                    Maybe.andThen (\poster -> Zipper.findFirst ((==) poster << .iFilename) x)
-                                        filmRoll.frsPoster
-                          , poster = filmRoll.frsPoster
-                          , starred = filmRoll.frsStarred
-                          }
-                        )
-                    )
-    in
-    { filmRolls =
-        Dict.fromList <|
-            List.filterMap toSortedZipper <|
-                Dict.toList filmRolls
+    { filmRolls = filmRolls
     , filmRollHover = Nothing
     }
 
@@ -108,7 +73,8 @@ type Msg
     = OnFilmRollHoverStart String Float
     | OnFilmRollHoverMove Float
     | OnFilmRollHoverEnd
-    | SetPoster String FilmRoll
+    | SetPoster String (Maybe String)
+    | GotSaveImageSettings String (HttpResult FilmRollSettings)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -125,13 +91,23 @@ update msg model =
         OnFilmRollHoverEnd ->
             ( { model | filmRollHover = Nothing }, Cmd.none )
 
-        SetPoster dir filmRoll ->
-            ( model
-            , Cmd.none
-              -- , Cmd.map (GotSaveImageSettings dir) <|
-              --     Request.postImageSettings (Url.percentEncode dir) <|
-              --         fromZipper (Just (.iFilename (Zipper.current filmRoll))) (Dict.get dir model.starred) filmRoll
-            )
+        GotSaveImageSettings dir (Ok settings) ->
+            ( { model | filmRolls = Dict.insert dir settings model.filmRolls }, Cmd.none )
+
+        GotSaveImageSettings _ (Err _) ->
+            ( model, Cmd.none )
+
+        SetPoster dir poster ->
+            case Dict.get dir model.filmRolls of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just filmRoll ->
+                    ( model
+                    , Cmd.map (GotSaveImageSettings dir) <|
+                        Request.postImageSettings (Url.percentEncode dir) <|
+                            { filmRoll | frsPoster = poster }
+                    )
 
 
 
@@ -170,7 +146,7 @@ viewFilmRollBrowser filmRollHover filmRolls =
         ]
 
 
-viewFilmRollBrowserRoll : Maybe ( String, Float ) -> ( String, FilmRoll ) -> Html Msg
+viewFilmRollBrowserRoll : Maybe ( String, Float ) -> ( String, FilmRollSettings ) -> Html Msg
 viewFilmRollBrowserRoll filmRollHover ( dir, filmRoll ) =
     let
         name =
@@ -187,23 +163,27 @@ viewFilmRollBrowserRoll filmRollHover ( dir, filmRoll ) =
             else
                 name
 
-        setFocus xs =
+        poster =
             case Maybe.map (Tuple.mapFirst ((==) dir)) filmRollHover of
                 Just ( True, offset ) ->
-                    focusWithOffset offset xs
+                    focusWithOffset offset filmRoll.frsSettings
 
                 _ ->
-                    xs
+                    Maybe.map .iFilename <|
+                        choice
+                            [ Maybe.andThen (\filename -> Dict.get filename filmRoll.frsSettings) filmRoll.frsPoster
+                            , List.head (Dict.values filmRoll.frsSettings)
+                            ]
     in
     div [ class "browser-filmroll", title dir ]
-        [ viewFilmRollBrowserImage dir <|
-            Zipper.current (setFocus filmRoll.settings)
+        [ viewMaybe poster <|
+            viewFilmRollBrowserImage dir
         , h2 [] [ text shortTitle ]
         ]
 
 
-viewFilmRollBrowserImage : String -> ImageSettings -> Html Msg
-viewFilmRollBrowserImage dir settings =
+viewFilmRollBrowserImage : String -> String -> Html Msg
+viewFilmRollBrowserImage dir filename =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
@@ -220,13 +200,13 @@ viewFilmRollBrowserImage dir settings =
             decodeOffset OnFilmRollHoverMove
         , on "mouseleave" <|
             Decode.succeed OnFilmRollHoverEnd
-        , href (toUrl { dir = dir, filename = settings.iFilename })
+        , href (toUrl { dir = dir, filename = filename })
         ]
         [ span
             [ style "background-image" <|
                 interpolate "url(\"{0}\")" <|
                     [ Url.Builder.absolute
-                        [ dir, "previews", previewExtension settings.iFilename ]
+                        [ dir, "previews", previewExtension filename ]
                         []
                     ]
             ]
@@ -238,13 +218,8 @@ viewFilmRollBrowserImage dir settings =
 -- HELPERS
 
 
-focusWithOffset : Float -> Zipper ImageSettings -> Zipper ImageSettings
+focusWithOffset : Float -> Dict String ImageSettings -> Maybe String
 focusWithOffset offset xs =
-    let
-        ys =
-            Zipper.toList xs
-    in
-    List.drop (round (toFloat (List.length ys) * offset)) ys
+    List.drop (floor (toFloat (Dict.size xs) * offset)) (Dict.values xs)
         |> List.head
-        |> Maybe.andThen (\x -> Zipper.findFirst ((==) x) xs)
-        |> Maybe.withDefault xs
+        |> Maybe.map .iFilename

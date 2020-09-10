@@ -1,6 +1,7 @@
 module Util exposing
     ( HttpResult
     , Route
+    , choice
     , matchKey
     , pushNotification
     , toUrl
@@ -41,6 +42,11 @@ toUrl route =
         [ Url.Builder.string "filename" route.filename
         , Url.Builder.string "dir" route.dir
         ]
+
+
+choice : List (Maybe a) -> Maybe a
+choice =
+    List.head << List.filterMap identity
 
 
 viewIf : Bool -> (() -> Html msg) -> Html msg
