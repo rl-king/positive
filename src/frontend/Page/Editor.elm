@@ -22,7 +22,6 @@ import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed
-import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
@@ -44,6 +43,9 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
     let
         current =
             Zipper.current filmRoll
+
+        maybe f =
+            Maybe.withDefault Sub.none << Maybe.map (Browser.Events.onKeyDown << f)
     in
     Sub.batch
         [ Browser.Events.onKeyDown <|
@@ -56,31 +58,27 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
                 , matchKey "8" (SetPreviewScale 8)
                 , matchKey "9" (SetPreviewScale 9)
                 ]
-        , Maybe.withDefault Sub.none <|
-            Maybe.map
-                (\clipboard_ ->
-                    Browser.Events.onKeyDown <|
-                        withCtrl <|
-                            Decode.map OnImageSettingsChange <|
-                                Decode.oneOf
-                                    [ matchKey "a" { clipboard_ | iFilename = current.iFilename }
-                                    , matchKey "c" { current | iCrop = clipboard_.iCrop }
-                                    , matchKey "t"
-                                        { clipboard_
-                                            | iFilename = current.iFilename
-                                            , iRotate = current.iRotate
-                                            , iCrop = current.iCrop
-                                        }
-                                    ]
-                )
-                clipboard
-        , Maybe.withDefault Sub.none <|
-            Maybe.map
-                (always <|
-                    Browser.Events.onKeyDown <|
-                        matchKey "Escape" (UpdateImageCropMode Nothing)
-                )
-                imageCropMode
+        , maybe
+            (\clipboard_ ->
+                withCtrl <|
+                    Decode.map OnImageSettingsChange <|
+                        Decode.oneOf
+                            [ matchKey "a" { clipboard_ | iFilename = current.iFilename }
+                            , matchKey "c" { current | iCrop = clipboard_.iCrop }
+                            , matchKey "t"
+                                { clipboard_
+                                    | iFilename = current.iFilename
+                                    , iRotate = current.iRotate
+                                    , iCrop = current.iCrop
+                                }
+                            ]
+            )
+            clipboard
+        , maybe
+            (always <|
+                matchKey "Escape" (UpdateImageCropMode Nothing)
+            )
+            imageCropMode
         ]
 
 
@@ -99,6 +97,7 @@ type alias Model =
     , scale : Float
     , previewColumns : Int
     , route : Route
+    , notifications : List String
     }
 
 
@@ -124,15 +123,12 @@ init route filmRoll =
     , scale = 1
     , previewColumns = 5
     , route = route
+    , notifications = []
     }
 
 
 
 -- UPDATE
-
-
-type alias HttpResult a =
-    Result ( Http.Error, Maybe { metadata : Http.Metadata, body : String } ) a
 
 
 type Msg
@@ -156,6 +152,7 @@ type Msg
     | AttemptSave String (Key { saveKey : () }) FilmRoll
     | ToggleStar String String FilmRoll
     | Rotate
+    | RemoveNotification
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -165,20 +162,16 @@ update key msg model =
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
 
         GotSaveImageSettings dir (Ok _) ->
-            -- pushNotification "Saved settings" model
-            ( model, Cmd.none )
+            pushNotification RemoveNotification "Saved settings" model
 
         GotSaveImageSettings _ (Err _) ->
-            -- pushNotification "Error saving settings" model
-            ( model, Cmd.none )
+            pushNotification RemoveNotification "Error saving settings" model
 
         GotGenerateHighres (Ok _) ->
-            -- pushNotification "Generated highres" model
-            ( model, Cmd.none )
+            pushNotification RemoveNotification "Generated highres" model
 
         GotGenerateHighres (Err _) ->
-            -- pushNotification "Error generating highres" model
-            ( model, Cmd.none )
+            pushNotification RemoveNotification "Error generating highres" model
 
         Rotate ->
             ( updateSettings
@@ -254,7 +247,7 @@ update key msg model =
             )
 
         GenerateHighres dir settings ->
-            -- pushNotification "Generating highres version" model
+            -- pushNotification RemoveNotification "Generating highres version" model
             --     |> Tuple.mapSecond
             --         (\cmds ->
             --             Cmd.batch
@@ -337,6 +330,9 @@ update key msg model =
             , Cmd.none
             )
 
+        RemoveNotification ->
+            ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
+
 
 type Key a
     = Key Int
@@ -382,14 +378,15 @@ fromZipper poster starred =
 -- VIEW
 
 
-view : Model -> Html Msg
-view model =
+view : Model -> List String -> Html Msg
+view model otherNotifications =
     main_ []
         [ viewNav model.route
         , viewLoading model.imageProcessingState
         , viewImage model.filmRoll model.route model
         , viewSettings model.filmRoll model.route model
         , viewCurrentFilmRoll model.route model.previewColumns model.filmRoll
+        , viewNotification (model.notifications ++ otherNotifications)
         ]
 
 
@@ -532,14 +529,6 @@ viewSettings filmRoll route model =
             [ button [ onClick (PreviousImage route.dir filmRoll) ] [ text "⯇" ]
             , button [ onClick (NextImage route.dir filmRoll) ] [ text "⯈" ]
             ]
-
-        -- , pre [ class "info" ]
-        --     [ text <|
-        --         interpolate "{0} | {1}"
-        --             [ settings.iFilename
-        --             , route.dir
-        --             ]
-        -- ]
         ]
 
 
@@ -765,29 +754,3 @@ toImageUrlParams =
 fractionalModBy : Float -> Float -> Float
 fractionalModBy m v =
     v - m * Basics.toFloat (Basics.floor (v / m))
-
-
-matchKey : String -> msg -> Decode.Decoder msg
-matchKey key msg =
-    Decode.field "key" Decode.string
-        |> Decode.andThen
-            (\s ->
-                if key == s then
-                    Decode.succeed msg
-
-                else
-                    Decode.fail "Not an match"
-            )
-
-
-withCtrl : Decode.Decoder a -> Decode.Decoder a
-withCtrl decoder =
-    Decode.field "ctrlKey" Decode.bool
-        |> Decode.andThen
-            (\ctrlPressed ->
-                if ctrlPressed then
-                    decoder
-
-                else
-                    Decode.fail "No ctrl pressed"
-            )

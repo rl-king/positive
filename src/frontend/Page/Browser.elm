@@ -24,7 +24,7 @@ import Set exposing (Set)
 import String.Interpolate exposing (interpolate)
 import Url exposing (Url)
 import Url.Builder
-import Util exposing (toUrl)
+import Util exposing (..)
 
 
 
@@ -248,34 +248,3 @@ focusWithOffset offset xs =
         |> List.head
         |> Maybe.andThen (\x -> Zipper.findFirst ((==) x) xs)
         |> Maybe.withDefault xs
-
-
-fractionalModBy : Float -> Float -> Float
-fractionalModBy m v =
-    v - m * Basics.toFloat (Basics.floor (v / m))
-
-
-matchKey : String -> msg -> Decode.Decoder msg
-matchKey key msg =
-    Decode.field "key" Decode.string
-        |> Decode.andThen
-            (\s ->
-                if key == s then
-                    Decode.succeed msg
-
-                else
-                    Decode.fail "Not an match"
-            )
-
-
-withCtrl : Decode.Decoder a -> Decode.Decoder a
-withCtrl decoder =
-    Decode.field "ctrlKey" Decode.bool
-        |> Decode.andThen
-            (\ctrlPressed ->
-                if ctrlPressed then
-                    decoder
-
-                else
-                    Decode.fail "No ctrl pressed"
-            )

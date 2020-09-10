@@ -52,17 +52,20 @@ main =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.page of
-        Browser m ->
-            Sub.map BrowserMsg <|
-                Page.Browser.subscriptions m
+    Sub.batch
+        [ serverMessage OnServerMessage
+        , case model.page of
+            Browser m ->
+                Sub.map BrowserMsg <|
+                    Page.Browser.subscriptions m
 
-        Editor m ->
-            Sub.map EditorMsg <|
-                Page.Editor.subscriptions m
+            Editor m ->
+                Sub.map EditorMsg <|
+                    Page.Editor.subscriptions m
 
-        Loading ->
-            Sub.none
+            Loading ->
+                Sub.none
+        ]
 
 
 
@@ -123,10 +126,6 @@ fromUrl url =
 -- UPDATE
 
 
-type alias HttpResult a =
-    Result ( Http.Error, Maybe { metadata : Http.Metadata, body : String } ) a
-
-
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url
@@ -170,13 +169,13 @@ update msg model =
                 { model | filmRolls = Success (Dict.fromList filmRolls) }
 
         GotFilmRolls _ (Err _) ->
-            pushNotification "Error gettings filmroll settings" model
+            pushNotification RemoveNotification "Error gettings filmroll settings" model
 
         RemoveNotification ->
             ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
 
         OnServerMessage message ->
-            pushNotification message model
+            pushNotification RemoveNotification message model
 
         BrowserMsg msg_ ->
             case model.page of
@@ -240,14 +239,6 @@ onNavigation maybeRoute model =
                     )
 
 
-pushNotification : String -> Model -> ( Model, Cmd Msg )
-pushNotification msg model =
-    ( { model | notifications = msg :: model.notifications }
-    , Task.perform (\_ -> RemoveNotification) <|
-        Process.sleep 10000
-    )
-
-
 
 -- VIEW
 
@@ -276,9 +267,8 @@ view model =
             { title = "Editor"
             , body =
                 [ Html.map EditorMsg <|
-                    Page.Editor.view m
+                    Page.Editor.view m model.notifications
                 , viewCancelScroll model.scrollTo
-                , viewNotification model.notifications
                 ]
             }
 
