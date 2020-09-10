@@ -35,7 +35,7 @@ import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
 import System.Directory
-import System.FilePath.Posix ((</>))
+import System.FilePath.Posix ((</>), isPathSeparator)
 
 -- POSITIVE
 
@@ -85,7 +85,8 @@ handlers isDev chan =
             { saSaveSettings = handleSaveSettings,
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
-              saGenerateHighRes = handleGenerateHighRes
+              saGenerateHighRes = handleGenerateHighRes,
+              saGenerateWallpaper = handleGenerateWallpaper
             }
     }
 
@@ -142,6 +143,24 @@ handleGenerateHighRes dir settings = do
     Right image -> do
       liftIO . HIP.writeImage output $ processImage settings image
       log $ "Wrote highres version of: " <> Text.pack input
+      pure NoContent
+
+handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
+handleGenerateWallpaper dir settings = do
+  let input = Text.unpack dir </> Text.unpack (iFilename settings)
+      output =
+        "/Users/king/Documents/wallpapers/positive"
+          </> filter (not . isPathSeparator) (Text.unpack dir)
+          <> " | "
+          <> Text.unpack (iFilename settings)
+  log $ "Generating wallpaper version of: " <> Text.pack input
+  maybeImage <- liftIO $ readImageFromDisk input
+  case maybeImage of
+    Left _ ->
+      log "Image read error" >> throwError err404
+    Right image -> do
+      liftIO . HIP.writeImage output . resizeImage 2560 $ processImage settings image
+      log $ "Wrote wallpaper version of: " <> Text.pack input
       pure NoContent
 
 -- HISTOGRAM

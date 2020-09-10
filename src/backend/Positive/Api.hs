@@ -47,6 +47,11 @@ data SettingsApi route = SettingsApi
       route :- "image" :> "settings" :> "highres"
         :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] ImageSettings
+        :> PostNoContent '[JSON] NoContent,
+    saGenerateWallpaper ::
+      route :- "image" :> "settings" :> "wallpaper"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)

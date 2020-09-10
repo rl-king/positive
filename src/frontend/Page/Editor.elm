@@ -115,7 +115,7 @@ type ImageProcessingState
 
 init : Route -> FilmRoll -> Set String -> Maybe String -> Model
 init route filmRoll starred poster =
-    { imageProcessingState = Ready
+    { imageProcessingState = Processing
     , starred = starred
     , poster = poster
     , filmRoll =
@@ -139,13 +139,14 @@ init route filmRoll starred poster =
 
 type Msg
     = GotSaveImageSettings String (HttpResult FilmRollSettings)
-    | GotGenerateHighres (HttpResult ())
+    | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (List Int))
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
     | OnImageLoad String ImageSettings
     | SaveSettings
     | GenerateHighres
+    | GenerateWallpaper
     | CopySettings ImageSettings
     | ApplyCopyToAll FilmRoll
     | UpdateImageCropMode (Maybe ImageCrop)
@@ -173,11 +174,11 @@ update key msg model =
         GotSaveImageSettings _ (Err _) ->
             pushNotification RemoveNotification "Error saving settings" model
 
-        GotGenerateHighres (Ok _) ->
-            pushNotification RemoveNotification "Generated highres" model
+        GotGenerate type_ (Ok _) ->
+            pushNotification RemoveNotification ("Generated " ++ type_) model
 
-        GotGenerateHighres (Err _) ->
-            pushNotification RemoveNotification "Error generating highres" model
+        GotGenerate type_ (Err _) ->
+            pushNotification RemoveNotification ("Error generating " ++ type_) model
 
         Rotate ->
             ( updateSettings
@@ -254,8 +255,23 @@ update key msg model =
                 |> Tuple.mapSecond
                     (\cmds ->
                         Cmd.batch
-                            [ Cmd.map GotGenerateHighres
-                                (Request.postImageSettingsHighres (Url.percentEncode model.route.dir) (Zipper.current model.filmRoll))
+                            [ Cmd.map (GotGenerate "highres") <|
+                                Request.postImageSettingsHighres
+                                    (Url.percentEncode model.route.dir)
+                                    (Zipper.current model.filmRoll)
+                            , cmds
+                            ]
+                    )
+
+        GenerateWallpaper ->
+            pushNotification RemoveNotification "Generating wallpaper version" model
+                |> Tuple.mapSecond
+                    (\cmds ->
+                        Cmd.batch
+                            [ Cmd.map (GotGenerate "wallpaper") <|
+                                Request.postImageSettingsWallpaper
+                                    (Url.percentEncode model.route.dir)
+                                    (Zipper.current model.filmRoll)
                             , cmds
                             ]
                     )
@@ -529,6 +545,7 @@ viewSettings filmRoll route model =
             ]
         , viewSettingsGroup
             [ button [ onClick GenerateHighres ] [ text "Generate highres" ]
+            , button [ onClick GenerateWallpaper ] [ text "Generate wallpaper" ]
             , viewIf (not (List.isEmpty model.undoState)) <|
                 \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]
