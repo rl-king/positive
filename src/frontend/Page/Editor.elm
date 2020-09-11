@@ -100,7 +100,7 @@ type alias Model =
     , scale : Float
     , previewColumns : Int
     , route : Route
-    , notifications : List String
+    , notifications : List ( Level, String )
     }
 
 
@@ -182,16 +182,16 @@ update key msg model =
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
 
         GotSaveImageSettings dir (Ok _) ->
-            pushNotification RemoveNotification "Saved settings" model
+            pushNotification Normal RemoveNotification "Saved settings" model
 
         GotSaveImageSettings _ (Err _) ->
-            pushNotification RemoveNotification "Error saving settings" model
+            pushNotification Warning RemoveNotification "Error saving settings" model
 
         GotGenerate type_ (Ok _) ->
-            pushNotification RemoveNotification ("Generated " ++ type_) model
+            pushNotification Normal RemoveNotification ("Generated " ++ type_) model
 
         GotGenerate type_ (Err _) ->
-            pushNotification RemoveNotification ("Error generating " ++ type_) model
+            pushNotification Warning RemoveNotification ("Error generating " ++ type_) model
 
         Rotate ->
             ( updateSettings
@@ -264,7 +264,7 @@ update key msg model =
             )
 
         GenerateHighres ->
-            pushNotification RemoveNotification "Generating highres version" model
+            pushNotification Normal RemoveNotification "Generating highres version" model
                 |> Tuple.mapSecond
                     (\cmds ->
                         Cmd.batch
@@ -277,7 +277,7 @@ update key msg model =
                     )
 
         GenerateWallpaper ->
-            pushNotification RemoveNotification "Generating wallpaper version" model
+            pushNotification Normal RemoveNotification "Generating wallpaper version" model
                 |> Tuple.mapSecond
                     (\cmds ->
                         Cmd.batch
@@ -414,7 +414,7 @@ fromZipper poster starred =
 -- VIEW
 
 
-view : Model -> List String -> Html Msg
+view : Model -> List ( Level, String ) -> Html Msg
 view model otherNotifications =
     main_ []
         [ viewNav model.route
@@ -422,7 +422,7 @@ view model otherNotifications =
         , viewImage model.filmRoll model.route model
         , viewSettings model.filmRoll model.route model
         , viewCurrentFilmRoll model.route model.previewColumns model.filmRoll
-        , viewNotification (model.notifications ++ otherNotifications)
+        , viewNotifications (model.notifications ++ otherNotifications)
         ]
 
 
@@ -706,12 +706,6 @@ viewHistogramBar index v =
 
 
 -- NOTIFICATONS
-
-
-viewNotification : List String -> Html msg
-viewNotification notifications =
-    div [ class "notifications" ] <|
-        List.map (\x -> span [] [ text x ]) (List.reverse notifications)
 
 
 viewLoading : ImageProcessingState -> Html msg

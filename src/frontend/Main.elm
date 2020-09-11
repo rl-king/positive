@@ -79,7 +79,7 @@ type alias Model =
     , page : Page
     , key : Navigation.Key
     , scrollTo : ScrollTo.State
-    , notifications : List String
+    , notifications : List ( Level, String )
     }
 
 
@@ -171,13 +171,13 @@ update msg model =
                 { model | filmRolls = Success (Dict.fromList filmRolls) }
 
         GotFilmRolls _ (Err _) ->
-            pushNotification RemoveNotification "Error gettings filmroll settings" model
+            pushNotification Warning RemoveNotification "Error gettings filmroll settings" model
 
         RemoveNotification ->
             ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
 
         OnServerMessage message ->
-            pushNotification RemoveNotification message model
+            pushNotification Server RemoveNotification message model
 
         BrowserMsg msg_ ->
             case model.page of
@@ -223,7 +223,7 @@ onNavigation maybeRoute model =
                 ( model, Cmd.none )
 
             Error _ ->
-                pushNotification RemoveNotification "Error loading filmrolls" model
+                pushNotification Warning RemoveNotification "Error loading filmrolls" model
 
             Unknown ->
                 ( { model | filmRolls = Requested }
@@ -312,7 +312,7 @@ view model =
         Loading ->
             { title = "Loading"
             , body =
-                [ viewNotification model.notifications
+                [ viewNotifications model.notifications
                 ]
             }
 
@@ -322,7 +322,7 @@ view model =
                 [ Html.map BrowserMsg <|
                     Page.Browser.view m
                 , viewCancelScroll model.scrollTo
-                , viewNotification model.notifications
+                , viewNotifications model.notifications
                 ]
             }
 
@@ -350,13 +350,3 @@ viewCancelScroll scrollTo =
                 , class "scroll-cancel-overlay"
                 ]
                 []
-
-
-
--- NOTIFICATONS
-
-
-viewNotification : List String -> Html msg
-viewNotification notifications =
-    div [ class "notifications" ] <|
-        List.map (\x -> span [] [ text x ]) (List.reverse notifications)

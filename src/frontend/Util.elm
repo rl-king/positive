@@ -1,5 +1,6 @@
 module Util exposing
     ( HttpResult
+    , Level(..)
     , Route
     , choice
     , matchKey
@@ -7,10 +8,12 @@ module Util exposing
     , toUrl
     , viewIf
     , viewMaybe
+    , viewNotifications
     , withCtrl
     )
 
 import Html exposing (..)
+import Html.Attributes exposing (..)
 import Http
 import Json.Decode as Decode
 import Process
@@ -28,12 +31,41 @@ type alias HttpResult a =
     Result ( Http.Error, Maybe { metadata : Http.Metadata, body : String } ) a
 
 
-pushNotification : msg -> String -> { a | notifications : List String } -> ( { a | notifications : List String }, Cmd msg )
-pushNotification clearMsg notification model =
-    ( { model | notifications = notification :: model.notifications }
+type Level
+    = Normal
+    | Warning
+    | Server
+
+
+pushNotification :
+    Level
+    -> msg
+    -> String
+    -> { a | notifications : List ( Level, String ) }
+    -> ( { a | notifications : List ( Level, String ) }, Cmd msg )
+pushNotification level clearMsg notification model =
+    ( { model | notifications = ( level, notification ) :: model.notifications }
     , Task.perform (\_ -> clearMsg) <|
-        Process.sleep 5000
+        Process.sleep 3500
     )
+
+
+viewNotifications : List ( Level, String ) -> Html msg
+viewNotifications notifications =
+    let
+        levelToClass level =
+            case level of
+                Warning ->
+                    "warning"
+
+                Server ->
+                    "server"
+
+                Normal ->
+                    "normal"
+    in
+    div [ class "notifications" ] <|
+        List.map (\( l, x ) -> span [ class (levelToClass l) ] [ text x ]) (List.reverse notifications)
 
 
 toUrl : Route -> String
