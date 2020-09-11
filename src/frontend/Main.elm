@@ -218,7 +218,7 @@ onNavigation maybeRoute model =
                 |> Maybe.map2 Tuple.pair maybeRoute
     in
     checkScrollPosition model.page <|
-        case model.filmRolls of
+        case .filmRolls (extractUpdates model) of
             Requested ->
                 ( model, Cmd.none )
 
@@ -238,9 +238,50 @@ onNavigation maybeRoute model =
                         )
 
                     Just ( route, ( filmRoll, starred, poster ) ) ->
-                        ( { model | page = Editor (Page.Editor.init route filmRoll starred poster) }
-                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                        case model.page of
+                            Editor m ->
+                                ( { model | page = Editor (Page.Editor.continue route filmRoll starred poster m) }
+                                , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                                )
+
+                            _ ->
+                                ( { model | page = Editor (Page.Editor.init route filmRoll starred poster) }
+                                , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                                )
+
+
+extractUpdates : Model -> Model
+extractUpdates model =
+    let
+        mapStatus f status =
+            case status of
+                Success x ->
+                    Success (f x)
+
+                x ->
+                    x
+
+        fromZipper xs =
+            Dict.fromList <|
+                List.map (\x -> ( x.iFilename, x )) <|
+                    Zipper.toList xs
+    in
+    case model.page of
+        Loading ->
+            model
+
+        Browser m ->
+            { model | filmRolls = mapStatus (always m.filmRolls) model.filmRolls }
+
+        Editor m ->
+            { model
+                | filmRolls =
+                    mapStatus
+                        (Dict.insert m.route.dir
+                            (FilmRollSettings m.poster m.starred (fromZipper m.filmRoll))
                         )
+                        model.filmRolls
+            }
 
 
 

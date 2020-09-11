@@ -1,6 +1,7 @@
 module Page.Editor exposing
     ( Model
     , Msg
+    , continue
     , init
     , subscriptions
     , update
@@ -130,6 +131,18 @@ init route filmRoll starred poster =
     , previewColumns = 5
     , route = route
     , notifications = []
+    }
+
+
+continue : Route -> FilmRoll -> Set String -> Maybe String -> Model -> Model
+continue route filmRoll starred poster model =
+    { model
+        | imageProcessingState = Processing
+        , starred = starred
+        , poster = poster
+        , filmRoll =
+            Maybe.withDefault filmRoll <|
+                Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
     }
 
 
