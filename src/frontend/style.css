@@ -171,7 +171,11 @@ nav {
 
 .files {
     width: 100%;
-    padding-bottom: 2rem;
+    padding-bottom: 50vh;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-end;
 }
 
 .files img {
@@ -250,9 +254,8 @@ nav {
 }
 
 .files .range-slider {
-    width: 20rem;
+    width: 15rem;
     margin-right: 2rem;
-    margin-left: auto;
 }
 
 li {

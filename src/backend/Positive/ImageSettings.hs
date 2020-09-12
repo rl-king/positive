@@ -43,7 +43,7 @@ instance MimeRender Image ByteString where
 
 data FilmRollSettings = FilmRollSettings
   { frsPoster :: Maybe Text,
-    frsStars :: HashMap Text Int,
+    frsRatings :: HashMap Text Int,
     frsSettings :: HashMap Text ImageSettings
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq)
@@ -52,21 +52,21 @@ instance Aeson.FromJSON FilmRollSettings where
   parseJSON =
     Aeson.withObject "FilmRollSettings" $ \o -> do
       poster <- o .:? "frsPoster"
-      stars <- o .:? "frsStars" .!= mempty
+      ratings <- o .:? "frsRatings" .!= mempty
       settings <- o .: "unFilmRollSettings" <|> o .: "frsSettings"
       pure $
         FilmRollSettings
           { frsPoster = poster,
-            frsStars = stars,
+            frsRatings = ratings,
             frsSettings = settings
           }
 
 instance Aeson.ToJSON FilmRollSettings where
-  toJSON FilmRollSettings {frsPoster, frsStars, frsSettings} =
+  toJSON FilmRollSettings {frsPoster, frsRatings, frsSettings} =
     Aeson.object
       [ "frsPoster" .= frsPoster,
         "frsSettings" .= frsSettings,
-        "frsStars" .= frsStars
+        "frsRatings" .= frsRatings
       ]
 
 empty :: FilmRollSettings
@@ -82,8 +82,8 @@ init imageSettings =
   FilmRollSettings Nothing mempty (HashMap.insert (iFilename imageSettings) imageSettings mempty)
 
 insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
-insert imageSettings FilmRollSettings {frsPoster, frsStars, frsSettings} =
-  FilmRollSettings frsPoster frsStars (HashMap.insert (iFilename imageSettings) imageSettings frsSettings)
+insert imageSettings FilmRollSettings {frsPoster, frsRatings, frsSettings} =
+  FilmRollSettings frsPoster frsRatings (HashMap.insert (iFilename imageSettings) imageSettings frsSettings)
 
 fromList :: [ImageSettings] -> FilmRollSettings
 fromList settings =

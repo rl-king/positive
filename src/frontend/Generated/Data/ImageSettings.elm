@@ -72,7 +72,7 @@ decodeImageCrop =
 
 type alias FilmRollSettings =
     { frsPoster : Maybe String
-    , frsStars : Dict.Dict String Int
+    , frsRatings : Dict.Dict String Int
     , frsSettings : Dict.Dict String ImageSettings
     }
 
@@ -81,7 +81,7 @@ encodeFilmRollSettings : FilmRollSettings -> Json.Encode.Value
 encodeFilmRollSettings a =
     Json.Encode.object
         [ ( "frsPoster", Maybe.Extra.unwrap Json.Encode.null Json.Encode.string a.frsPoster )
-        , ( "frsStars", Json.Encode.dict identity Json.Encode.int a.frsStars )
+        , ( "frsRatings", Json.Encode.dict identity Json.Encode.int a.frsRatings )
         , ( "frsSettings", Json.Encode.dict identity encodeImageSettings a.frsSettings )
         ]
 
@@ -90,5 +90,5 @@ decodeFilmRollSettings : Json.Decode.Decoder FilmRollSettings
 decodeFilmRollSettings =
     Json.Decode.succeed FilmRollSettings
         |> Json.Decode.Pipeline.required "frsPoster" (Json.Decode.nullable Json.Decode.string)
-        |> Json.Decode.Pipeline.required "frsStars" (Json.Decode.dict Json.Decode.int)
+        |> Json.Decode.Pipeline.required "frsRatings" (Json.Decode.dict Json.Decode.int)
         |> Json.Decode.Pipeline.required "frsSettings" (Json.Decode.dict decodeImageSettings)

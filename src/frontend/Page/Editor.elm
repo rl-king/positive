@@ -91,7 +91,7 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
 
 type alias Model =
     { imageProcessingState : ImageProcessingState
-    , stars : Stars
+    , ratings : Ratings
     , poster : Maybe String
     , filmRoll : FilmRoll
     , saveKey : Key { saveKey : () }
@@ -100,6 +100,7 @@ type alias Model =
     , histogram : List Int
     , undoState : List FilmRoll
     , scale : Float
+    , minimumRating : Int
     , previewColumns : Int
     , route : Route
     , notifications : List ( Level, String )
@@ -110,7 +111,7 @@ type alias FilmRoll =
     Zipper ImageSettings
 
 
-type alias Stars =
+type alias Ratings =
     Dict String Int
 
 
@@ -120,10 +121,10 @@ type ImageProcessingState
     | Queued FilmRoll
 
 
-init : Route -> FilmRoll -> Stars -> Maybe String -> Model
-init route filmRoll stars poster =
+init : Route -> FilmRoll -> Ratings -> Maybe String -> Model
+init route filmRoll ratings poster =
     { imageProcessingState = Processing
-    , stars = stars
+    , ratings = ratings
     , poster = poster
     , filmRoll = focus route filmRoll
     , saveKey = Key 0
@@ -132,17 +133,18 @@ init route filmRoll stars poster =
     , histogram = []
     , undoState = []
     , scale = 1
+    , minimumRating = 0
     , previewColumns = 5
     , route = route
     , notifications = []
     }
 
 
-continue : Route -> FilmRoll -> Stars -> Maybe String -> Model -> Model
-continue route filmRoll stars poster model =
+continue : Route -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
+continue route filmRoll ratings poster model =
     { model
         | imageProcessingState = Processing
-        , stars = stars
+        , ratings = ratings
         , poster = poster
         , filmRoll = focus route filmRoll
     }
@@ -178,7 +180,8 @@ type Msg
     | UpdateScale Float
     | SetColumnCount Int
     | AttemptSave String (Key { saveKey : () }) FilmRoll
-    | Star String Int
+    | Rate String Int
+    | SetMinRating Int
     | Rotate
     | RemoveNotification
 
@@ -353,7 +356,7 @@ update key msg model =
                 , saveSettings model
                 )
 
-        Star filename rating ->
+        Rate filename rating ->
             let
                 check x =
                     case x of
@@ -368,11 +371,14 @@ update key msg model =
                                 Just rating
 
                 newModel =
-                    { model | stars = Dict.update filename check model.stars }
+                    { model | ratings = Dict.update filename check model.ratings }
             in
             ( newModel
             , saveSettings newModel
             )
+
+        SetMinRating rating ->
+            ( { model | minimumRating = rating }, Cmd.none )
 
         RemoveNotification ->
             ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
@@ -391,7 +397,7 @@ saveSettings : Model -> Cmd Msg
 saveSettings model =
     Cmd.map (GotSaveImageSettings model.route.dir) <|
         Request.postImageSettings (Url.percentEncode model.route.dir) <|
-            fromZipper model.poster model.stars model.filmRoll
+            fromZipper model.poster model.ratings model.filmRoll
 
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
@@ -417,9 +423,9 @@ updateSettings f model =
             }
 
 
-fromZipper : Maybe String -> Stars -> FilmRoll -> FilmRollSettings
-fromZipper poster stars =
-    FilmRollSettings poster stars
+fromZipper : Maybe String -> Ratings -> FilmRoll -> FilmRollSettings
+fromZipper poster ratings =
+    FilmRollSettings poster ratings
         << Dict.fromList
         << List.map (\x -> ( x.iFilename, x ))
         << Zipper.toList
@@ -436,7 +442,7 @@ view model otherNotifications =
         , viewLoading model.imageProcessingState
         , viewImage model.filmRoll model.route model
         , viewSettings model.filmRoll model.route model
-        , viewCurrentFilmRoll model.route model.previewColumns model.stars model.filmRoll
+        , viewCurrentFilmRoll model.route model.previewColumns model.minimumRating model.ratings model.filmRoll
         , viewNotifications (model.notifications ++ otherNotifications)
         ]
 
@@ -460,21 +466,24 @@ viewNav route =
 -- FILES
 
 
-viewCurrentFilmRoll : Route -> Int -> Stars -> FilmRoll -> Html Msg
-viewCurrentFilmRoll route columns stars filmRoll =
+viewCurrentFilmRoll : Route -> Int -> Int -> Ratings -> FilmRoll -> Html Msg
+viewCurrentFilmRoll route columns minimumRating ratings filmRoll =
     section [ class "files" ]
         [ viewRangeInput (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
-        , ul [] <|
-            List.concat
-                [ List.map (viewCurrentFilmRollLink False route.dir columns stars) (Zipper.before filmRoll)
-                , [ viewCurrentFilmRollLink True route.dir columns stars (Zipper.current filmRoll) ]
-                , List.map (viewCurrentFilmRollLink False route.dir columns stars) (Zipper.after filmRoll)
-                ]
+        , viewRangeInput (SetMinRating << floor) 1 ( 0, 5, 0 ) "Rating" (toFloat minimumRating) -- FIXME: remove floats
+        , Html.Keyed.ul [] <|
+            List.map (\( _, filename, x ) -> ( filename, x )) <|
+                List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
+                    List.concat
+                        [ List.map (viewCurrentFilmRollLink False route.dir columns ratings) (Zipper.before filmRoll)
+                        , [ viewCurrentFilmRollLink True route.dir columns ratings (Zipper.current filmRoll) ]
+                        , List.map (viewCurrentFilmRollLink False route.dir columns ratings) (Zipper.after filmRoll)
+                        ]
         ]
 
 
-viewCurrentFilmRollLink : Bool -> String -> Int -> Stars -> ImageSettings -> Html Msg
-viewCurrentFilmRollLink isCurrent dir columns stars settings =
+viewCurrentFilmRollLink : Bool -> String -> Int -> Ratings -> ImageSettings -> ( Int, String, Html Msg )
+viewCurrentFilmRollLink isCurrent dir columns ratings settings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
@@ -486,7 +495,9 @@ viewCurrentFilmRollLink isCurrent dir columns stars settings =
         rotate deg =
             fractionalModBy (degrees -360) (settings.iRotate - degrees deg)
     in
-    li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 5 ) ], width ]
+    ( Maybe.withDefault 0 (Dict.get settings.iFilename ratings)
+    , settings.iFilename
+    , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 5 ) ], width ]
         [ a
             [ href <|
                 Util.toUrl { filename = settings.iFilename, dir = dir }
@@ -507,17 +518,18 @@ viewCurrentFilmRollLink isCurrent dir columns stars settings =
         , span [ class "files-file-footer" ]
             [ text settings.iFilename
             , button [ onClick (CopySettings settings) ] [ text "copy" ]
-            , viewStars settings.iFilename stars
+            , viewRating settings.iFilename ratings
             ]
         ]
+    )
 
 
-viewStars : String -> Stars -> Html Msg
-viewStars filename stars =
+viewRating : String -> Ratings -> Html Msg
+viewRating filename ratings =
     let
         rating =
             Maybe.withDefault 0 <|
-                Dict.get filename stars
+                Dict.get filename ratings
 
         gliph n =
             if n <= rating then
@@ -526,9 +538,9 @@ viewStars filename stars =
             else
                 "☆"
     in
-    div [ class "stars" ] <|
+    div [ class "ratings" ] <|
         List.map
-            (\n -> button [ onClick (Star filename n) ] [ text (gliph n) ])
+            (\n -> button [ onClick (Rate filename n) ] [ text (gliph n) ])
             (List.range 1 5)
 
 
