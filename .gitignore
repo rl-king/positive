@@ -4,5 +4,6 @@ dist-newstyle
 elm-stuff
 dist
 assets
+src/frontend/Generated
 positive.cabal
 *~
