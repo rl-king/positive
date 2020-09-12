@@ -15,7 +15,7 @@ run overwrite =
       imageContactSettings = "contacts" </> filename
       check path = if overwrite then pure False else doesFileExist path
    in do
-        filenames <- fmap Text.pack . filter (isExtensionOf ".png") <$> listDirectory "."
+        filenames <- fmap Text.pack . filter (\x -> isExtensionOf ".tif" x || isExtensionOf ".png" x) <$> listDirectory "."
         unless (null filenames) $ do
           let settings = fromFilenames filenames
           unlessM (check imageSettings) $ Aeson.encodeFile imageSettings settings
