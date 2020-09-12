@@ -56,13 +56,15 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
                 , matchKey "r" Rotate
                 , matchKey "h" PreviousImage
                 , matchKey "l" NextImage
-                , matchKey "8" (SetPreviewScale 8)
-                , matchKey "9" (SetPreviewScale 9)
+                , matchKey "6" (UpdateScale 0.6)
+                , matchKey "7" (UpdateScale 0.7)
+                , matchKey "8" (UpdateScale 0.8)
+                , matchKey "9" (UpdateScale 0.9)
                 ]
         , maybe
             (\clipboard_ ->
-                withCtrl <|
-                    Decode.map OnImageSettingsChange <|
+                Decode.map OnImageSettingsChange <|
+                    withCtrl <|
                         Decode.oneOf
                             [ matchKey "a" { clipboard_ | iFilename = current.iFilename }
                             , matchKey "c" { current | iCrop = clipboard_.iCrop }
@@ -123,9 +125,7 @@ init route filmRoll stars poster =
     { imageProcessingState = Processing
     , stars = stars
     , poster = poster
-    , filmRoll =
-        Maybe.withDefault filmRoll <|
-            Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
+    , filmRoll = focus route filmRoll
     , saveKey = Key 0
     , imageCropMode = Nothing
     , clipboard = Nothing
@@ -144,10 +144,14 @@ continue route filmRoll stars poster model =
         | imageProcessingState = Processing
         , stars = stars
         , poster = poster
-        , filmRoll =
-            Maybe.withDefault filmRoll <|
-                Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
+        , filmRoll = focus route filmRoll
     }
+
+
+focus : Route -> FilmRoll -> FilmRoll
+focus route filmRoll =
+    Maybe.withDefault filmRoll <|
+        Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
 
 
 
@@ -172,7 +176,7 @@ type Msg
     | NextImage
     | Undo
     | UpdateScale Float
-    | SetPreviewScale Int
+    | SetColumnCount Int
     | AttemptSave String (Key { saveKey : () }) FilmRoll
     | Star String Int
     | Rotate
@@ -337,7 +341,7 @@ update key msg model =
         UpdateScale val ->
             ( { model | scale = val }, Cmd.none )
 
-        SetPreviewScale scale ->
+        SetColumnCount scale ->
             ( { model | previewColumns = scale }, Cmd.none )
 
         AttemptSave dir saveKey filmRoll ->
@@ -459,7 +463,7 @@ viewNav route =
 viewCurrentFilmRoll : Route -> Int -> Stars -> FilmRoll -> Html Msg
 viewCurrentFilmRoll route columns stars filmRoll =
     section [ class "files" ]
-        [ viewRangeInput (SetPreviewScale << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
+        [ viewRangeInput (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
                 [ List.map (viewCurrentFilmRollLink False route.dir columns stars) (Zipper.before filmRoll)
