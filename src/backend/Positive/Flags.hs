@@ -16,6 +16,7 @@ data Mode
   = Init
   | Previews
   | Contacts
+  | SingleImage FilePath
   | Server
   deriving (Show, Eq)
 
@@ -32,5 +33,6 @@ parser =
     <*> ( flag' Init (long "init" <> short 'i')
             <|> flag' Previews (long "previews" <> short 'p')
             <|> flag' Contacts (long "contacts" <> short 'c')
+            <|> SingleImage <$> strOption (long "single" <> short 's')
             <|> pure Server
         )

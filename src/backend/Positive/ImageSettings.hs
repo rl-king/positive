@@ -94,7 +94,7 @@ fromFilenames xs =
   FilmRollSettings
     Nothing
     mempty
-    (HashMap.fromList $ fmap (\x -> (x, ImageSettings x 0 noCrop 2.2 0 0 0 0 1)) xs)
+    (HashMap.fromList $ fmap (\x -> (x, plainImageSettings x)) xs)
 
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
@@ -106,6 +106,10 @@ difference (FilmRollSettings pa sa a) (FilmRollSettings pb sb b) =
     (pa <|> pb)
     (sa <> sb)
     (HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b)
+
+plainImageSettings :: Text -> ImageSettings
+plainImageSettings x =
+  ImageSettings x 0 noCrop 2.2 0 0 0 0 1
 
 instance Elm.HasElmType FilmRollSettings where
   elmDefinition =

@@ -11,6 +11,7 @@ import qualified Positive.Log as Log
 import Positive.Prelude
 import qualified Positive.Preview as Preview
 import qualified Positive.Server as Server
+import qualified Positive.SingleImage as SingleImage
 import qualified System.Log.FastLogger as FastLogger
 
 -- MAIN
@@ -29,5 +30,7 @@ main = do
           Preview.run log
         Flags.Contacts ->
           Contacts.run log
+        Flags.SingleImage filepath ->
+          SingleImage.run log filepath
         Flags.Server ->
           when fIsDev (CodeGen.run log) >> Server.run logger flags
