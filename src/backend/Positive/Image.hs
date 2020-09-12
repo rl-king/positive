@@ -22,12 +22,10 @@ readImageFromDisk path =
 resizeImage :: Int -> MonochromeImage -> MonochromeImage
 resizeImage targetWidth image =
   let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
-      preSize =
-        if HIP.rows image - targetWidth > 3000
-          then HIP.resizeDW (HIP.Bicubic 0.25) HIP.Edge (HIP.Sz2 (round (int2Double 2500 * mul)) 2500)
-          else id
-   in HIP.resizeDW (HIP.Bicubic (-0.25)) HIP.Edge (HIP.Sz2 (round (int2Double targetWidth * mul)) targetWidth) $
-        preSize image
+      preWidth = HIP.rows image - floor (int2Double targetWidth / 2)
+      resize = HIP.resizeDW (HIP.Bicubic (-0.25)) HIP.Edge
+   in resize (HIP.Sz2 (round (int2Double targetWidth * mul)) targetWidth) $
+        resize (HIP.Sz2 (round (int2Double preWidth * mul)) preWidth) image
 
 processImage :: ImageSettings -> MonochromeImage -> MonochromeImage
 processImage is image =
