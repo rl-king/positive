@@ -18,16 +18,16 @@ import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Massiv.Array as Massiv
-import qualified Data.Massiv.Array.IO as Massiv
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
 import Network.Wai.Handler.Warp hiding (run)
 import Positive.Api
-import Positive.Flags
-import Positive.Image
-import Positive.ImageSettings
+import Positive.Flags (Flags (..))
+import qualified Positive.Image as Image
+import Positive.ImageSettings (FilmRollSettings, ImageSettings (..))
+import qualified Positive.ImageSettings as ImageSettings
 import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
 import qualified Positive.Preview as Preview
@@ -35,7 +35,7 @@ import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
 import System.Directory
-import System.FilePath.Posix ((</>), isPathSeparator)
+import System.FilePath.Posix (isPathSeparator, (</>))
 
 -- POSITIVE
 
@@ -43,7 +43,7 @@ type PositiveT m =
   ReaderT Env m
 
 data Env = Env
-  { eImageMVar :: !(MVar (Text, MonochromeImage)),
+  { eImageMVar :: !(MVar (Text, Image.MonochromeImage)),
     ePreviewMVar :: !(MVar ()),
     eEventChan :: !(Chan ServerEvent),
     eIsDev :: !Bool,
@@ -98,27 +98,15 @@ handleImage dir settings = do
       Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
   if eIsDev
     then do
-      processed <- timed "Apply" $ processImage settings image
-      encoded <- timed "Encode" =<< encode "_.png" processed
+      processed <- timed "Apply" $ Image.processImage settings image
+      encoded <- timed "Encode" =<< Image.encode "_.png" processed
       liftIO putMVarBack
       pure encoded
     else do
       log $ "Apply settings and encode: " <> iFilename settings
-      encoded <- encode "_.png" $ processImage settings image
+      encoded <- Image.encode "_.png" $ Image.processImage settings image
       liftIO putMVarBack
       pure encoded
-
-encode ::
-  ( MonadIO m,
-    Massiv.ColorSpace (HIP.DefSpace cs) i e,
-    Massiv.ColorSpace (Massiv.BaseSpace (HIP.DefSpace cs)) i e
-  ) =>
-  FilePath ->
-  HIP.Image cs e ->
-  m ByteString
-encode path image =
-  liftIO . Massiv.encodeImageM Massiv.imageWriteAutoFormats path $
-    HIP.unImage (HIP.toDefSpace image)
 
 handleSaveSettings :: Text -> FilmRollSettings -> PositiveT Handler FilmRollSettings
 handleSaveSettings dir newSettings = do
@@ -136,12 +124,12 @@ handleGenerateHighRes dir settings = do
   let input = Text.unpack dir </> Text.unpack (iFilename settings)
       output = Text.unpack dir </> "highres" </> Text.unpack (iFilename settings)
   log $ "Generating highres version of: " <> Text.pack input
-  maybeImage <- liftIO $ readImageFromDisk input
+  maybeImage <- liftIO $ Image.readImageFromDisk input
   case maybeImage of
     Left _ ->
       log "Image read error" >> throwError err404
     Right image -> do
-      liftIO . HIP.writeImage output $ processImage settings image
+      liftIO . HIP.writeImage output $ Image.processImage settings image
       log $ "Wrote highres version of: " <> Text.pack input
       pure NoContent
 
@@ -154,12 +142,12 @@ handleGenerateWallpaper dir settings = do
           <> " | "
           <> Text.unpack (iFilename settings)
   log $ "Generating wallpaper version of: " <> Text.pack input
-  maybeImage <- liftIO $ readImageFromDisk input
+  maybeImage <- liftIO $ Image.readImageFromDisk input
   case maybeImage of
     Left _ ->
       log "Image read error" >> throwError err404
     Right image -> do
-      liftIO . HIP.writeImage output . resizeImage 2560 $ processImage settings image
+      liftIO . HIP.writeImage output . Image.resizeImage 2560 $ Image.processImage settings image
       log $ "Wrote wallpaper version of: " <> Text.pack input
       pure NoContent
 
@@ -178,17 +166,17 @@ handleGetSettingsHistogram dir settings =
         fmap (fmap snd . sortOn fst . HashMap.toList)
           . Massiv.foldlP adjust bins (HashMap.unionWith (+)) bins
           . HIP.unImage
-          $ processImage settings image
+          $ Image.processImage settings image
 
 -- LIST DIRECTORIES
 
 handleGetSettings :: PositiveT Handler [(Text, FilmRollSettings)]
 handleGetSettings =
-  HashMap.toList <$> liftIO findImageSettings
+  HashMap.toList <$> liftIO ImageSettings.findImageSettings
 
 -- IMAGE
 
-getImage :: Text -> PositiveT Handler (MonochromeImage, IO ())
+getImage :: Text -> PositiveT Handler (Image.MonochromeImage, IO ())
 getImage path = do
   Env {eImageMVar} <- ask
   currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
@@ -199,11 +187,11 @@ getImage path = do
       pure (loadedImage, putMVar eImageMVar currentlyLoaded)
     else do
       logDebug "From disk"
-      maybeImage <- liftIO $ readImageFromDisk (Text.unpack path)
+      maybeImage <- liftIO $ Image.readImageFromDisk (Text.unpack path)
       case maybeImage of
         Left err -> log ("Image read error: " <> tshow err) >> throwError err404
         Right image ->
-          let resized = resizeImage 1440 image
+          let resized = Image.resizeImage 1440 image
            in pure (resized, putMVar eImageMVar (path, resized))
 
 -- LOG

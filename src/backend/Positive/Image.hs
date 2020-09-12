@@ -1,6 +1,10 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Positive.Image where
 
 import Control.Exception.Safe (IOException, tryIO)
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.Massiv.Array.IO as Massiv
 import GHC.Float (int2Double)
 import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
@@ -51,6 +55,18 @@ processImage is image =
         . HIP.normalize
         . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-0.25)) (HIP.Fill 0) (iRotate is))
         $ HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
+
+encode ::
+  ( MonadIO m,
+    Massiv.ColorSpace (HIP.DefSpace cs) i e,
+    Massiv.ColorSpace (Massiv.BaseSpace (HIP.DefSpace cs)) i e
+  ) =>
+  FilePath ->
+  HIP.Image cs e ->
+  m ByteString
+encode path image =
+  liftIO . Massiv.encodeImageM Massiv.imageWriteAutoFormats path $
+    HIP.unImage (HIP.toDefSpace image)
 
 -- CONTACTS
 
