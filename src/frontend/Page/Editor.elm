@@ -89,7 +89,7 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
 
 type alias Model =
     { imageProcessingState : ImageProcessingState
-    , starred : Set String
+    , stars : Stars
     , poster : Maybe String
     , filmRoll : FilmRoll
     , saveKey : Key { saveKey : () }
@@ -108,16 +108,20 @@ type alias FilmRoll =
     Zipper ImageSettings
 
 
+type alias Stars =
+    Dict String Int
+
+
 type ImageProcessingState
     = Ready
     | Processing
     | Queued FilmRoll
 
 
-init : Route -> FilmRoll -> Set String -> Maybe String -> Model
-init route filmRoll starred poster =
+init : Route -> FilmRoll -> Stars -> Maybe String -> Model
+init route filmRoll stars poster =
     { imageProcessingState = Processing
-    , starred = starred
+    , stars = stars
     , poster = poster
     , filmRoll =
         Maybe.withDefault filmRoll <|
@@ -134,11 +138,11 @@ init route filmRoll starred poster =
     }
 
 
-continue : Route -> FilmRoll -> Set String -> Maybe String -> Model -> Model
-continue route filmRoll starred poster model =
+continue : Route -> FilmRoll -> Stars -> Maybe String -> Model -> Model
+continue route filmRoll stars poster model =
     { model
         | imageProcessingState = Processing
-        , starred = starred
+        , stars = stars
         , poster = poster
         , filmRoll =
             Maybe.withDefault filmRoll <|
@@ -170,7 +174,7 @@ type Msg
     | UpdateScale Float
     | SetPreviewScale Int
     | AttemptSave String (Key { saveKey : () }) FilmRoll
-    | ToggleStar String String FilmRoll
+    | Star String Int
     | Rotate
     | RemoveNotification
 
@@ -345,18 +349,25 @@ update key msg model =
                 , saveSettings model
                 )
 
-        ToggleStar dir filename filmRoll ->
+        Star filename rating ->
             let
-                toggle v =
-                    Just <|
-                        if Set.member filename v then
-                            Set.remove filename v
+                check x =
+                    case x of
+                        Nothing ->
+                            Just rating
 
-                        else
-                            Set.insert filename v
+                        Just y ->
+                            if y == rating then
+                                Nothing
+
+                            else
+                                Just rating
+
+                newModel =
+                    { model | stars = Dict.update filename check model.stars }
             in
-            ( model
-            , Cmd.none
+            ( newModel
+            , saveSettings newModel
             )
 
         RemoveNotification ->
@@ -376,7 +387,7 @@ saveSettings : Model -> Cmd Msg
 saveSettings model =
     Cmd.map (GotSaveImageSettings model.route.dir) <|
         Request.postImageSettings (Url.percentEncode model.route.dir) <|
-            fromZipper model.poster model.starred model.filmRoll
+            fromZipper model.poster model.stars model.filmRoll
 
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
@@ -402,9 +413,9 @@ updateSettings f model =
             }
 
 
-fromZipper : Maybe String -> Set String -> FilmRoll -> FilmRollSettings
-fromZipper poster starred =
-    FilmRollSettings poster starred
+fromZipper : Maybe String -> Stars -> FilmRoll -> FilmRollSettings
+fromZipper poster stars =
+    FilmRollSettings poster stars
         << Dict.fromList
         << List.map (\x -> ( x.iFilename, x ))
         << Zipper.toList
@@ -421,7 +432,7 @@ view model otherNotifications =
         , viewLoading model.imageProcessingState
         , viewImage model.filmRoll model.route model
         , viewSettings model.filmRoll model.route model
-        , viewCurrentFilmRoll model.route model.previewColumns model.filmRoll
+        , viewCurrentFilmRoll model.route model.previewColumns model.stars model.filmRoll
         , viewNotifications (model.notifications ++ otherNotifications)
         ]
 
@@ -445,21 +456,21 @@ viewNav route =
 -- FILES
 
 
-viewCurrentFilmRoll : Route -> Int -> FilmRoll -> Html Msg
-viewCurrentFilmRoll route columns filmRoll =
+viewCurrentFilmRoll : Route -> Int -> Stars -> FilmRoll -> Html Msg
+viewCurrentFilmRoll route columns stars filmRoll =
     section [ class "files" ]
         [ viewRangeInput (SetPreviewScale << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , ul [] <|
             List.concat
-                [ List.map (viewCurrentFilmRollLink False route.dir columns) (Zipper.before filmRoll)
-                , [ viewCurrentFilmRollLink True route.dir columns (Zipper.current filmRoll) ]
-                , List.map (viewCurrentFilmRollLink False route.dir columns) (Zipper.after filmRoll)
+                [ List.map (viewCurrentFilmRollLink False route.dir columns stars) (Zipper.before filmRoll)
+                , [ viewCurrentFilmRollLink True route.dir columns stars (Zipper.current filmRoll) ]
+                , List.map (viewCurrentFilmRollLink False route.dir columns stars) (Zipper.after filmRoll)
                 ]
         ]
 
 
-viewCurrentFilmRollLink : Bool -> String -> Int -> ImageSettings -> Html Msg
-viewCurrentFilmRollLink isCurrent dir columns settings =
+viewCurrentFilmRollLink : Bool -> String -> Int -> Stars -> ImageSettings -> Html Msg
+viewCurrentFilmRollLink isCurrent dir columns stars settings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
@@ -492,10 +503,29 @@ viewCurrentFilmRollLink isCurrent dir columns settings =
         , span [ class "files-file-footer" ]
             [ text settings.iFilename
             , button [ onClick (CopySettings settings) ] [ text "copy" ]
-
-            -- , button [ onClick (ToggleStar dir settings.iFilename) ] [ text "star" ]
+            , viewStars settings.iFilename stars
             ]
         ]
+
+
+viewStars : String -> Stars -> Html Msg
+viewStars filename stars =
+    let
+        rating =
+            Maybe.withDefault 0 <|
+                Dict.get filename stars
+
+        gliph n =
+            if n <= rating then
+                "★"
+
+            else
+                "☆"
+    in
+    div [ class "stars" ] <|
+        List.map
+            (\n -> button [ onClick (Star filename n) ] [ text (gliph n) ])
+            (List.range 1 5)
 
 
 

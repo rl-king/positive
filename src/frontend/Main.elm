@@ -210,7 +210,7 @@ onNavigation maybeRoute model =
     let
         toSortedZipper filmRoll =
             Zipper.fromList (List.sortBy .iFilename (Dict.values filmRoll.frsSettings))
-                |> Maybe.map (\x -> ( x, filmRoll.frsStarred, filmRoll.frsPoster ))
+                |> Maybe.map (\x -> ( x, filmRoll.frsStars, filmRoll.frsPoster ))
 
         toFilmRoll filmRolls =
             Maybe.andThen (\{ dir } -> Dict.get dir filmRolls) maybeRoute
@@ -278,7 +278,7 @@ extractUpdates model =
                 | filmRolls =
                     mapStatus
                         (Dict.insert m.route.dir
-                            (FilmRollSettings m.poster m.starred (fromZipper m.filmRoll))
+                            (FilmRollSettings m.poster m.stars (fromZipper m.filmRoll))
                         )
                         model.filmRolls
             }

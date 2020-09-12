@@ -43,7 +43,7 @@ instance MimeRender Image ByteString where
 
 data FilmRollSettings = FilmRollSettings
   { frsPoster :: Maybe Text,
-    frsStarred :: HashSet Text,
+    frsStars :: HashMap Text Int,
     frsSettings :: HashMap Text ImageSettings
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq)
@@ -52,21 +52,21 @@ instance Aeson.FromJSON FilmRollSettings where
   parseJSON =
     Aeson.withObject "FilmRollSettings" $ \o -> do
       poster <- o .:? "frsPoster"
-      starred <- o .:? "frsStarred" .!= mempty
+      stars <- o .:? "frsStars" .!= mempty
       settings <- o .: "unFilmRollSettings" <|> o .: "frsSettings"
       pure $
         FilmRollSettings
           { frsPoster = poster,
-            frsStarred = starred,
+            frsStars = stars,
             frsSettings = settings
           }
 
 instance Aeson.ToJSON FilmRollSettings where
-  toJSON FilmRollSettings {frsPoster, frsStarred, frsSettings} =
+  toJSON FilmRollSettings {frsPoster, frsStars, frsSettings} =
     Aeson.object
       [ "frsPoster" .= frsPoster,
         "frsSettings" .= frsSettings,
-        "frsStarred" .= frsStarred
+        "frsStars" .= frsStars
       ]
 
 empty :: FilmRollSettings
@@ -82,8 +82,8 @@ init imageSettings =
   FilmRollSettings Nothing mempty (HashMap.insert (iFilename imageSettings) imageSettings mempty)
 
 insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
-insert imageSettings FilmRollSettings {frsPoster, frsStarred, frsSettings} =
-  FilmRollSettings frsPoster frsStarred (HashMap.insert (iFilename imageSettings) imageSettings frsSettings)
+insert imageSettings FilmRollSettings {frsPoster, frsStars, frsSettings} =
+  FilmRollSettings frsPoster frsStars (HashMap.insert (iFilename imageSettings) imageSettings frsSettings)
 
 fromList :: [ImageSettings] -> FilmRollSettings
 fromList settings =
@@ -139,6 +139,8 @@ instance
   where
   elmDecoder =
     Expression.App "Json.Decode.dict" (Elm.elmDecoder @Aeson.Value @a)
+
+-- SET
 
 instance (Elm.HasElmType a, ElmComparable a) => Elm.HasElmType (HashSet a) where
   elmType =

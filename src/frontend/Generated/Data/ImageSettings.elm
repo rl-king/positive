@@ -5,7 +5,6 @@ import Json.Decode
 import Json.Decode.Pipeline
 import Json.Encode
 import Maybe.Extra
-import Set
 
 
 type alias ImageSettings =
@@ -73,7 +72,7 @@ decodeImageCrop =
 
 type alias FilmRollSettings =
     { frsPoster : Maybe String
-    , frsStarred : Set.Set String
+    , frsStars : Dict.Dict String Int
     , frsSettings : Dict.Dict String ImageSettings
     }
 
@@ -82,7 +81,7 @@ encodeFilmRollSettings : FilmRollSettings -> Json.Encode.Value
 encodeFilmRollSettings a =
     Json.Encode.object
         [ ( "frsPoster", Maybe.Extra.unwrap Json.Encode.null Json.Encode.string a.frsPoster )
-        , ( "frsStarred", Json.Encode.set Json.Encode.string a.frsStarred )
+        , ( "frsStars", Json.Encode.dict identity Json.Encode.int a.frsStars )
         , ( "frsSettings", Json.Encode.dict identity encodeImageSettings a.frsSettings )
         ]
 
@@ -91,5 +90,5 @@ decodeFilmRollSettings : Json.Decode.Decoder FilmRollSettings
 decodeFilmRollSettings =
     Json.Decode.succeed FilmRollSettings
         |> Json.Decode.Pipeline.required "frsPoster" (Json.Decode.nullable Json.Decode.string)
-        |> Json.Decode.Pipeline.required "frsStarred" (Json.Decode.map Set.fromList (Json.Decode.list Json.Decode.string))
+        |> Json.Decode.Pipeline.required "frsStars" (Json.Decode.dict Json.Decode.int)
         |> Json.Decode.Pipeline.required "frsSettings" (Json.Decode.dict decodeImageSettings)
