@@ -259,3 +259,17 @@ insertPreviewSettings ps settings = do
     (fail "Something went wrong decoding the settings file")
     (Aeson.encodeFile ps . insert settings)
     previewSettings
+
+pickFilename :: FilePath -> IO FilePath
+pickFilename filepath = do
+  current <- Glob.glob (dropExtension filepath <> "*")
+  pure $
+    if null current
+      then filepath
+      else
+        let toNumbers = read @Int . reverse . takeWhile isDigit . reverse . dropExtension
+         in case sortOn Down $ toNumbers <$> filter (/= filepath) current of
+              n : _ ->
+                mconcat [dropExtension filepath, "-", show (n + 1), takeExtension filepath]
+              _ ->
+                mconcat [dropExtension filepath, "-1", takeExtension filepath]

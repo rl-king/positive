@@ -20,14 +20,15 @@ run log filepath = do
   let filename = Text.pack $ takeFileName filepath
   case HashMap.lookup filename . frsSettings =<< maybeSettings of
     Nothing ->
-      generate log "No settings file found, generating plain image" filepath $
+      generate log "No settings file found, generating plain image: " filepath $
         plainImageSettings filename
     Just settings ->
-      generate log "Settings file found, generating image" filepath settings
+      generate log "Settings file found, generating image: " filepath settings
 
 generate :: (Text -> IO ()) -> Text -> String -> ImageSettings -> IO ()
 generate log message filepath settings = do
-  log message
   image <- readImageFromDisk filepath
   createDirectoryIfMissing False "highres"
-  either (log . tshow) (HIP.writeImage ("highres" </> filepath) . processImage settings) image
+  outputWithCount <- ImageSettings.pickFilename ("highres" </> filepath)
+  log $ message <> Text.pack outputWithCount
+  either (log . tshow) (HIP.writeImage outputWithCount . processImage settings) image

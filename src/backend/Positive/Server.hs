@@ -129,7 +129,8 @@ handleGenerateHighRes dir settings = do
     Left _ ->
       log "Image read error" >> throwError err404
     Right image -> do
-      liftIO . HIP.writeImage output $ Image.processImage settings image
+      outputWithCount <- liftIO $ ImageSettings.pickFilename output
+      liftIO . HIP.writeImage outputWithCount $ Image.processImage settings image
       log $ "Wrote highres version of: " <> Text.pack input
       pure NoContent
 
