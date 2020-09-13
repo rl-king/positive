@@ -9,10 +9,9 @@ import System.FilePath.Posix
 
 run :: Bool -> IO ()
 run overwrite =
-  let filename = "image-settings.json"
-      imageSettings = filename
-      imagePreviewSettings = "previews" </> filename
-      imageContactSettings = "contacts" </> filename
+  let imageSettings = "image-settings.json"
+      imagePreviewSettings = "previews" </> imageSettings
+      -- imageContactSettings = "contacts" </> filename
       check path = if overwrite then pure False else doesFileExist path
    in do
         filenames <- fmap Text.pack . filter (\x -> isExtensionOf ".tif" x || isExtensionOf ".png" x) <$> listDirectory "."
@@ -21,5 +20,6 @@ run overwrite =
           unlessM (check imageSettings) $ Aeson.encodeFile imageSettings settings
           createDirectoryIfMissing False (dropFileName imagePreviewSettings)
           unlessM (check imagePreviewSettings) $ Aeson.encodeFile imagePreviewSettings empty
-          createDirectoryIfMissing False (dropFileName imageContactSettings)
-          unlessM (check imageContactSettings) $ Aeson.encodeFile imageContactSettings empty
+
+-- createDirectoryIfMissing False (dropFileName imageContactSettings)
+-- unlessM (check imageContactSettings) $ Aeson.encodeFile imageContactSettings empty

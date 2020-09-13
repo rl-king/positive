@@ -25,7 +25,7 @@ main = do
       let log = Log.log logger
       case fMode of
         Flags.Init ->
-          Init.run fHard >> Preview.run log >> Contacts.run log
+          Init.run fHard >> Preview.run log -- >> Contacts.run log
         Flags.Previews ->
           Preview.run log
         Flags.Contacts ->
