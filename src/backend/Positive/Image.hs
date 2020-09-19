@@ -53,8 +53,16 @@ processImage is image =
         -- at which it makes smaller images have more contrast due to different max and min
         -- values vs the original size
         . HIP.normalize
-        . (if iRotate is == 0 then id else HIP.rotate (HIP.Bicubic (-0.25)) (HIP.Fill 0) (iRotate is))
+        . rotate (iRotate is)
         $ HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
+
+rotate :: Double -> MonochromeImage -> MonochromeImage
+rotate rad =
+  case floor (rad * (180 / pi)) :: Int of
+    90 -> HIP.rotate90
+    180 -> HIP.rotate180
+    270 -> HIP.rotate270
+    _ -> id
 
 encode ::
   ( MonadIO m,
