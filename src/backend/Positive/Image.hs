@@ -58,7 +58,7 @@ processImage is image =
 
 rotate :: Double -> MonochromeImage -> MonochromeImage
 rotate rad =
-  case floor (rad * (180 / pi)) :: Int of
+  case abs . floor $ rad * 180 / pi :: Int of
     90 -> HIP.rotate90
     180 -> HIP.rotate180
     270 -> HIP.rotate270
