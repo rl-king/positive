@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Positive.CodeGen where
@@ -54,10 +55,9 @@ run log = do
   runElmFormat log
 
 runElmFormat :: (Text -> IO ()) -> IO ()
-runElmFormat log = do
+runElmFormat log =
   let args = ["--elm-version=0.19", "--yes", "src/frontend/Generated"]
-  result <- Process.withCreateProcess (Process.proc "elm-format" args) $
-    \_ _ _ handler -> Process.waitForProcess handler
-  case result of
-    System.Exit.ExitSuccess -> log "Formatted generated code with elm-format"
-    _ -> log $ "Something went wrong trying to format the generated Elm code: " <> tshow result
+   in Process.withCreateProcess (Process.proc "elm-format" args) $
+        \_ _ _ handler -> Process.waitForProcess handler >>= \case
+          System.Exit.ExitSuccess -> log "Formatted generated code with elm-format"
+          result -> log $ "Something went wrong trying to format the generated Elm code: " <> tshow result
