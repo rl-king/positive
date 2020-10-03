@@ -63,11 +63,11 @@ instance Aeson.FromJSON FilmRollSettings where
           }
 
 instance Aeson.ToJSON FilmRollSettings where
-  toJSON FilmRollSettings {frsPoster, frsRatings, frsSettings} =
+  toJSON filmRollSettings =
     Aeson.object
-      [ "frsPoster" .= frsPoster,
-        "frsSettings" .= frsSettings,
-        "frsRatings" .= frsRatings
+      [ "frsPoster" .= filmRollSettings.frsPoster,
+        "frsSettings" .= filmRollSettings.frsSettings,
+        "frsRatings" .= filmRollSettings.frsRatings
       ]
 
 empty :: FilmRollSettings
@@ -80,22 +80,19 @@ isEmpty =
 
 init :: ImageSettings -> FilmRollSettings
 init imageSettings =
-  FilmRollSettings Nothing mempty (HashMap.insert (iFilename imageSettings) imageSettings mempty)
+  empty{frsSettings = HashMap.insert imageSettings.iFilename imageSettings mempty}
 
 insert :: ImageSettings -> FilmRollSettings -> FilmRollSettings
-insert imageSettings FilmRollSettings {frsPoster, frsRatings, frsSettings} =
-  FilmRollSettings frsPoster frsRatings (HashMap.insert (iFilename imageSettings) imageSettings frsSettings)
+insert imageSettings filmRollSettings =
+  filmRollSettings{frsSettings = HashMap.insert imageSettings.iFilename imageSettings filmRollSettings.frsSettings}
 
 fromList :: [ImageSettings] -> FilmRollSettings
 fromList settings =
-  FilmRollSettings Nothing mempty (HashMap.fromList $ fmap (\is -> (iFilename is, is)) settings)
+  empty{frsSettings = HashMap.fromList $ fmap (\is -> (iFilename is, is)) settings}
 
 fromFilenames :: [Text] -> FilmRollSettings
 fromFilenames xs =
-  FilmRollSettings
-    Nothing
-    mempty
-    (HashMap.fromList $ fmap (\x -> (x, plainImageSettings x)) xs)
+  empty{frsSettings = HashMap.fromList $ fmap (\x -> (x, plainImageSettings x)) xs}
 
 toList :: FilmRollSettings -> [ImageSettings]
 toList =
