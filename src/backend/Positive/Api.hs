@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Positive.Api where
 
 import Data.ByteString.Lazy (ByteString)
+import Network.HTTP.Media ((//))
 import Positive.ImageSettings
 import Positive.Prelude hiding (ByteString)
 import Servant
@@ -55,3 +57,14 @@ data SettingsApi route = SettingsApi
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)
+
+-- IMAGE
+
+data Image
+
+instance Accept Image where
+  contentType _ =
+    "image" // "png"
+
+instance MimeRender Image ByteString where
+  mimeRender _ = id

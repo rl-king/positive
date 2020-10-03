@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
@@ -15,7 +14,6 @@ import Data.Aeson ((.!=), (.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
 import Data.Bifunctor
 import qualified Data.ByteString.Base64 as Base64
-import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Maybe
 import qualified Data.Text as Text
@@ -23,22 +21,10 @@ import qualified Generics.SOP as SOP
 import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
-import qualified Network.HTTP.Media as Media
-import Positive.Prelude hiding (ByteString)
+import Positive.Prelude
 import Servant
 import qualified System.FilePath.Glob as Glob
 import System.FilePath.Posix as Path
-
--- IMAGE
-
-data Image
-
-instance Accept Image where
-  contentType _ =
-    "image" Media.// "jpg"
-
-instance MimeRender Image ByteString where
-  mimeRender _ = id
 
 -- FILMROLLSETTINGS
 
