@@ -105,7 +105,7 @@ update msg model =
                 Just filmRoll ->
                     ( model
                     , Cmd.map (GotSaveImageSettings dir) <|
-                        Request.postImageSettings (Url.percentEncode dir) <|
+                        Request.postImageSettings dir <|
                             { filmRoll | frsPoster = poster }
                     )
 

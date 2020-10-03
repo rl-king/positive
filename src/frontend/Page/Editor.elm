@@ -253,7 +253,7 @@ update key msg model =
             let
                 getHistogram =
                     Cmd.map GotHistogram <|
-                        Request.postImageSettingsHistogram (Url.percentEncode dir) settings
+                        Request.postImageSettingsHistogram dir settings
             in
             case model.imageProcessingState of
                 Ready ->
@@ -281,7 +281,7 @@ update key msg model =
                         Cmd.batch
                             [ Cmd.map (GotGenerate "highres") <|
                                 Request.postImageSettingsHighres
-                                    (Url.percentEncode model.route.dir)
+                                    model.route.dir
                                     (Zipper.current model.filmRoll)
                             , cmds
                             ]
@@ -294,7 +294,7 @@ update key msg model =
                         Cmd.batch
                             [ Cmd.map (GotGenerate "wallpaper") <|
                                 Request.postImageSettingsWallpaper
-                                    (Url.percentEncode model.route.dir)
+                                    model.route.dir
                                     (Zipper.current model.filmRoll)
                             , cmds
                             ]
@@ -396,7 +396,7 @@ nextKey (Key k) =
 saveSettings : Model -> Cmd Msg
 saveSettings model =
     Cmd.map (GotSaveImageSettings model.route.dir) <|
-        Request.postImageSettings (Url.percentEncode model.route.dir) <|
+        Request.postImageSettings model.route.dir <|
             fromZipper model.poster model.ratings model.filmRoll
 
 
