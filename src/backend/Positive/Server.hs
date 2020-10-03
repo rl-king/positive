@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Positive.Server
   ( run,
@@ -35,7 +36,7 @@ import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
 import System.Directory
-import System.FilePath.Posix (isPathSeparator, (</>))
+import System.FilePath.Posix ((</>), isPathSeparator)
 
 -- POSITIVE
 
@@ -43,17 +44,17 @@ type PositiveT m =
   ReaderT Env m
 
 data Env = Env
-  { eImageMVar :: !(MVar (Text, Image.MonochromeImage)),
-    ePreviewMVar :: !(MVar ()),
-    eEventChan :: !(Chan ServerEvent),
-    eIsDev :: !Bool,
-    eLogger :: !Log.TimedFastLogger
+  { imageMVar :: !(MVar (Text, Image.MonochromeImage)),
+    previewMVar :: !(MVar ()),
+    eventChan :: !(Chan ServerEvent),
+    isDev :: !Bool,
+    logger :: !Log.TimedFastLogger
   }
 
 -- SERVER
 
 run :: Log.TimedFastLogger -> Flags -> IO ()
-run logger Flags {fIsDev} =
+run logger flags =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
@@ -63,9 +64,9 @@ run logger Flags {fIsDev} =
         imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
         previewMVar <- newEmptyMVar
         eventChan <- newChan
-        let env = Env imageMVar previewMVar eventChan fIsDev logger
+        let env = Env imageMVar previewMVar eventChan flags.isDev logger
         Preview.loop previewMVar (Log.log logger)
-        runSettings settings (genericServeT (`runReaderT` env) (handlers fIsDev eventChan))
+        runSettings settings (genericServeT (`runReaderT` env) (handlers flags.isDev eventChan))
 
 -- HANDLERS
 
@@ -92,11 +93,11 @@ handlers isDev chan =
 
 handleImage :: Text -> ImageSettings -> PositiveT Handler ByteString
 handleImage dir settings = do
-  Env {eIsDev} <- ask
+  env <- ask
   (image, putMVarBack) <-
     getImage $
       Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
-  if eIsDev
+  if env.isDev
     then do
       processed <- timed "Apply" $ Image.processImage settings image
       encoded <- timed "Encode" =<< Image.encode "_.png" processed
@@ -112,8 +113,8 @@ handleSaveSettings :: Text -> FilmRollSettings -> PositiveT Handler FilmRollSett
 handleSaveSettings dir newSettings = do
   liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
   logDebug "Wrote settings"
-  Env {ePreviewMVar} <- ask
-  void . liftIO $ tryPutMVar ePreviewMVar ()
+  env <- ask
+  void . liftIO $ tryPutMVar env.previewMVar ()
   pure newSettings
 
 -- GENERATE PREVIEWS
@@ -179,13 +180,13 @@ handleGetSettings =
 
 getImage :: Text -> PositiveT Handler (Image.MonochromeImage, IO ())
 getImage path = do
-  Env {eImageMVar} <- ask
-  currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar eImageMVar
+  env <- ask
+  currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar env.imageMVar
   logDebug $ "MVar: " <> tshow currentlyLoaded
   if path == loadedPath
     then do
       logDebug "From cache"
-      pure (loadedImage, putMVar eImageMVar currentlyLoaded)
+      pure (loadedImage, putMVar env.imageMVar currentlyLoaded)
     else do
       logDebug "From disk"
       maybeImage <- liftIO $ Image.readImageFromDisk (Text.unpack path)
@@ -193,22 +194,22 @@ getImage path = do
         Left err -> log ("Image read error: " <> tshow err) >> throwError err404
         Right image ->
           let resized = Image.resizeImage 1440 image
-           in pure (resized, putMVar eImageMVar (path, resized))
+           in pure (resized, putMVar env.imageMVar (path, resized))
 
 -- LOG
 
 log :: MonadIO m => Text -> PositiveT m ()
 log msg = do
-  Env {eLogger, eEventChan} <- ask
-  liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
-  liftIO . eLogger $ Log.format "info" msg
+  env <- ask
+  liftIO . writeChan env.eventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
+  liftIO . env.logger $ Log.format "info" msg
 
 logDebug :: MonadIO m => Text -> PositiveT m ()
 logDebug msg = do
-  Env {eIsDev, eLogger, eEventChan} <- ask
-  when eIsDev $ do
-    liftIO . writeChan eEventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
-    liftIO . eLogger $ Log.format "debug" msg
+  env <- ask
+  when env.isDev $ do
+    liftIO . writeChan env.eventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
+    liftIO . env.logger $ Log.format "debug" msg
 
 -- PROFILE
 

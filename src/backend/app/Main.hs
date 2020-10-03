@@ -1,10 +1,10 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Main where
 
 import qualified Positive.CodeGen as CodeGen
 import qualified Positive.Contacts as Contacts
-import Positive.Flags (Flags (..))
 import qualified Positive.Flags as Flags
 import qualified Positive.Init as Init
 import qualified Positive.Log as Log
@@ -21,11 +21,11 @@ main = do
   timeCache <- FastLogger.newTimeCache FastLogger.simpleTimeFormat
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
-      flags@Flags {fIsDev, fMode, fHard} <- Flags.parseArgs
+      flags <- Flags.parseArgs
       let log = Log.log logger
-      case fMode of
+      case flags.mode of
         Flags.Init ->
-          Init.run fHard >> Preview.run log -- >> Contacts.run log
+          Init.run flags.hard >> Preview.run log -- >> Contacts.run log
         Flags.Previews ->
           Preview.run log
         Flags.Contacts ->
@@ -33,4 +33,4 @@ main = do
         Flags.SingleImage filepath ->
           SingleImage.run log filepath
         Flags.Server ->
-          when fIsDev (CodeGen.run log) >> Server.run logger flags
+          when flags.isDev (CodeGen.run log) >> Server.run logger flags

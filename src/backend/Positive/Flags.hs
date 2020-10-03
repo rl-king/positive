@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
+
 module Positive.Flags where
 
 import Options.Applicative
@@ -6,9 +8,9 @@ import Positive.Prelude
 -- FLAGS
 
 data Flags = Flags
-  { fIsDev :: !Bool,
-    fHard :: !Bool,
-    fMode :: !Mode
+  { isDev :: !Bool,
+    hard :: !Bool,
+    mode :: !Mode
   }
   deriving (Show, Eq)
 
@@ -28,8 +30,8 @@ parseArgs =
 parser :: Parser Flags
 parser =
   Flags
-    <$> flag False True (long "dev")
-    <*> flag False True (long "hard")
+    <$> flag False True (long "dev" <> help "generate elm, verbose logging")
+    <*> flag False True (long "hard" <> help "reset settings")
     <*> ( flag' Init (long "init" <> short 'i')
             <|> flag' Previews (long "previews" <> short 'p')
             <|> flag' Contacts (long "contacts" <> short 'c')
