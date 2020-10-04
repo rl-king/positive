@@ -45,7 +45,7 @@ type PositiveT m =
 
 data Env = Env
   { imageMVar :: !(MVar (Text, Image.MonochromeImage)),
-    previewMVar :: !(MVar ()),
+    previewMVar :: !(MVar [(FilePath, ImageSettings)]),
     eventChan :: !(Chan ServerEvent),
     isDev :: !Bool,
     logger :: !Log.TimedFastLogger
@@ -114,7 +114,9 @@ handleSaveSettings dir newSettings = do
   liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
   logDebug "Wrote settings"
   env <- ask
-  void . liftIO $ tryPutMVar env.previewMVar ()
+  missing <- liftIO Preview.findMissingPreviews
+  void . liftIO $ tryPutMVar env.previewMVar missing
+  log $ "Updating " <> tshow (length missing) <> " preview(s)"
   pure newSettings
 
 -- GENERATE PREVIEWS

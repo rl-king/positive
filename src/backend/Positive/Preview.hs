@@ -1,4 +1,5 @@
 {-# LANGUAGE NumericUnderscores #-}
+{-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Positive.Preview where
 
@@ -16,12 +17,16 @@ run :: (Text -> IO ()) -> IO ()
 run log = do
   missing <- findMissingPreviews
   log $ Text.unwords ["Found", tshow $ length missing, "outdated preview(s)"]
-  generatePreviews log missing
+  for_ (zip missing [1 :: Int ..]) $ \(x, index) ->
+    generatePreview (\t -> log (t <> " | " <> tshow index <> " of " <> tshow (length missing))) x
 
-loop :: MVar () -> (Text -> IO ()) -> IO ()
+loop :: MVar [(FilePath, ImageSettings)] -> (Text -> IO ()) -> IO ()
 loop mvar log =
-  void . forkIO . forever $
-    takeMVar mvar >> threadDelay 2000_000_0 >> whenM (isEmptyMVar mvar) (run log) -- run if nothing happened in after 20 secs
+  void . forkIO . forever $ do
+    work <- takeMVar mvar
+    case work of
+      [] -> log "Finished generating previews"
+      x : xs -> generatePreview log x >> void (tryPutMVar mvar xs)
 
 -- FIND
 
@@ -32,21 +37,19 @@ findMissingPreviews =
 
 prependDir :: FilePath -> FilmRollSettings -> [(FilePath, ImageSettings)]
 prependDir dir settings =
-  (\x -> (dir </> Text.unpack (iFilename x), x)) <$> toList settings
+  (\x -> (dir </> Text.unpack x.iFilename, x)) <$> toList settings
 
 -- WRITE
 
-generatePreviews :: (Text -> IO ()) -> [(FilePath, ImageSettings)] -> IO ()
-generatePreviews log iss =
-  let total = length iss
-   in for_ (zip iss [1 .. total]) $ \((input, is), index) -> do
-        let dir = dropFileName input
-            output = dir </> "previews" </> replaceExtension (Text.unpack (iFilename is)) ".jpg"
-        maybeImage <- readImageFromDisk input
-        case maybeImage of
-          Left _ ->
-            log $ Text.unwords ["Error generating preview", Text.pack output, "|", tshow index, "of", tshow total]
-          Right image -> do
-            HIP.writeImage output $ processImage is (resizeImage 750 image)
-            insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
-            log $ Text.unwords ["Generated preview", Text.pack output, "|", tshow index, "of", tshow total]
+generatePreview :: (Text -> IO ()) -> (FilePath, ImageSettings) -> IO ()
+generatePreview log (input, is) = do
+  let dir = dropFileName input
+      output = dir </> "previews" </> replaceExtension (Text.unpack is.iFilename) ".jpg"
+  maybeImage <- readImageFromDisk input
+  case maybeImage of
+    Left _ ->
+      log $ Text.unwords ["Error generating preview", Text.pack output]
+    Right image -> do
+      HIP.writeImage output $ processImage is (resizeImage 750 image)
+      insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
+      log $ Text.unwords ["Generated preview", Text.pack output]
