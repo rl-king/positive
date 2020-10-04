@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
@@ -54,31 +53,31 @@ data Env = Env
 -- SERVER
 
 run :: Log.TimedFastLogger -> Flags -> IO ()
-run logger flags =
+run logger_ flags =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
-            (Log.log logger ("listening on port " <> tshow @Int 8080))
+            (Log.log logger_ ("listening on port " <> tshow @Int 8080))
             defaultSettings
    in do
-        imageMVar <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
-        previewMVar <- newEmptyMVar
-        eventChan <- newChan
-        let env = Env imageMVar previewMVar eventChan flags.isDev logger
-        Preview.loop previewMVar (Log.log logger)
-        runSettings settings (genericServeT (`runReaderT` env) (handlers flags.isDev eventChan))
+        imageMVar_ <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
+        previewMVar_ <- newEmptyMVar
+        eventChan_ <- newChan
+        let env = Env imageMVar_ previewMVar_ eventChan_ flags.isDev logger_
+        Preview.loop previewMVar_ (Log.log logger_)
+        runSettings settings (genericServeT (`runReaderT` env) (handlers flags.isDev eventChan_))
 
 -- HANDLERS
 
 handlers :: Bool -> Chan ServerEvent -> Api (AsServerT (PositiveT Handler))
-handlers isDev chan =
+handlers isDev_ chan =
   Api
     { aImageApi =
         genericServerT
           ImageApi
             { iaImage = handleImage,
               iaEvents = pure $ eventSourceAppChan chan,
-              iaRaw = Static.serve isDev
+              iaRaw = Static.serve isDev_
             },
       aSettingsApi =
         genericServerT
@@ -96,7 +95,7 @@ handleImage dir settings = do
   env <- ask
   (image, putMVarBack) <-
     getImage $
-      Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
+      Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
   if env.isDev
     then do
       processed <- timed "Apply" $ Image.processImage settings image
@@ -104,7 +103,7 @@ handleImage dir settings = do
       liftIO putMVarBack
       pure encoded
     else do
-      log $ "Apply settings and encode: " <> iFilename settings
+      log $ "Apply settings and encode: " <> settings.iFilename
       encoded <- Image.encode "_.png" $ Image.processImage settings image
       liftIO putMVarBack
       pure encoded
@@ -116,7 +115,7 @@ handleSaveSettings dir newSettings = do
   env <- ask
   missing <- liftIO Preview.findMissingPreviews
   void . liftIO $ tryPutMVar env.previewMVar missing
-  log $ "Updating " <> tshow (length missing) <> " preview(s)"
+  logDebug $ "Updating " <> tshow (length missing) <> " preview(s)"
   pure newSettings
 
 -- GENERATE PREVIEWS
@@ -124,8 +123,8 @@ handleSaveSettings dir newSettings = do
 handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
   liftIO $ createDirectoryIfMissing False (Text.unpack dir </> "highres")
-  let input = Text.unpack dir </> Text.unpack (iFilename settings)
-      output = Text.unpack dir </> "highres" </> Text.unpack (iFilename settings)
+  let input = Text.unpack dir </> Text.unpack settings.iFilename
+      output = Text.unpack dir </> "highres" </> Text.unpack settings.iFilename
   log $ "Generating highres version of: " <> Text.pack input
   maybeImage <- liftIO $ Image.readImageFromDisk input
   case maybeImage of
@@ -139,12 +138,12 @@ handleGenerateHighRes dir settings = do
 
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
-  let input = Text.unpack dir </> Text.unpack (iFilename settings)
+  let input = Text.unpack dir </> Text.unpack settings.iFilename
       output =
         "/Users/king/Documents/wallpapers/positive"
           </> filter (not . isPathSeparator) (Text.unpack dir)
           <> " | "
-          <> Text.unpack (iFilename settings)
+          <> Text.unpack settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
   maybeImage <- liftIO $ Image.readImageFromDisk input
   case maybeImage of
@@ -164,9 +163,9 @@ handleGetSettingsHistogram dir settings =
    in do
         (image, putMVarBack) <-
           getImage $
-            Text.pack (Text.unpack dir </> Text.unpack (iFilename settings))
+            Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
         liftIO putMVarBack
-        logDebug $ "Creating histogram for: " <> iFilename settings
+        logDebug $ "Creating histogram for: " <> settings.iFilename
         fmap (fmap snd . sortOn fst . HashMap.toList)
           . Massiv.foldlP adjust bins (HashMap.unionWith (+)) bins
           . HIP.unImage
