@@ -52,6 +52,7 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
         [ Browser.Events.onKeyDown <|
             Decode.oneOf
                 [ matchKey "s" SaveSettings
+                , matchKey "u" Undo
                 , matchKey "c" (CopySettings current)
                 , matchKey "r" Rotate
                 , matchKey "h" PreviousImage
