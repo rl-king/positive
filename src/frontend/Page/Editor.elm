@@ -733,6 +733,8 @@ viewImage filmRoll route model =
                         ]
                         []
             ]
+        , section [ class "zones" ]
+            [ viewRangeInput UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" model.scale ]
         ]
 
 
