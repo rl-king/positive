@@ -71,7 +71,6 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -O2
     - -Wall
     - -Wcompat
     - -Wincomplete-record-updates

@@ -117,6 +117,26 @@ gamma x =
 
 zone :: Double -> Double -> MonochromePixel -> MonochromePixel
 zone t i =
-  let m v = (1 - abs (v - t)) ^ (2 :: Int)
-   in fmap (\v -> v + (i * m v))
+  let m v = curve (1 - v - t)
+   in fmap (\v -> v + (m v * i))
 {-# INLINE zone #-}
+
+curve :: Double -> Double
+curve x =
+  negate 1 / 2 * (cos (pi * x) - 1)
+
+-- DEBUG
+
+draw :: Double -> Double -> IO ()
+draw t i =
+  traverse_
+    (putStrLn . concat)
+    [ flip replicate "=" . round . abs . (*) 50 . (-) x $
+        zone_ t i x
+      | x <- [0, 0.025 .. 1]
+    ]
+
+zone_ :: Double -> Double -> Double -> Double
+zone_ t i v =
+  let m = curve (1 - v - t)
+   in (v + (m * i))
