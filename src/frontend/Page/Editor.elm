@@ -729,7 +729,6 @@ viewImage filmRoll route model =
                         ]
                         []
             ]
-        , viewZones filmRoll model
         ]
 
 
@@ -760,51 +759,6 @@ viewLoading state =
     viewIf (state /= Ready) <|
         \_ ->
             div [ class "loading-spinner" ] []
-
-
-
--- ZONES
-
-
-viewZones : FilmRoll -> Model -> Html Msg
-viewZones filmRoll model =
-    let
-        settings =
-            Zipper.current filmRoll
-
-        zone t x v =
-            v + (x * m t v)
-
-        m t v =
-            (1 - abs (v - t)) ^ 2
-
-        vs =
-            List.map (\x -> toFloat x / 10) <| List.range 1 10
-
-        apply =
-            zone 0.9 settings.iZone9 << zone 0.5 settings.iZone5 << zone 0.1 settings.iZone1
-    in
-    section [ class "zones" ]
-        [ viewRangeInput UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" model.scale
-        , Html.Keyed.ul [] <|
-            List.map2 viewZoneBar (List.map apply vs) vs
-        ]
-
-
-viewZoneBar : Float -> Float -> ( String, Html msg )
-viewZoneBar value zone =
-    let
-        height v =
-            style "height" (String.fromFloat (abs (1 + 4 * v)) ++ "rem")
-
-        background v =
-            style "background-color" ("hsl(0, 0%," ++ String.fromFloat (v * 100) ++ "%)")
-    in
-    ( String.fromFloat value
-    , li [ height (value - zone), background zone ]
-        []
-      -- [ span [] [ text (String.left 6 (String.fromFloat value)) ] ]
-    )
 
 
 
