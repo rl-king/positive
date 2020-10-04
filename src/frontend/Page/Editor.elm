@@ -56,6 +56,9 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
                 , matchKey "r" Rotate
                 , matchKey "h" PreviousImage
                 , matchKey "l" NextImage
+                , matchKey "3" (UpdateScale 0.3)
+                , matchKey "4" (UpdateScale 0.4)
+                , matchKey "5" (UpdateScale 0.5)
                 , matchKey "6" (UpdateScale 0.6)
                 , matchKey "7" (UpdateScale 0.7)
                 , matchKey "8" (UpdateScale 0.8)
