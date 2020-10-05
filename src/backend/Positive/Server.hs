@@ -64,7 +64,7 @@ run logger_ flags =
         previewMVar_ <- newEmptyMVar
         eventChan_ <- newChan
         let env = Env imageMVar_ previewMVar_ eventChan_ flags.isDev logger_
-        Preview.loop previewMVar_ (Log.log logger_)
+        Preview.loop previewMVar_ eventChan_ (Log.log logger_)
         runSettings settings (genericServeT (`runReaderT` env) (handlers flags.isDev eventChan_))
 
 -- HANDLERS

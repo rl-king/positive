@@ -1,11 +1,15 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Positive.Preview where
 
+import Control.Concurrent.Chan
 import Control.Concurrent.MVar
+import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
+import Network.Wai.EventSource
 import Positive.Image
 import Positive.ImageSettings as ImageSettings
 import Positive.Prelude hiding (ByteString)
@@ -20,13 +24,15 @@ run log = do
   for_ (zip missing [1 :: Int ..]) $ \(x, index) ->
     generatePreview (\t -> log (t <> " | " <> tshow index <> " of " <> tshow (length missing))) x
 
-loop :: MVar [(FilePath, ImageSettings)] -> (Text -> IO ()) -> IO ()
-loop mvar log =
-  void . forkIO . forever $ do
-    work <- takeMVar mvar
-    case work of
+loop :: MVar [(FilePath, ImageSettings)] -> Chan ServerEvent -> (Text -> IO ()) -> IO ()
+loop mvar eventChan log =
+  void . forkIO . forever $
+    takeMVar mvar >>= \case
       [] -> log "Finished generating previews"
-      x : xs -> generatePreview log x >> void (tryPutMVar mvar xs)
+      x@(_, is) : xs -> do
+        generatePreview log x
+        writeChan eventChan (ServerEvent (Just "preview") Nothing [Builder.byteString $ encodeUtf8 is.iFilename])
+        void (tryPutMVar mvar xs)
 
 -- FIND
 

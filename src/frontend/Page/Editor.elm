@@ -1,4 +1,4 @@
-module Page.Editor exposing
+port module Page.Editor exposing
     ( Model
     , Msg
     , continue
@@ -33,6 +33,13 @@ import Task
 import Url exposing (Url)
 import Url.Builder
 import Util exposing (..)
+
+
+
+-- PORT
+
+
+port previewReady : (String -> msg) -> Sub msg
 
 
 
@@ -86,6 +93,7 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
                 matchKey "Escape" (UpdateImageCropMode Nothing)
             )
             imageCropMode
+        , previewReady OnPreviewReady
         ]
 
 
@@ -96,6 +104,7 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
 type alias Model =
     { imageProcessingState : ImageProcessingState
     , ratings : Ratings
+    , previewVersions : PreviewVersions
     , poster : Maybe String
     , filmRoll : FilmRoll
     , saveKey : Key { saveKey : () }
@@ -116,6 +125,10 @@ type alias FilmRoll =
 
 
 type alias Ratings =
+    Dict String Int
+
+
+type alias PreviewVersions =
     Dict String Int
 
 
@@ -141,6 +154,7 @@ init route filmRoll ratings poster =
     , previewColumns = 5
     , route = route
     , notifications = []
+    , previewVersions = Dict.empty
     }
 
 
@@ -188,6 +202,7 @@ type Msg
     | SetMinRating Int
     | Rotate
     | RemoveNotification
+    | OnPreviewReady String
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -272,6 +287,21 @@ update key msg model =
 
                     else
                         ( { model | imageProcessingState = Processing, filmRoll = n }, Cmd.none )
+
+        OnPreviewReady filename ->
+            let
+                f x =
+                    case x of
+                        Nothing ->
+                            Just 1
+
+                        Just y ->
+                            Just (y + 1)
+            in
+            pushNotification Normal
+                RemoveNotification
+                ("Preview ready: " ++ filename)
+                { model | previewVersions = Dict.update filename f model.previewVersions }
 
         SaveSettings ->
             ( model
@@ -446,7 +476,12 @@ view model otherNotifications =
         , viewLoading model.imageProcessingState
         , viewImage model.filmRoll model.route model
         , viewSettings model.filmRoll model.route model
-        , viewCurrentFilmRoll model.route model.previewColumns model.minimumRating model.ratings model.filmRoll
+        , viewCurrentFilmRoll model.route
+            model.previewColumns
+            model.minimumRating
+            model.previewVersions
+            model.ratings
+            model.filmRoll
         , viewNotifications (model.notifications ++ otherNotifications)
         ]
 
@@ -470,8 +505,8 @@ viewNav route =
 -- FILES
 
 
-viewCurrentFilmRoll : Route -> Int -> Int -> Ratings -> FilmRoll -> Html Msg
-viewCurrentFilmRoll route columns minimumRating ratings filmRoll =
+viewCurrentFilmRoll : Route -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
+viewCurrentFilmRoll route columns minimumRating previewVersions ratings filmRoll =
     section [ class "files" ]
         [ viewRangeInput (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , viewRangeInput (SetMinRating << floor) 1 ( 0, 5, 0 ) "Rating" (toFloat minimumRating) -- FIXME: remove floats
@@ -479,15 +514,15 @@ viewCurrentFilmRoll route columns minimumRating ratings filmRoll =
             List.map (\( _, filename, x ) -> ( filename, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
                     List.concat
-                        [ List.map (viewCurrentFilmRollLink False route.dir columns ratings) (Zipper.before filmRoll)
-                        , [ viewCurrentFilmRollLink True route.dir columns ratings (Zipper.current filmRoll) ]
-                        , List.map (viewCurrentFilmRollLink False route.dir columns ratings) (Zipper.after filmRoll)
+                        [ List.map (viewCurrentFilmRollLink False route.dir columns previewVersions ratings) (Zipper.before filmRoll)
+                        , [ viewCurrentFilmRollLink True route.dir columns previewVersions ratings (Zipper.current filmRoll) ]
+                        , List.map (viewCurrentFilmRollLink False route.dir columns previewVersions ratings) (Zipper.after filmRoll)
                         ]
         ]
 
 
-viewCurrentFilmRollLink : Bool -> String -> Int -> Ratings -> ImageSettings -> ( Int, String, Html Msg )
-viewCurrentFilmRollLink isCurrent dir columns ratings settings =
+viewCurrentFilmRollLink : Bool -> String -> Int -> PreviewVersions -> Ratings -> ImageSettings -> ( Int, String, Html Msg )
+viewCurrentFilmRollLink isCurrent dir columns previewVersions ratings settings =
     let
         previewExtension x =
             String.dropRight 3 x ++ "jpg"
@@ -510,7 +545,9 @@ viewCurrentFilmRollLink isCurrent dir columns ratings settings =
                 [ src <|
                     Url.Builder.absolute
                         [ dir, "previews", previewExtension settings.iFilename ]
-                        []
+                        [ Url.Builder.int "v" <|
+                            Maybe.withDefault 0 (Dict.get settings.iFilename previewVersions)
+                        ]
                 ]
                 []
             ]

@@ -24,6 +24,10 @@
          app.ports.serverMessage.send(e.data);
      });
 
+     evtSource.addEventListener("preview", e => {
+          app.ports.previewReady.send(e.data);
+      });
+
     </script>
 </body>
 
