@@ -40,6 +40,7 @@ dependencies:
   - mtl
   - optparse-applicative
   - process
+  - psqueues
   - record-hasfield
   - safe-exceptions
   - servant

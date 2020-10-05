@@ -18,6 +18,7 @@ import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Massiv.Array as Massiv
+import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
@@ -43,7 +44,7 @@ type PositiveT m =
   ReaderT Env m
 
 data Env = Env
-  { imageMVar :: !(MVar (Text, Image.MonochromeImage)),
+  { imageMVar :: !(MVar (OrdPSQ Text UTCTime Image.MonochromeImage)),
     previewMVar :: !(MVar [(FilePath, ImageSettings)]),
     eventChan :: !(Chan ServerEvent),
     isDev :: !Bool,
@@ -60,7 +61,7 @@ run logger_ flags =
             (Log.log logger_ ("listening on port " <> tshow @Int 8080))
             defaultSettings
    in do
-        imageMVar_ <- newMVar ("", HIP.fromLists [[HIP.PixelY 1]])
+        imageMVar_ <- newMVar OrdPSQ.empty
         previewMVar_ <- newEmptyMVar
         eventChan_ <- newChan
         let env = Env imageMVar_ previewMVar_ eventChan_ flags.isDev logger_
@@ -182,20 +183,25 @@ handleGetSettings =
 getImage :: Text -> PositiveT Handler (Image.MonochromeImage, IO ())
 getImage path = do
   env <- ask
-  currentlyLoaded@(loadedPath, loadedImage) <- liftIO $ takeMVar env.imageMVar
-  logDebug $ "MVar: " <> tshow currentlyLoaded
-  if path == loadedPath
-    then do
+  now <- liftIO Time.getCurrentTime
+  cache <- liftIO $ takeMVar env.imageMVar
+  logDebug $ "Cached images: " <> tshow (OrdPSQ.size cache)
+  case OrdPSQ.lookup path cache of
+    Just (_, loadedImage) -> do
       logDebug "From cache"
-      pure (loadedImage, putMVar env.imageMVar currentlyLoaded)
-    else do
+      pure (loadedImage, putMVar env.imageMVar $ insertAndTrim path now loadedImage cache)
+    Nothing -> do
       logDebug "From disk"
       maybeImage <- liftIO $ Image.readImageFromDisk (Text.unpack path)
-      case maybeImage of
+      case Image.resizeImage 1440 <$> maybeImage of
         Left err -> log ("Image read error: " <> tshow err) >> throwError err404
         Right image ->
-          let resized = Image.resizeImage 1440 image
-           in pure (resized, putMVar env.imageMVar (path, resized))
+          pure (image, putMVar env.imageMVar $ insertAndTrim path now image cache)
+
+insertAndTrim :: (Ord k, Ord p) => k -> p -> v -> OrdPSQ k p v -> OrdPSQ k p v
+insertAndTrim k v p psq =
+  let q = OrdPSQ.insert k v p psq
+   in if OrdPSQ.size q > 40 then OrdPSQ.deleteMin q else q
 
 -- LOG
 
