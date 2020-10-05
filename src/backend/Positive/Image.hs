@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Positive.Image where
 
@@ -35,25 +36,25 @@ processImage :: ImageSettings -> MonochromeImage -> MonochromeImage
 processImage is image =
   let HIP.Sz2 h w = HIP.dims image
       (y, x) =
-        ( floor $ int2Double h / 100 * icTop (iCrop is),
-          floor $ int2Double w / 100 * icLeft (iCrop is)
+        ( floor $ int2Double h / 100 * icTop is.iCrop,
+          floor $ int2Double w / 100 * icLeft is.iCrop
         )
-      cropWidth = floor $ int2Double (w - x) * (icWidth (iCrop is) / 100)
+      cropWidth = floor $ int2Double (w - x) * (icWidth is.iCrop / 100)
       cropHeight = floor $ int2Double cropWidth * mul
       mul = int2Double h / int2Double w
    in HIP.map
-        ( zone 0.9 (iZone9 is)
-            . zone 0.5 (iZone5 is)
-            . zone 0.1 (iZone1 is)
-            . gamma (iGamma is)
-            . compress (iBlackpoint is) (iWhitepoint is)
+        ( zone 0.9 is.iZone9
+            . zone 0.5 is.iZone5
+            . zone 0.1 is.iZone1
+            . gamma is.iGamma
+            . compress is.iBlackpoint is.iWhitepoint
             . invert
         )
         -- NOTE: 'normalize' is the only "automatic" correction and has a subtle effect
         -- at which it makes smaller images have more contrast due to different max and min
         -- values vs the original size
         . HIP.normalize
-        . rotate (iRotate is)
+        . rotate is.iRotate
         $ HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
 
 rotate :: Double -> MonochromeImage -> MonochromeImage

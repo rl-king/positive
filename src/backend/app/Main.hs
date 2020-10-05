@@ -1,4 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Main where
