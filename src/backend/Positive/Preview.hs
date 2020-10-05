@@ -22,7 +22,7 @@ run log = do
   missing <- findMissingPreviews
   log $ Text.unwords ["Found", tshow $ length missing, "outdated preview(s)"]
   for_ (zip missing [1 :: Int ..]) $ \(x, index) ->
-    generatePreview (\t -> log (t <> " | " <> tshow index <> " of " <> tshow (length missing))) x
+    generatePreview (addCount log (drop index missing)) x
 
 loop :: MVar [(FilePath, ImageSettings)] -> Chan ServerEvent -> (Text -> IO ()) -> IO ()
 loop mvar eventChan log =
@@ -30,15 +30,19 @@ loop mvar eventChan log =
     takeMVar mvar >>= \case
       [] -> log "Finished generating previews"
       x@(_, is) : xs -> do
-        generatePreview log x
+        generatePreview (addCount log xs) x
         writeChan eventChan (ServerEvent (Just "preview") Nothing [Builder.byteString $ encodeUtf8 is.iFilename])
         void (tryPutMVar mvar xs)
+
+addCount :: (Text -> IO ()) -> [a] -> Text -> IO ()
+addCount log xs t =
+  log (t <> " | " <> tshow (length xs) <> " left in queue")
 
 -- FIND
 
 findMissingPreviews :: IO [(FilePath, ImageSettings)]
 findMissingPreviews =
-  fmap concat . mapM (\dir -> prependDir dir <$> diffedPreviewSettings dir (dir </> "previews"))
+  fmap (sortOn fst . concat) . mapM (\dir -> prependDir dir <$> diffedPreviewSettings dir (dir </> "previews"))
     =<< fmap dropFileName <$> findImageSettingFiles
 
 prependDir :: FilePath -> FilmRollSettings -> [(FilePath, ImageSettings)]

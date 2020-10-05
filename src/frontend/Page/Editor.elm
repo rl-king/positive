@@ -606,9 +606,9 @@ viewSettings filmRoll route model =
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ viewRangeInput (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
-                , viewRangeInput (\v -> { settings | iZone1 = v }) 0.01 ( -0.5, 0.5, 0 ) "Zone I" settings.iZone1
-                , viewRangeInput (\v -> { settings | iZone5 = v }) 0.01 ( -0.5, 0.5, 0 ) "Zone V" settings.iZone5
-                , viewRangeInput (\v -> { settings | iZone9 = v }) 0.01 ( -0.5, 0.5, 0 ) "Zone IX" settings.iZone9
+                , viewRangeInput (\v -> { settings | iZone1 = v }) 0.001 ( -0.25, 0.25, 0 ) "Zone I" settings.iZone1
+                , viewRangeInput (\v -> { settings | iZone5 = v }) 0.001 ( -0.25, 0.25, 0 ) "Zone V" settings.iZone5
+                , viewRangeInput (\v -> { settings | iZone9 = v }) 0.001 ( -0.25, 0.25, 0 ) "Zone IX" settings.iZone9
                 , viewRangeInput (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.5, 0.5, 0 ) "Blackpoint" settings.iBlackpoint
                 , viewRangeInput (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
