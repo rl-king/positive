@@ -204,6 +204,7 @@ type Msg
     | Rotate
     | RemoveNotification
     | OnPreviewReady String
+    | LoadOriginal
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -420,6 +421,9 @@ update key msg model =
 
         RemoveNotification ->
             ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
+
+        LoadOriginal ->
+            ( { model | imageProcessingState = Processing }, Cmd.none )
 
 
 type Key a
@@ -660,6 +664,8 @@ viewSettings filmRoll route model =
         , viewSettingsGroup
             [ button [ onClick PreviousImage ] [ text "⯇" ]
             , button [ onClick NextImage ] [ text "⯈" ]
+            , viewIf (model.imageProcessingState == Preview) <|
+                \_ -> button [ onClick LoadOriginal ] [ text "Load original" ]
             ]
         ]
 
