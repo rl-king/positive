@@ -29,9 +29,9 @@ import System.FilePath.Posix as Path
 -- FILMROLLSETTINGS
 
 data FilmRollSettings = FilmRollSettings
-  { frsPoster :: Maybe Text,
-    frsRatings :: HashMap Text Int,
-    frsSettings :: HashMap Text ImageSettings
+  { frsPoster :: !(Maybe Text),
+    frsRatings :: !(HashMap Text Int),
+    frsSettings :: !(HashMap Text ImageSettings)
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq)
 
@@ -153,15 +153,15 @@ instance ElmComparable Text
 -- IMAGESETTINGS
 
 data ImageSettings = ImageSettings
-  { iFilename :: Text,
-    iRotate :: Double,
-    iCrop :: ImageCrop,
-    iGamma :: Double,
-    iZone1 :: Double,
-    iZone5 :: Double,
-    iZone9 :: Double,
-    iBlackpoint :: Double,
-    iWhitepoint :: Double
+  { iFilename :: !Text,
+    iRotate :: !Double,
+    iCrop :: !ImageCrop,
+    iGamma :: !Double,
+    iZone1 :: !Double,
+    iZone5 :: !Double,
+    iZone9 :: !Double,
+    iBlackpoint :: !Double,
+    iWhitepoint :: !Double
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
 
@@ -186,9 +186,9 @@ instance Elm.HasElmEncoder Aeson.Value ImageSettings where
 -- CROP
 
 data ImageCrop = ImageCrop
-  { icTop :: Double,
-    icLeft :: Double,
-    icWidth :: Double
+  { icTop :: !Double,
+    icLeft :: !Double,
+    icWidth :: !Double
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
 
