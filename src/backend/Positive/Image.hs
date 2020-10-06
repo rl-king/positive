@@ -25,12 +25,10 @@ readImageFromDisk path =
   tryIO $ HIP.readImageY path
 
 resizeImage :: Int -> MonochromeImage -> MonochromeImage
-resizeImage targetWidth image =
-  let mul = int2Double (HIP.rows image) / int2Double (HIP.cols image)
-      preWidth = HIP.rows image - floor (int2Double targetWidth / 2)
-      resize = HIP.resizeDW (HIP.Bicubic (-0.25)) HIP.Edge
-   in resize (HIP.Sz2 (round (int2Double targetWidth * mul)) targetWidth) $
-        resize (HIP.Sz2 (round (int2Double preWidth * mul)) preWidth) image
+resizeImage targetWidth image
+  | HIP.cols image `div` targetWidth > 5 = HIP.shrink2x2 (HIP.shrink3x3 image)
+  | HIP.cols image `div` targetWidth > 3 = HIP.shrink3x3 image
+  | otherwise = HIP.shrink2x2 image
 
 processImage :: ImageSettings -> MonochromeImage -> MonochromeImage
 processImage is image =
