@@ -58,6 +58,7 @@ runElmFormat :: (Text -> IO ()) -> IO ()
 runElmFormat log =
   let args = ["--elm-version=0.19", "--yes", "src/frontend/Generated"]
    in Process.withCreateProcess (Process.proc "elm-format" args) $
-        \_ _ _ handler -> Process.waitForProcess handler >>= \case
-          System.Exit.ExitSuccess -> log "Formatted generated code with elm-format"
-          result -> log $ "Something went wrong trying to format the generated Elm code: " <> tshow result
+        \_ _ _ handler ->
+          Process.waitForProcess handler >>= \case
+            System.Exit.ExitSuccess -> log "Formatted generated code with elm-format"
+            result -> log $ "Something went wrong trying to format the generated Elm code: " <> tshow result

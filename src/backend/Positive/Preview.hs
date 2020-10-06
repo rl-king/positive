@@ -6,6 +6,7 @@ module Positive.Preview where
 
 import Control.Concurrent.Chan
 import Control.Concurrent.MVar
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
@@ -17,9 +18,9 @@ import System.FilePath.Posix
 
 -- PREVIEW
 
-run :: (Text -> IO ()) -> IO ()
-run log = do
-  missing <- findMissingPreviews
+run :: (Text -> IO ()) -> Bool -> IO ()
+run log replace = do
+  missing <- findMissingPreviews replace
   log $ Text.unwords ["Found", tshow $ length missing, "outdated preview(s)"]
   for_ (zip missing [1 :: Int ..]) $ \(x, index) ->
     generatePreview (addCount log (drop index missing)) x
@@ -40,10 +41,16 @@ addCount log xs t =
 
 -- FIND
 
-findMissingPreviews :: IO [(FilePath, ImageSettings)]
-findMissingPreviews =
-  fmap (sortOn fst . concat) . mapM (\dir -> prependDir dir <$> diffedPreviewSettings dir (dir </> "previews"))
-    =<< fmap dropFileName <$> findImageSettingFiles
+findMissingPreviews :: Bool -> IO [(FilePath, ImageSettings)]
+findMissingPreviews replace =
+  let toSettings dir =
+        if replace
+          then
+            maybe (fail "Something went wrong reading the settings file") pure
+              =<< Aeson.decodeFileStrict (dir </> "image-settings.json")
+          else diffedPreviewSettings dir (dir </> "previews")
+   in fmap (sortOn fst . concat) . mapM (\dir -> prependDir dir <$> toSettings dir)
+        =<< fmap dropFileName <$> findImageSettingFiles
 
 prependDir :: FilePath -> FilmRollSettings -> [(FilePath, ImageSettings)]
 prependDir dir settings =

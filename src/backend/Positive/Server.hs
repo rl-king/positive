@@ -36,7 +36,7 @@ import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
 import System.Directory
-import System.FilePath.Posix ((</>), isPathSeparator)
+import System.FilePath.Posix (isPathSeparator, (</>))
 
 -- POSITIVE
 
@@ -114,7 +114,7 @@ handleSaveSettings dir newSettings = do
   liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
   logDebug "Wrote settings"
   env <- ask
-  missing <- liftIO Preview.findMissingPreviews
+  missing <- liftIO $ Preview.findMissingPreviews False
   void . liftIO $ tryPutMVar env.previewMVar missing
   logDebug $ "Updating " <> tshow (length missing) <> " preview(s)"
   pure newSettings

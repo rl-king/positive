@@ -23,13 +23,8 @@ main = do
       flags <- Flags.parseArgs
       let log = Log.log logger
       case flags.mode of
-        Flags.Init ->
-          Init.run flags.hard >> Preview.run log -- >> Contacts.run log
-        Flags.Previews ->
-          Preview.run log
-        Flags.Contacts ->
-          Contacts.run log
-        Flags.SingleImage filepath ->
-          SingleImage.run log filepath
-        Flags.Server ->
-          when flags.isDev (CodeGen.run log) >> Server.run logger flags
+        Flags.Init replace -> Init.run replace >> Preview.run log replace
+        Flags.Previews replace -> Preview.run log replace
+        Flags.Contacts -> Contacts.run log
+        Flags.SingleImage filepath -> SingleImage.run log filepath
+        Flags.Server -> when flags.isDev (CodeGen.run log) >> Server.run logger flags

@@ -9,18 +9,19 @@ import Positive.Prelude
 
 data Flags = Flags
   { isDev :: !Bool,
-    hard :: !Bool,
     mode :: !Mode
   }
   deriving (Show, Eq)
 
 data Mode
-  = Init
-  | Previews
+  = Init Replace
+  | Previews Replace
   | Contacts
   | SingleImage FilePath
   | Server
   deriving (Show, Eq)
+
+type Replace = Bool
 
 parseArgs :: IO Flags
 parseArgs =
@@ -31,10 +32,15 @@ parser :: Parser Flags
 parser =
   Flags
     <$> flag False True (long "dev" <> help "generate elm, verbose logging")
-    <*> flag False True (long "hard" <> help "reset settings")
-    <*> ( flag' Init (long "init" <> short 'i')
-            <|> flag' Previews (long "previews" <> short 'p')
-            <|> flag' Contacts (long "contacts" <> short 'c')
-            <|> SingleImage <$> strOption (long "single" <> short 's')
-            <|> pure Server
-        )
+      <*> ( flag' Init (long "init" <> short 'i' <> help "create image-settings.json and previews")
+              <*> replace
+                <|> flag' Previews (long "previews" <> short 'p' <> help "generate previews")
+              <*> replace
+                <|> flag' Contacts (long "contacts" <> short 'c' <> help "generate contactsheet")
+                <|> SingleImage <$> strOption (long "single" <> short 's' <> help "generate single highres image")
+                <|> pure Server
+          )
+
+replace :: Parser Replace
+replace =
+  flag False True (long "replace" <> help "replace existing")

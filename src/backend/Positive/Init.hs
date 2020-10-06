@@ -8,11 +8,11 @@ import System.Directory
 import System.FilePath.Posix
 
 run :: Bool -> IO ()
-run overwrite =
+run replace =
   let imageSettings = "image-settings.json"
       imagePreviewSettings = "previews" </> imageSettings
       -- imageContactSettings = "contacts" </> filename
-      check path = if overwrite then pure False else doesFileExist path
+      check path = if replace then pure False else doesFileExist path
    in do
         filenames <- fmap Text.pack . filter (\x -> isExtensionOf ".tif" x || isExtensionOf ".png" x) <$> listDirectory "."
         unless (null filenames) $ do
