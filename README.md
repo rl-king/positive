@@ -17,6 +17,6 @@ I made this because I've always felt the need for less magic and more control co
 # Reload hs/elm/css on save
 ./build-dev.sh
 
-# Build hs/elm, embed assets into final binary
+# Build hs/elm, embed js/html/css into hs output binary
 ./build-bin.sh
 ```
