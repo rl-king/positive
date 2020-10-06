@@ -136,11 +136,12 @@ type ImageProcessingState
     = Ready
     | Processing
     | Queued FilmRoll
+    | Preview
 
 
 init : Route -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
-    { imageProcessingState = Processing
+    { imageProcessingState = Preview
     , ratings = ratings
     , poster = poster
     , filmRoll = focus route filmRoll
@@ -161,7 +162,7 @@ init route filmRoll ratings poster =
 continue : Route -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
 continue route filmRoll ratings poster model =
     { model
-        | imageProcessingState = Processing
+        | imageProcessingState = Preview
         , ratings = ratings
         , poster = poster
         , filmRoll = focus route filmRoll
@@ -275,6 +276,9 @@ update key msg model =
                         Request.postImageSettingsHistogram dir settings
             in
             case model.imageProcessingState of
+                Preview ->
+                    ( { model | imageProcessingState = Ready }, Cmd.none )
+
                 Ready ->
                     ( { model | imageProcessingState = Ready }, Cmd.none )
 
@@ -437,6 +441,13 @@ saveSettings model =
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
     case model.imageProcessingState of
+        Preview ->
+            { model
+                | imageProcessingState = Processing
+                , filmRoll = Zipper.mapCurrent f model.filmRoll
+                , undoState = model.filmRoll :: model.undoState
+            }
+
         Ready ->
             { model
                 | imageProcessingState = Processing
@@ -524,9 +535,6 @@ viewCurrentFilmRoll route columns minimumRating previewVersions ratings filmRoll
 viewCurrentFilmRollLink : Bool -> String -> Int -> PreviewVersions -> Ratings -> ImageSettings -> ( Int, String, Html Msg )
 viewCurrentFilmRollLink isCurrent dir columns previewVersions ratings settings =
     let
-        previewExtension x =
-            String.dropRight 3 x ++ "jpg"
-
         width =
             style "width" <|
                 interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
@@ -744,16 +752,30 @@ viewImage filmRoll route model =
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper", scale ]
-            [ img
-                [ on "load" (Decode.succeed (OnImageLoad route.dir (Zipper.current filmRoll)))
-                , style "user-select" "none"
-                , src <|
-                    Url.Builder.absolute [ "image" ]
-                        [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
-                        , Url.Builder.string "dir" route.dir
+            [ case model.imageProcessingState of
+                Preview ->
+                    img
+                        [ style "user-select" "none"
+                        , src <|
+                            Url.Builder.absolute
+                                [ route.dir, "previews", previewExtension current.iFilename ]
+                                [ Url.Builder.int "v" <|
+                                    Maybe.withDefault 0 (Dict.get current.iFilename model.previewVersions)
+                                ]
                         ]
-                ]
-                []
+                        []
+
+                _ ->
+                    img
+                        [ on "load" (Decode.succeed (OnImageLoad route.dir (Zipper.current filmRoll)))
+                        , style "user-select" "none"
+                        , src <|
+                            Url.Builder.absolute [ "image" ]
+                                [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
+                                , Url.Builder.string "dir" route.dir
+                                ]
+                        ]
+                        []
             , viewMaybe model.imageCropMode <|
                 \imageCrop ->
                     div
@@ -799,13 +821,27 @@ viewHistogramBar index v =
 
 viewLoading : ImageProcessingState -> Html msg
 viewLoading state =
-    viewIf (state /= Ready) <|
-        \_ ->
+    case state of
+        Ready ->
+            text ""
+
+        Preview ->
+            text ""
+
+        Processing ->
+            div [ class "loading-spinner" ] []
+
+        Queued _ ->
             div [ class "loading-spinner" ] []
 
 
 
 -- HELPERS
+
+
+previewExtension : String -> String
+previewExtension x =
+    String.dropRight 3 x ++ "jpg"
 
 
 resetAll : ImageSettings -> ImageSettings
