@@ -168,6 +168,7 @@ continue route filmRoll ratings poster model =
         , ratings = ratings
         , poster = poster
         , filmRoll = focus route filmRoll
+        , route = route
     }
 
 
