@@ -25,15 +25,23 @@ run log replace = do
   for_ (zip missing [1 :: Int ..]) $ \(x, index) ->
     generatePreview (addCount log (drop index missing)) x
 
-loop :: MVar [(FilePath, ImageSettings)] -> Chan ServerEvent -> (Text -> IO ()) -> IO ()
-loop mvar eventChan log =
+-- LOOP
+
+loop ::
+  MVar [(FilePath, ImageSettings)] ->
+  MVar (OrdPSQ Text UTCTime MonochromeImage) ->
+  Chan ServerEvent ->
+  (Text -> IO ()) ->
+  IO ()
+loop queueMVar cacheMVar eventChan log =
   void . forkIO . forever $
-    takeMVar mvar >>= \case
+    {- block while some other process uses cacheMVar -}
+    takeMVar queueMVar <* readMVar cacheMVar >>= \case
       [] -> log "Finished generating previews"
       x@(_, is) : xs -> do
         generatePreview (addCount log xs) x
         writeChan eventChan (ServerEvent (Just "preview") Nothing [Builder.byteString $ encodeUtf8 is.iFilename])
-        void (tryPutMVar mvar xs)
+        void (tryPutMVar queueMVar xs)
 
 addCount :: (Text -> IO ()) -> [a] -> Text -> IO ()
 addCount log xs t =
