@@ -41,9 +41,11 @@ processImage is image =
       cropHeight = floor $ int2Double cropWidth * mul
       mul = int2Double h / int2Double w
    in HIP.map
-        ( zone 0.9 is.iZone9
-            . zone 0.5 is.iZone5
-            . zone 0.1 is.iZone1
+        ( zone 0.9 is.iZones.z9
+            . zone 0.7 is.iZones.z7
+            . zone 0.5 is.iZones.z5
+            . zone 0.3 is.iZones.z3
+            . zone 0.1 is.iZones.z1
             . gamma is.iGamma
             . compress is.iBlackpoint is.iWhitepoint
             . invert

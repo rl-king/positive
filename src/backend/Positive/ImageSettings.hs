@@ -93,7 +93,7 @@ difference (FilmRollSettings pa sa a) (FilmRollSettings pb sb b) =
 
 plainImageSettings :: Text -> ImageSettings
 plainImageSettings x =
-  ImageSettings x 0 noCrop 2.2 0 0 0 0 1
+  ImageSettings x 0 noCrop 2.2 initZones 0 1
 
 instance Elm.HasElmType FilmRollSettings where
   elmDefinition =
@@ -128,24 +128,6 @@ instance
   elmDecoder =
     Expression.App "Json.Decode.dict" (Elm.elmDecoder @Aeson.Value @a)
 
--- SET
-
-instance (Elm.HasElmType a, ElmComparable a) => Elm.HasElmType (HashSet a) where
-  elmType =
-    Type.App "Set.Set" (Elm.elmType @a)
-
-instance (Elm.HasElmEncoder Aeson.Value a, ElmComparable a) => Elm.HasElmEncoder Aeson.Value (HashSet a) where
-  elmEncoder =
-    Expression.App "Json.Encode.set" (Elm.elmEncoder @Aeson.Value @a)
-
-instance (Elm.HasElmDecoder Aeson.Value a, ElmComparable a) => Elm.HasElmDecoder Aeson.Value (HashSet a) where
-  elmDecoder =
-    Expression.apps
-      "Json.Decode.map"
-      [ "Set.fromList",
-        Expression.App "Json.Decode.list" (Elm.elmDecoder @Aeson.Value @a)
-      ]
-
 class ElmComparable a
 
 instance ElmComparable Text
@@ -157,13 +139,35 @@ data ImageSettings = ImageSettings
     iRotate :: !Double,
     iCrop :: !ImageCrop,
     iGamma :: !Double,
-    iZone1 :: !Double,
-    iZone5 :: !Double,
-    iZone9 :: !Double,
+    iZones :: !Zones,
     iBlackpoint :: !Double,
     iWhitepoint :: !Double
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.ToJSON)
+
+instance Aeson.FromJSON ImageSettings where
+  parseJSON =
+    Aeson.withObject "ImageSettings" $ \o -> do
+      filename <- o .: "iFilename"
+      rotate <- o .: "iRotate"
+      crop <- o .: "iCrop"
+      gamma <- o .: "iGamma"
+      zone1 <- o .:? "iZone1" .!= 0
+      zone5 <- o .:? "iZone5" .!= 0
+      zone9 <- o .:? "iZone9" .!= 0
+      zones <- o .:? "iZones" .!= Zones zone1 0 0 0 zone5 0 0 0 zone9
+      blackpoint <- o .: "iBlackpoint"
+      whitepoint <- o .: "iWhitepoint"
+      pure $
+        ImageSettings
+          { iFilename = filename,
+            iRotate = rotate,
+            iCrop = crop,
+            iGamma = gamma,
+            iZones = zones,
+            iBlackpoint = blackpoint,
+            iWhitepoint = whitepoint
+          }
 
 instance FromHttpApiData ImageSettings where
   parseUrlPiece piece =
@@ -182,6 +186,37 @@ instance Elm.HasElmDecoder Aeson.Value ImageSettings where
 instance Elm.HasElmEncoder Aeson.Value ImageSettings where
   elmEncoderDefinition =
     Just $ Elm.deriveElmJSONEncoder @ImageSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeImageSettings"
+
+-- Zones
+
+data Zones = Zones
+  { z1 :: !Double,
+    z2 :: !Double,
+    z3 :: !Double,
+    z4 :: !Double,
+    z5 :: !Double,
+    z6 :: !Double,
+    z7 :: !Double,
+    z8 :: !Double,
+    z9 :: !Double
+  }
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+initZones :: Zones
+initZones =
+  Zones 0 0 0 0 0 0 0 0 0
+
+instance Elm.HasElmType Zones where
+  elmDefinition =
+    Just $ Elm.deriveElmTypeDefinition @Zones Elm.defaultOptions "Generated.Data.ImageSettings.Zones"
+
+instance Elm.HasElmDecoder Aeson.Value Zones where
+  elmDecoderDefinition =
+    Just $ Elm.deriveElmJSONDecoder @Zones Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeZones"
+
+instance Elm.HasElmEncoder Aeson.Value Zones where
+  elmEncoderDefinition =
+    Just $ Elm.deriveElmJSONEncoder @Zones Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeZones"
 
 -- CROP
 

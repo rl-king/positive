@@ -32,6 +32,7 @@ run log = do
         Elm.jsonDefinitions @ImageSettings
           <> Elm.jsonDefinitions @ImageCrop
           <> Elm.jsonDefinitions @FilmRollSettings
+          <> Elm.jsonDefinitions @Zones
       modules =
         Pretty.modules $
           Simplification.simplifyDefinition

@@ -17,6 +17,7 @@ import Generated.Data.ImageSettings as ImageSettings
         ( FilmRollSettings
         , ImageCrop
         , ImageSettings
+        , Zones
         )
 import Generated.Request as Request
 import Html exposing (..)
@@ -611,16 +612,24 @@ viewSettings filmRoll route model =
 
                 _ ->
                     Zipper.current filmRoll
+
+        zones =
+            settings.iZones
     in
     section [ class "image-settings" ]
         [ viewSettingsGroup
             [ viewHistogram model.histogram ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
+                [ viewRangeInput (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "Zone I" settings.iZones.z1
+                , viewRangeInput (\v -> { settings | iZones = { zones | z3 = v } }) 0.001 ( -0.25, 0.25, 0 ) "Zone III" settings.iZones.z3
+                , viewRangeInput (\v -> { settings | iZones = { zones | z5 = v } }) 0.001 ( -0.25, 0.25, 0 ) "Zone V" settings.iZones.z5
+                , viewRangeInput (\v -> { settings | iZones = { zones | z7 = v } }) 0.001 ( -0.25, 0.25, 0 ) "Zone VII" settings.iZones.z7
+                , viewRangeInput (\v -> { settings | iZones = { zones | z9 = v } }) 0.001 ( -0.25, 0.25, 0 ) "Zone IX" settings.iZones.z9
+                ]
+        , viewSettingsGroup <|
+            List.map (Html.map OnImageSettingsChange)
                 [ viewRangeInput (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
-                , viewRangeInput (\v -> { settings | iZone1 = v }) 0.001 ( -0.25, 0.25, 0 ) "Zone I" settings.iZone1
-                , viewRangeInput (\v -> { settings | iZone5 = v }) 0.001 ( -0.25, 0.25, 0 ) "Zone V" settings.iZone5
-                , viewRangeInput (\v -> { settings | iZone9 = v }) 0.001 ( -0.25, 0.25, 0 ) "Zone IX" settings.iZone9
                 , viewRangeInput (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.5, 0.5, 0 ) "Blackpoint" settings.iBlackpoint
                 , viewRangeInput (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
@@ -852,12 +861,12 @@ previewExtension x =
 
 resetAll : ImageSettings -> ImageSettings
 resetAll current =
-    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 0 0 0 0 1
+    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 (Zones 0 0 0 0 0 0 0 0 0) 0 1
 
 
 resetTone : ImageSettings -> ImageSettings
 resetTone current =
-    ImageSettings current.iFilename current.iRotate current.iCrop 2.2 0 0 0 0 1
+    ImageSettings current.iFilename current.iRotate current.iCrop 2.2 (Zones 0 0 0 0 0 0 0 0 0) 0 1
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
