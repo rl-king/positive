@@ -24,6 +24,7 @@ import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed
+import Html.Lazy
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
@@ -488,11 +489,25 @@ fromZipper poster ratings =
 view : Model -> List ( Level, String ) -> Html Msg
 view model otherNotifications =
     main_ []
-        [ viewNav model.route
-        , viewLoading model.imageProcessingState
-        , viewImage model.filmRoll model.route model
-        , viewSettings model.filmRoll model.route model
-        , viewCurrentFilmRoll model.route
+        [ Html.Lazy.lazy viewNav model.route
+        , Html.Lazy.lazy viewLoading model.imageProcessingState
+        , Html.Lazy.lazy6 viewImage
+            model.filmRoll
+            model.route
+            model.imageCropMode
+            model.scale
+            model.imageProcessingState
+            model.previewVersions
+        , Html.Lazy.lazy7 viewSettings
+            model.filmRoll
+            model.route
+            model.histogram
+            model.undoState
+            model.imageCropMode
+            model.clipboard
+            model.imageProcessingState
+        , Html.Lazy.lazy6 viewCurrentFilmRoll
+            model.route
             model.previewColumns
             model.minimumRating
             model.previewVersions
@@ -602,11 +617,19 @@ viewRating filename ratings =
 -- IMAGE SETTINGS
 
 
-viewSettings : FilmRoll -> Route -> Model -> Html Msg
-viewSettings filmRoll route model =
+viewSettings :
+    FilmRoll
+    -> Route
+    -> List Int
+    -> List FilmRoll
+    -> Maybe ImageCrop
+    -> Maybe ImageSettings
+    -> ImageProcessingState
+    -> Html Msg
+viewSettings filmRoll route histogram undoState imageCropMode clipboard_ imageProcessingState =
     let
         settings =
-            case model.imageProcessingState of
+            case imageProcessingState of
                 Queued queuedFilmRoll ->
                     Zipper.current queuedFilmRoll
 
@@ -618,7 +641,7 @@ viewSettings filmRoll route model =
     in
     section [ class "image-settings" ]
         [ viewSettingsGroup
-            [ viewHistogram model.histogram ]
+            [ Html.Lazy.lazy viewHistogram histogram ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ viewRangeInput (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
@@ -634,12 +657,12 @@ viewSettings filmRoll route model =
                 , viewRangeInput (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
         , viewSettingsGroup
-            [ viewImageCropMode settings model.imageCropMode
+            [ viewImageCropMode settings imageCropMode
             , button [ onClick Rotate ] [ text "Rotate" ]
             ]
         , viewSettingsGroup
             [ button [ onClick (CopySettings settings) ] [ text "Copy settings" ]
-            , viewMaybe model.clipboard <|
+            , viewMaybe clipboard_ <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
                         [ pre [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
@@ -667,13 +690,13 @@ viewSettings filmRoll route model =
         , viewSettingsGroup
             [ button [ onClick GenerateHighres ] [ text "Generate highres" ]
             , button [ onClick GenerateWallpaper ] [ text "Generate wallpaper" ]
-            , viewIf (not (List.isEmpty model.undoState)) <|
+            , viewIf (not (List.isEmpty undoState)) <|
                 \_ -> button [ onClick Undo ] [ text "Undo" ]
             ]
         , viewSettingsGroup
             [ button [ onClick PreviousImage ] [ text "⯇" ]
             , button [ onClick NextImage ] [ text "⯈" ]
-            , viewIf (model.imageProcessingState == Preview) <|
+            , viewIf (imageProcessingState == Preview) <|
                 \_ -> button [ onClick LoadOriginal ] [ text "Load original" ]
             ]
         ]
@@ -747,8 +770,12 @@ viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
         ]
 
 
-viewImage : FilmRoll -> Route -> Model -> Html Msg
-viewImage filmRoll route model =
+
+-- IMAGE
+
+
+viewImage : FilmRoll -> Route -> Maybe ImageCrop -> Float -> ImageProcessingState -> Dict String Int -> Html Msg
+viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersions =
     let
         current =
             Zipper.current filmRoll
@@ -760,14 +787,14 @@ viewImage filmRoll route model =
         ifCropping settings =
             Maybe.withDefault settings <|
                 Maybe.map (\_ -> { settings | iRotate = 0, iCrop = ImageCrop 0 0 100 })
-                    model.imageCropMode
+                    imageCropMode
 
         scale =
-            style "transform" ("scale(" ++ String.fromFloat model.scale ++ ")")
+            style "transform" ("scale(" ++ String.fromFloat scale_ ++ ")")
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper", scale ]
-            [ case model.imageProcessingState of
+            [ case imageProcessingState of
                 Preview ->
                     img
                         [ style "user-select" "none"
@@ -775,7 +802,7 @@ viewImage filmRoll route model =
                             Url.Builder.absolute
                                 [ route.dir, "previews", previewExtension current.iFilename ]
                                 [ Url.Builder.int "v" <|
-                                    Maybe.withDefault 0 (Dict.get current.iFilename model.previewVersions)
+                                    Maybe.withDefault 0 (Dict.get current.iFilename previewVersions)
                                 ]
                         ]
                         []
@@ -791,7 +818,7 @@ viewImage filmRoll route model =
                                 ]
                         ]
                         []
-            , viewMaybe model.imageCropMode <|
+            , viewMaybe imageCropMode <|
                 \imageCrop ->
                     div
                         [ class "image-crop-overlay"
@@ -808,7 +835,7 @@ viewImage filmRoll route model =
                         []
             ]
         , section [ class "zones" ]
-            [ viewRangeInput UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" model.scale ]
+            [ viewRangeInput UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" scale_ ]
         ]
 
 
