@@ -50,6 +50,11 @@ data SettingsApi route = SettingsApi
         :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
+    saGetCoordinateInfo ::
+      route :- "image" :> "settings" :> "coordinate"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)
+        :> Post '[JSON] [CoordinateInfo],
     saGenerateWallpaper ::
       route :- "image" :> "settings" :> "wallpaper"
         :> QueryParam' '[Required, Strict] "dir" Text

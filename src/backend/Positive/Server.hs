@@ -27,7 +27,11 @@ import Network.Wai.Handler.Warp hiding (run)
 import Positive.Api
 import Positive.Flags (Flags (..))
 import qualified Positive.Image as Image
-import Positive.ImageSettings (FilmRollSettings, ImageSettings (..))
+import Positive.ImageSettings
+  ( CoordinateInfo (..),
+    FilmRollSettings,
+    ImageSettings (..),
+  )
 import qualified Positive.ImageSettings as ImageSettings
 import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
@@ -87,6 +91,7 @@ handlers isDev_ chan =
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
               saGenerateHighRes = handleGenerateHighRes,
+              saGetCoordinateInfo = handleGetCoordinateInfo,
               saGenerateWallpaper = handleGenerateWallpaper
             }
     }
@@ -171,6 +176,22 @@ handleGetSettingsHistogram dir settings =
           . Massiv.foldlP adjust bins (HashMap.unionWith (+)) bins
           . HIP.unImage
           $ Image.processImage settings image
+
+handleGetCoordinateInfo :: Text -> ([(Double, Double)], ImageSettings) -> PositiveT Handler [CoordinateInfo]
+handleGetCoordinateInfo dir (coordinates, settings) =
+  let toInfo image (x, y) =
+        CoordinateInfo x y
+          . (\(HIP.PixelY p) -> p)
+          . HIP.borderIndex Massiv.Continue image
+          $ HIP.Ix2
+            (floor (int2Double (HIP.rows image) * y))
+            (floor (int2Double (HIP.cols image) * x))
+   in do
+        (image, putMVarBack) <-
+          first (Image.processImage settings)
+            <$> getImage (Text.pack (Text.unpack dir </> Text.unpack settings.iFilename))
+        liftIO putMVarBack
+        pure $ fmap (toInfo image) coordinates
 
 -- LIST DIRECTORIES
 

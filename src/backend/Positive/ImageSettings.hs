@@ -243,6 +243,27 @@ instance Elm.HasElmEncoder Aeson.Value ImageCrop where
   elmEncoderDefinition =
     Just $ Elm.deriveElmJSONEncoder @ImageCrop Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeImageCrop"
 
+-- COORDINATE
+
+data CoordinateInfo = CoordinateInfo
+  { ciX :: !Double,
+    ciY :: !Double,
+    ciValue :: !Double
+  }
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+
+instance Elm.HasElmType CoordinateInfo where
+  elmDefinition =
+    Just $ Elm.deriveElmTypeDefinition @CoordinateInfo Elm.defaultOptions "Generated.Data.ImageSettings.CoordinateInfo"
+
+instance Elm.HasElmDecoder Aeson.Value CoordinateInfo where
+  elmDecoderDefinition =
+    Just $ Elm.deriveElmJSONDecoder @CoordinateInfo Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeCoordinateInfo"
+
+instance Elm.HasElmEncoder Aeson.Value CoordinateInfo where
+  elmEncoderDefinition =
+    Just $ Elm.deriveElmJSONEncoder @CoordinateInfo Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeCoordinateInfo"
+
 -- FS
 
 findImageSettings :: IO (HashMap Text FilmRollSettings)

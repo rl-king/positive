@@ -6,7 +6,6 @@ module Positive.Image where
 import Control.Exception.Safe (IOException, tryIO)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Massiv.Array.IO as Massiv
-import GHC.Float (int2Double)
 import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
 import Positive.ImageSettings as ImageSettings

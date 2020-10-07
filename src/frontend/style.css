@@ -381,7 +381,52 @@ input[type="range"]::-moz-range-thumb {
     overflow: hidden;
 }
 
+.coordinate-info span {
+    padding: 0 .5rem;
+    position: absolute;
+    font-family: var(--mono);
+    font-weight: 600;
+    text-shadow: 3px 3px 25px rgba(0,0,0,0.3);
+    background-color: #333;
+}
+
+.coordinate-info span:after {
+    content: "";
+    width: 5px;
+    height: 5px;
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    background-color: #fff;
+}
+
+.coordinate-info span.-flip:after {
+    right: 0;
+    left: unset;
+}
+
+.coordinate-info span.-dark:after {
+    background-color: #333;
+}
+
+.coordinate-info span.-dark {
+    text-shadow: 3px 3px 25px rgba(255,255,255,0.3);
+    color: #333;
+    background-color: #fff;
+}
+
+.coordinate-info span.-flip {
+    transform: translateX(-100%);
+}
+
+.coordinate-info {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
 .image-crop-overlay {
+    width: 100%;
     height: 100%;
     position: absolute;
     top: 0;
