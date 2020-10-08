@@ -961,15 +961,15 @@ viewCoordinate { element } settings scale coordinate =
                 [ String.fromFloat (element.width * coordinate.ciX + xOffset) ]
         , classList
             [ ( "-dark", coordinate.ciValue > 0.5 )
-            , ( "-flip", coordinate.ciX > 0.9 )
+            , ( "-flip", coordinate.ciX > 0.85 )
             , ( "-flap", coordinate.ciY > 0.95 )
             , ( "coordinate", True )
             ]
         ]
-        [ text (String.left 7 (String.fromFloat coordinate.ciValue))
+        [ button [ onClick (RemoveCoordinate coordinate) ]
+            [ text (String.left 7 (String.fromFloat coordinate.ciValue)) ]
         , span [ class "coordinate-buttons" ]
-            [ button [ onClick (RemoveCoordinate coordinate) ] [ text "×" ]
-            , button
+            [ button
                 [ class "coordinate-min"
                 , onClick <|
                     OnImageSettingsChange <|
