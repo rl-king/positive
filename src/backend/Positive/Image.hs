@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
@@ -24,21 +25,21 @@ readImageFromDisk path =
   tryIO $ HIP.readImageY path
 
 resizeImage :: Int -> MonochromeImage -> MonochromeImage
-resizeImage targetWidth image
+resizeImage !targetWidth !image
   | HIP.cols image `div` targetWidth > 5 = HIP.shrink2x2 (HIP.shrink3x3 image)
   | HIP.cols image `div` targetWidth > 3 = HIP.shrink3x3 image
   | otherwise = HIP.shrink2x2 image
 
 processImage :: ImageSettings -> MonochromeImage -> MonochromeImage
-processImage is image =
-  let HIP.Sz2 h w = HIP.dims image
-      (y, x) =
+processImage !is !image =
+  let HIP.Sz2 !h !w = HIP.dims image
+      (!y, !x) =
         ( floor $ int2Double h / 100 * icTop is.iCrop,
           floor $ int2Double w / 100 * icLeft is.iCrop
         )
-      cropWidth = floor $ int2Double (w - x) * (icWidth is.iCrop / 100)
-      cropHeight = floor $ int2Double cropWidth * mul
-      mul = int2Double h / int2Double w
+      !cropWidth = floor $ int2Double (w - x) * (icWidth is.iCrop / 100)
+      !cropHeight = floor $ int2Double cropWidth * mul
+      !mul = int2Double h / int2Double w
    in HIP.map
         ( zone 0.9 is.iZones.z9
             . zone 0.7 is.iZones.z7
@@ -57,7 +58,7 @@ processImage is image =
         $ HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
 
 rotate :: Double -> MonochromeImage -> MonochromeImage
-rotate rad =
+rotate !rad =
   case floor $ rad * 180 / pi :: Int of
     -90 -> HIP.rotate270
     -270 -> HIP.rotate90
@@ -109,29 +110,29 @@ invert =
 {-# INLINE invert #-}
 
 compress :: Double -> Double -> MonochromePixel -> MonochromePixel
-compress s l =
+compress !s !l =
   fmap (\p -> min 1 . max 0 $ (p - s) / (l - s))
 {-# INLINE compress #-}
 
 gamma :: Double -> MonochromePixel -> MonochromePixel
-gamma x =
+gamma !x =
   fmap (** x)
 {-# INLINE gamma #-}
 
 zone :: Double -> Double -> MonochromePixel -> MonochromePixel
-zone t i =
+zone !t !i =
   let m v = curve (1 - v - t)
    in fmap (\v -> v + (m v * i))
 {-# INLINE zone #-}
 
 curve :: Double -> Double
-curve x =
+curve !x =
   negate 1 / 2 * (cos (pi * x) - 1)
 
 -- DEBUG
 
 draw :: Double -> Double -> IO ()
-draw t i =
+draw !t !i =
   traverse_
     (putStrLn . concat)
     [ flip replicate "=" . round . abs . (*) 50 . (-) x $
@@ -140,6 +141,6 @@ draw t i =
     ]
 
 zone_ :: Double -> Double -> Double -> Double
-zone_ t i v =
+zone_ !t !i !v =
   let m = curve (1 - v - t)
    in (v + (m * i))
