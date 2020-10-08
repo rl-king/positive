@@ -883,7 +883,8 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
                     imageCropMode
 
         scale =
-            style "transform" ("scale(" ++ String.fromFloat scale_ ++ ")")
+            style "transform" <|
+                interpolate "scale({0})" [ String.fromFloat scale_ ]
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper" ]
@@ -905,20 +906,20 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
 
                 _ ->
                     img
-                        [ on "load" (Decode.succeed (OnImageLoad route.dir (Zipper.current filmRoll)))
+                        [ on "load" (Decode.succeed (OnImageLoad route.dir current))
                         , onCoordinateClick
                         , id "image"
                         , style "user-select" "none"
                         , scale
                         , src <|
                             Url.Builder.absolute [ "image" ]
-                                [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
+                                [ toImageUrlParams (ifCropping current)
                                 , Url.Builder.string "dir" route.dir
                                 ]
                         ]
                         []
             , Html.Keyed.node "div" [ class "coordinate-info" ] <|
-                List.map (viewCoordinate element scale_) <|
+                List.map (viewCoordinate element current scale_) <|
                     Dict.values coordinateInfo
             , viewMaybe imageCropMode <|
                 \imageCrop ->
@@ -941,8 +942,8 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
         ]
 
 
-viewCoordinate : Element -> Float -> CoordinateInfo -> ( String, Html Msg )
-viewCoordinate { element } scale coordinate =
+viewCoordinate : Element -> ImageSettings -> Float -> CoordinateInfo -> ( String, Html Msg )
+viewCoordinate { element } settings scale coordinate =
     let
         xOffset =
             (element.width / scale - element.width) / 2
@@ -951,21 +952,39 @@ viewCoordinate { element } scale coordinate =
             (element.height / scale - element.height) / 2
     in
     ( String.fromFloat coordinate.ciX ++ String.fromFloat coordinate.ciY
-    , button
-        [ style "transform" <|
-            interpolate "translate({0}px, {1}px)"
-                [ String.fromFloat (element.width * coordinate.ciX + xOffset)
-                , String.fromFloat (element.height * coordinate.ciY + yOffset)
-                ]
+    , span
+        [ style "top" <|
+            interpolate "{0}px"
+                [ String.fromFloat (element.height * coordinate.ciY + yOffset) ]
+        , style "left" <|
+            interpolate "{0}px"
+                [ String.fromFloat (element.width * coordinate.ciX + xOffset) ]
         , classList
             [ ( "-dark", coordinate.ciValue > 0.5 )
             , ( "-flip", coordinate.ciX > 0.9 )
             , ( "-flap", coordinate.ciY > 0.95 )
             , ( "coordinate", True )
             ]
-        , onClick (RemoveCoordinate coordinate)
         ]
-        [ text (String.left 7 (String.fromFloat coordinate.ciValue)) ]
+        [ text (String.left 7 (String.fromFloat coordinate.ciValue))
+        , span [ class "coordinate-buttons" ]
+            [ button [ onClick (RemoveCoordinate coordinate) ] [ text "×" ]
+            , button
+                [ class "coordinate-min"
+                , onClick <|
+                    OnImageSettingsChange <|
+                        updateZoneByInt (round (coordinate.ciValue * 10)) (\v -> v - 0.025) settings
+                ]
+                [ text "-" ]
+            , button
+                [ class "coordinate-plus"
+                , onClick <|
+                    OnImageSettingsChange <|
+                        updateZoneByInt (round (coordinate.ciValue * 10)) (\v -> v + 0.025) settings
+                ]
+                [ text "+" ]
+            ]
+        ]
     )
 
 
@@ -1017,6 +1036,55 @@ viewLoading state =
 
 
 -- HELPERS
+
+
+updateZoneByInt : Int -> (Float -> Float) -> ImageSettings -> ImageSettings
+updateZoneByInt n f settings =
+    let
+        g =
+            threeDecimalFloat << f
+
+        set zones =
+            case n of
+                0 ->
+                    { zones | z1 = g zones.z1 }
+
+                1 ->
+                    { zones | z1 = g zones.z1 }
+
+                2 ->
+                    { zones | z1 = g zones.z1 }
+
+                3 ->
+                    { zones | z3 = g zones.z3 }
+
+                4 ->
+                    { zones | z3 = g zones.z3 }
+
+                5 ->
+                    { zones | z5 = g zones.z5 }
+
+                6 ->
+                    { zones | z5 = g zones.z5 }
+
+                7 ->
+                    { zones | z7 = g zones.z7 }
+
+                8 ->
+                    { zones | z7 = g zones.z7 }
+
+                9 ->
+                    { zones | z9 = g zones.z9 }
+
+                _ ->
+                    { zones | z9 = g zones.z9 }
+    in
+    { settings | iZones = set settings.iZones }
+
+
+threeDecimalFloat : Float -> Float
+threeDecimalFloat x =
+    toFloat (round (x * 1000)) / 1000
 
 
 previewExtension : String -> String
