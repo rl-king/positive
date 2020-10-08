@@ -18,6 +18,7 @@ import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Massiv.Array as Massiv
+import qualified Data.Massiv.Array.Mutable as Massiv.Mutable
 import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
@@ -164,18 +165,19 @@ handleGenerateWallpaper dir settings = do
 
 handleGetSettingsHistogram :: Text -> ImageSettings -> PositiveT Handler [Int]
 handleGetSettingsHistogram dir settings =
-  let bins = HashMap.fromList [(x, 0) :: (Word8, Int) | x <- [0 .. 255]]
-      adjust acc (HIP.PixelY x) = HashMap.adjust (+ 1) (floor (255 * x)) acc
+  let toHistogram arr =
+        liftIO . Massiv.Mutable.createArrayS_ @Massiv.P @_ @Int (Massiv.Sz1 255) $
+          \marr ->
+            Massiv.forM_ arr $
+              \(HIP.PixelY p) -> Massiv.modify marr (pure . (+) 1) (fromIntegral (HIP.toWord8 p))
    in do
         (image, putMVarBack) <-
           getImage $
             Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
         liftIO putMVarBack
         logDebug $ "Creating histogram for: " <> settings.iFilename
-        fmap (fmap snd . sortOn fst . HashMap.toList)
-          . Massiv.foldlP adjust bins (HashMap.unionWith (+)) bins
-          . HIP.unImage
-          $ Image.processImage settings image
+        fmap Massiv.toList . toHistogram . HIP.unImage $
+          Image.processImage settings image
 
 handleGetCoordinateInfo :: Text -> ([(Double, Double)], ImageSettings) -> PositiveT Handler [CoordinateInfo]
 handleGetCoordinateInfo dir (coordinates, settings) =
