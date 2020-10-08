@@ -8,6 +8,16 @@
     }
 }
 
+@keyframes open {
+    from {
+        width: 0;
+    }
+
+    to {
+        width: 5rem;
+    }
+}
+
 @keyframes slideup {
     from {
         transform: translateY(100%);
@@ -381,16 +391,27 @@ input[type="range"]::-moz-range-thumb {
     overflow: hidden;
 }
 
-.coordinate-info span {
-    padding: 0 .5rem;
+.coordinate {
+    padding: 0 0 0 .35rem;
     position: absolute;
     font-family: var(--mono);
-    font-weight: 600;
-    text-shadow: 3px 3px 25px rgba(0,0,0,0.3);
+    font-weight: 500;
+    text-align: left;
     background-color: #333;
+    transition: background-color .35s;
+    animation: open .35s forwards;
 }
 
-.coordinate-info span:after {
+.coordinate:hover {
+    background-color: #444;
+    z-index: 1;
+}
+
+.coordinate.-dark:hover {
+    background-color: #eee;
+}
+
+.coordinate:after {
     content: "";
     width: 5px;
     height: 5px;
@@ -400,23 +421,36 @@ input[type="range"]::-moz-range-thumb {
     background-color: #fff;
 }
 
-.coordinate-info span.-flip:after {
+.coordinate.-flip:after {
     right: 0;
     left: unset;
 }
 
-.coordinate-info span.-dark:after {
+.coordinate.-flap:after {
+    top: unset;
+    bottom: -5px;
+}
+
+.coordinate.-dark:after {
     background-color: #333;
 }
 
-.coordinate-info span.-dark {
+.coordinate.-dark {
     text-shadow: 3px 3px 25px rgba(255,255,255,0.3);
     color: #333;
     background-color: #fff;
 }
 
-.coordinate-info span.-flip {
+.coordinate.-flip {
     transform: translateX(-100%);
+}
+
+.coordinate.-flap {
+    transform: translateY(calc(-5px + -100%));
+}
+
+.coordinate.-flip.-flap {
+    transform: translate(-100%, calc(-5px + -100%));
 }
 
 .coordinate-info {

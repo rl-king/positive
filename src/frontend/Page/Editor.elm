@@ -912,7 +912,7 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
                                 ]
                         ]
                         []
-            , div [ class "coordinate-info" ] <|
+            , Html.Keyed.node "div" [ class "coordinate-info" ] <|
                 List.map (viewCoordinate element) <|
                     Dict.values coordinateInfo
             , viewMaybe imageCropMode <|
@@ -936,16 +936,22 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
         ]
 
 
-viewCoordinate : Element -> CoordinateInfo -> Html Msg
+viewCoordinate : Element -> CoordinateInfo -> ( String, Html Msg )
 viewCoordinate { element } coordinate =
-    span
-        -- FIXME: make button
+    ( String.fromFloat coordinate.ciX ++ String.fromFloat coordinate.ciY
+    , button
         [ style "left" (interpolate "{0}px" [ String.fromFloat (element.width * coordinate.ciX) ])
         , style "top" (interpolate "{0}px" [ String.fromFloat (element.height * coordinate.ciY) ])
-        , classList [ ( "-dark", coordinate.ciValue > 0.5 ), ( "-flip", coordinate.ciX > 0.9 ) ]
+        , classList
+            [ ( "-dark", coordinate.ciValue > 0.5 )
+            , ( "-flip", coordinate.ciX > 0.9 )
+            , ( "-flap", coordinate.ciY > 0.95 )
+            , ( "coordinate", True )
+            ]
         , onClick (RemoveCoordinate coordinate)
         ]
         [ text (String.left 7 (String.fromFloat coordinate.ciValue)) ]
+    )
 
 
 onCoordinateClick : Attribute Msg
