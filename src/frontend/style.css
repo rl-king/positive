@@ -394,6 +394,7 @@ input[type="range"]::-moz-range-thumb {
 .coordinate {
     padding: 0 0 0 .35rem;
     position: absolute;
+    border-radius: 0;
     font-family: var(--mono);
     font-weight: 500;
     text-align: left;
@@ -419,6 +420,7 @@ input[type="range"]::-moz-range-thumb {
     top: -5px;
     left: -5px;
     background-color: #fff;
+    transition: background-color .35s;
 }
 
 .coordinate.-flip:after {

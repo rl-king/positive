@@ -417,7 +417,10 @@ update key msg model =
                     )
 
         UpdateScale val ->
-            ( { model | scale = val }, Cmd.none )
+            ( { model | scale = val }
+            , Task.attempt (GotElementPosition << Result.withDefault model.imageElement) <|
+                Browser.Dom.getElement "image"
+            )
 
         SetColumnCount scale ->
             ( { model | previewColumns = scale }, Cmd.none )
@@ -883,13 +886,14 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
             style "transform" ("scale(" ++ String.fromFloat scale_ ++ ")")
     in
     section [ id "image-section" ]
-        [ div [ class "image-wrapper", scale ]
+        [ div [ class "image-wrapper" ]
             [ case imageProcessingState of
                 Preview ->
                     img
                         [ style "user-select" "none"
                         , onCoordinateClick
                         , id "image"
+                        , scale
                         , src <|
                             Url.Builder.absolute
                                 [ route.dir, "previews", previewExtension current.iFilename ]
@@ -905,6 +909,7 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
                         , onCoordinateClick
                         , id "image"
                         , style "user-select" "none"
+                        , scale
                         , src <|
                             Url.Builder.absolute [ "image" ]
                                 [ toImageUrlParams (ifCropping (Zipper.current filmRoll))
@@ -913,7 +918,7 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
                         ]
                         []
             , Html.Keyed.node "div" [ class "coordinate-info" ] <|
-                List.map (viewCoordinate element) <|
+                List.map (viewCoordinate element scale_) <|
                     Dict.values coordinateInfo
             , viewMaybe imageCropMode <|
                 \imageCrop ->
@@ -936,12 +941,22 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
         ]
 
 
-viewCoordinate : Element -> CoordinateInfo -> ( String, Html Msg )
-viewCoordinate { element } coordinate =
+viewCoordinate : Element -> Float -> CoordinateInfo -> ( String, Html Msg )
+viewCoordinate { element } scale coordinate =
+    let
+        xOffset =
+            (element.width / scale - element.width) / 2
+
+        yOffset =
+            (element.height / scale - element.height) / 2
+    in
     ( String.fromFloat coordinate.ciX ++ String.fromFloat coordinate.ciY
     , button
-        [ style "left" (interpolate "{0}px" [ String.fromFloat (element.width * coordinate.ciX) ])
-        , style "top" (interpolate "{0}px" [ String.fromFloat (element.height * coordinate.ciY) ])
+        [ style "transform" <|
+            interpolate "translate({0}px, {1}px)"
+                [ String.fromFloat (element.width * coordinate.ciX + xOffset)
+                , String.fromFloat (element.height * coordinate.ciY + yOffset)
+                ]
         , classList
             [ ( "-dark", coordinate.ciValue > 0.5 )
             , ( "-flip", coordinate.ciX > 0.9 )
