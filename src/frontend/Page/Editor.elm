@@ -51,7 +51,7 @@ port previewReady : (String -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
-subscriptions { imageCropMode, route, clipboard, filmRoll } =
+subscriptions { coordinateInfo, imageCropMode, route, clipboard, filmRoll } =
     let
         current =
             Zipper.current filmRoll
@@ -98,6 +98,7 @@ subscriptions { imageCropMode, route, clipboard, filmRoll } =
             )
             imageCropMode
         , previewReady OnPreviewReady
+        , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
 
 
@@ -121,7 +122,8 @@ type alias Model =
     , previewColumns : Int
     , route : Route
     , notifications : List ( Level, String )
-    , coordinateInfo : Maybe ( Element, List CoordinateInfo )
+    , imageElement : Element
+    , coordinateInfo : Dict ( Float, Float ) CoordinateInfo
     }
 
 
@@ -161,7 +163,12 @@ init route filmRoll ratings poster =
     , route = route
     , notifications = []
     , previewVersions = Dict.empty
-    , coordinateInfo = Nothing
+    , imageElement =
+        { scene = { width = 0, height = 0 }
+        , viewport = { x = 0, y = 0, width = 0, height = 0 }
+        , element = { x = 0, y = 0, width = 0, height = 0 }
+        }
+    , coordinateInfo = Dict.empty
     }
 
 
@@ -173,6 +180,7 @@ continue route filmRoll ratings poster model =
         , poster = poster
         , filmRoll = focus route filmRoll
         , route = route
+        , coordinateInfo = Dict.empty
     }
 
 
@@ -213,9 +221,11 @@ type Msg
     | OnPreviewReady String
     | LoadOriginal
     | OnImageClick ( Float, Float )
-    | ReplaceCoordinateInfo (List CoordinateInfo)
-    | RequestCoordinateInfo ( Float, Float ) (Result Browser.Dom.Error Element)
+    | RemoveCoordinate CoordinateInfo
+    | RequestCoordinateInfo ( Float, Float ) Element
     | GotCoordinateInfo Element (HttpResult (List CoordinateInfo))
+    | OnBrowserResize
+    | GotElementPosition Element
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -288,16 +298,15 @@ update key msg model =
                         Request.postImageSettingsHistogram dir settings
 
                 updateCoordinateInfo =
-                    case model.coordinateInfo of
-                        Nothing ->
-                            Cmd.none
+                    if Dict.isEmpty model.coordinateInfo then
+                        Cmd.none
 
-                        Just ( element, coordinateInfo ) ->
-                            Cmd.map (GotCoordinateInfo element) <|
-                                Request.postImageSettingsCoordinate model.route.dir
-                                    ( List.map (\{ ciX, ciY } -> ( ciX, ciY )) coordinateInfo
-                                    , Zipper.current model.filmRoll
-                                    )
+                    else
+                        Cmd.map (GotCoordinateInfo model.imageElement) <|
+                            Request.postImageSettingsCoordinate model.route.dir
+                                ( Dict.keys model.coordinateInfo
+                                , Zipper.current model.filmRoll
+                                )
             in
             case model.imageProcessingState of
                 Preview ->
@@ -452,43 +461,50 @@ update key msg model =
         LoadOriginal ->
             ( { model | imageProcessingState = Processing }, Cmd.none )
 
-        OnImageClick coordinates ->
-            ( model
-            , Task.attempt (RequestCoordinateInfo coordinates) <|
-                Browser.Dom.getElement "image"
-            )
-
-        ReplaceCoordinateInfo coordinates ->
-            ( { model | coordinateInfo = Maybe.map (Tuple.mapSecond (always coordinates)) model.coordinateInfo }
+        RemoveCoordinate { ciX, ciY } ->
+            ( { model | coordinateInfo = Dict.remove ( ciX, ciY ) model.coordinateInfo }
             , Cmd.none
             )
 
-        RequestCoordinateInfo ( x, y ) (Ok ({ element } as element_)) ->
-            let
-                coordinate =
-                    ( (x - element.x) / element.width, (y - element.y) / element.height )
-
-                current =
-                    Maybe.withDefault [] <|
-                        Maybe.map Tuple.second model.coordinateInfo
-            in
+        OnImageClick coordinate ->
             ( model
-            , Cmd.map (GotCoordinateInfo element_) <|
-                Request.postImageSettingsCoordinate model.route.dir
-                    ( coordinate
-                        :: List.map (\{ ciX, ciY } -> ( ciX, ciY )) current
-                    , Zipper.current model.filmRoll
-                    )
+            , Task.attempt (RequestCoordinateInfo coordinate << Result.withDefault model.imageElement) <|
+                Browser.Dom.getElement "image"
             )
 
-        RequestCoordinateInfo _ (Err _) ->
-            ( model, Cmd.none )
+        RequestCoordinateInfo ( x, y ) ({ element } as imageElement) ->
+            let
+                ( cX, cY ) =
+                    ( (x - element.x) / element.width, (y - element.y) / element.height )
+            in
+            ( { model
+                | imageElement = imageElement
+                , coordinateInfo = Dict.insert ( cX, cY ) (CoordinateInfo cX cY 0) model.coordinateInfo
+              }
+            , Cmd.map (GotCoordinateInfo imageElement) <|
+                Request.postImageSettingsCoordinate model.route.dir
+                    ( [ ( cX, cY ) ], Zipper.current model.filmRoll )
+            )
 
-        GotCoordinateInfo element (Ok coordinates) ->
-            ( { model | coordinateInfo = Just ( element, coordinates ) }, Cmd.none )
+        GotCoordinateInfo element (Ok coordinateInfo) ->
+            ( { model
+                | coordinateInfo =
+                    List.foldl (\c -> Dict.insert ( c.ciX, c.ciY ) c) model.coordinateInfo coordinateInfo
+              }
+            , Cmd.none
+            )
 
         GotCoordinateInfo _ (Err _) ->
             ( model, Cmd.none )
+
+        GotElementPosition element ->
+            ( { model | imageElement = element }, Cmd.none )
+
+        OnBrowserResize ->
+            ( model
+            , Task.attempt (GotElementPosition << Result.withDefault model.imageElement) <|
+                Browser.Dom.getElement "image"
+            )
 
 
 type Key a
@@ -554,7 +570,7 @@ view model otherNotifications =
     main_ []
         [ Html.Lazy.lazy viewNav model.route
         , Html.Lazy.lazy viewLoading model.imageProcessingState
-        , Html.Lazy.lazy7 viewImage
+        , Html.Lazy.lazy8 viewImage
             model.filmRoll
             model.route
             model.imageCropMode
@@ -562,6 +578,7 @@ view model otherNotifications =
             model.imageProcessingState
             model.previewVersions
             model.coordinateInfo
+            model.imageElement
         , Html.Lazy.lazy7 viewSettings
             model.filmRoll
             model.route
@@ -845,9 +862,10 @@ viewImage :
     -> Float
     -> ImageProcessingState
     -> Dict String Int
-    -> Maybe ( Element, List CoordinateInfo )
+    -> Dict ( Float, Float ) CoordinateInfo
+    -> Element
     -> Html Msg
-viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersions coordinateInfo =
+viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersions coordinateInfo element =
     let
         current =
             Zipper.current filmRoll
@@ -894,10 +912,9 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
                                 ]
                         ]
                         []
-            , viewMaybe coordinateInfo <|
-                \( element, coordinates ) ->
-                    div [ class "coordinate-info" ] <|
-                        List.map (viewCoordinate element coordinates) coordinates
+            , div [ class "coordinate-info" ] <|
+                List.map (viewCoordinate element) <|
+                    Dict.values coordinateInfo
             , viewMaybe imageCropMode <|
                 \imageCrop ->
                     div
@@ -919,14 +936,14 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
         ]
 
 
-viewCoordinate : Element -> List CoordinateInfo -> CoordinateInfo -> Html Msg
-viewCoordinate { element } coordinates coordinate =
+viewCoordinate : Element -> CoordinateInfo -> Html Msg
+viewCoordinate { element } coordinate =
     span
         -- FIXME: make button
         [ style "left" (interpolate "{0}px" [ String.fromFloat (element.width * coordinate.ciX) ])
         , style "top" (interpolate "{0}px" [ String.fromFloat (element.height * coordinate.ciY) ])
         , classList [ ( "-dark", coordinate.ciValue > 0.5 ), ( "-flip", coordinate.ciX > 0.9 ) ]
-        , onClick (ReplaceCoordinateInfo (List.filter ((/=) coordinate) coordinates))
+        , onClick (RemoveCoordinate coordinate)
         ]
         [ text (String.left 7 (String.fromFloat coordinate.ciValue)) ]
 
