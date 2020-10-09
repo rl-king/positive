@@ -27,6 +27,7 @@ import Html.Attributes as Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed
 import Html.Lazy
+import Icon
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
@@ -738,46 +739,48 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessi
                 ]
         , viewSettingsGroup
             [ viewImageCropMode settings imageCropMode
-            , button [ onClick Rotate ] [ text "Rotate" ]
+            , button [ onClick Rotate, title "rotate" ] [ Icon.rotate ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (CopySettings settings) ] [ text "Copy settings" ]
+            [ button [ onClick (CopySettings settings), title "copy" ] [ Icon.copy ]
             , viewMaybe clipboard_ <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
                         [ pre [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
-                        , viewClipboardButton "Both" { clipboard | iFilename = settings.iFilename }
-                        , viewClipboardButton "Tone"
+                        , viewClipboardButton "both" Icon.applyBoth { clipboard | iFilename = settings.iFilename }
+                        , viewClipboardButton "tone"
+                            Icon.applyTone
                             { clipboard
                                 | iFilename = settings.iFilename
                                 , iRotate = settings.iRotate
                                 , iCrop = settings.iCrop
                             }
-                        , viewClipboardButton "Crop" { settings | iCrop = clipboard.iCrop }
+                        , viewClipboardButton "crop" Icon.applyCrop { settings | iCrop = clipboard.iCrop }
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
                                     Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
+                            , title "apply to all photos"
                             ]
-                            [ text "Apply to all" ]
+                            [ Icon.applyAll ]
                         ]
             ]
         , viewSettingsGroup
-            [ button [ onClick SaveSettings ] [ text "Save" ]
-            , button [ onClick (OnImageSettingsChange (resetAll settings)) ] [ text "Reset" ]
-            , button [ onClick (OnImageSettingsChange (resetTone settings)) ] [ text "Reset tone" ]
-            ]
-        , viewSettingsGroup
-            [ button [ onClick GenerateHighres ] [ text "Generate highres" ]
-            , button [ onClick GenerateWallpaper ] [ text "Generate wallpaper" ]
+            [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
+            , button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
+            , button [ onClick (OnImageSettingsChange (resetTone settings)), title "reset tone" ] [ Icon.resetTone ]
             , viewIf (not (List.isEmpty undoState)) <|
-                \_ -> button [ onClick Undo ] [ text "Undo" ]
+                \_ -> button [ onClick Undo, title "undo" ] [ Icon.undo ]
             ]
         , viewSettingsGroup
-            [ button [ onClick PreviousImage ] [ text "⯇" ]
-            , button [ onClick NextImage ] [ text "⯈" ]
+            [ button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
+            , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
             , viewIf (imageProcessingState == Preview) <|
-                \_ -> button [ onClick LoadOriginal ] [ text "Load original" ]
+                \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
+            ]
+        , viewSettingsGroup
+            [ button [ onClick PreviousImage ] [ Icon.left ]
+            , button [ onClick NextImage ] [ Icon.right ]
             ]
         ]
 
@@ -787,9 +790,9 @@ viewSettingsGroup =
     div [ class "image-settings-group" ]
 
 
-viewClipboardButton : String -> ImageSettings -> Html Msg
-viewClipboardButton title settings =
-    button [ onClick (OnImageSettingsChange settings) ] [ text title ]
+viewClipboardButton : String -> Html Msg -> ImageSettings -> Html Msg
+viewClipboardButton desc icon settings =
+    button [ onClick (OnImageSettingsChange settings), title desc ] [ icon ]
 
 
 viewImageCropMode : ImageSettings -> Maybe ImageCrop -> Html Msg
@@ -807,7 +810,7 @@ viewImageCropMode current imageCropMode =
     case imageCropMode of
         Nothing ->
             span [] <|
-                [ button [ onClick (UpdateImageCropMode (Just current.iCrop)) ] [ text "Crop" ]
+                [ button [ onClick (UpdateImageCropMode (Just current.iCrop)) ] [ Icon.crop ]
                 ]
 
         Just imageCrop ->
@@ -815,8 +818,8 @@ viewImageCropMode current imageCropMode =
                 [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop
                 , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft
                 , viewRangeInput (onWidthChange imageCrop) 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth
-                , button [ onClick (UpdateImageCropMode Nothing) ] [ text "Cancel" ]
-                , button [ onClick (ApplyCrop imageCrop) ] [ text "Apply" ]
+                , button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.cancel ]
+                , button [ onClick (ApplyCrop imageCrop) ] [ Icon.ok ]
                 ]
 
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="30px" height="8px" viewBox="0 0 30 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>undo</title>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="positive-icons" transform="translate(-60.000000, -35.000000)" stroke="#FFFFFF" stroke-width="2">
+            <g id="undo" transform="translate(61.000000, 36.000000)">
+                <rect id="Rectangle" fill="#FFFFFF" x="0" y="0" width="6" height="6"></rect>
+                <rect id="Rectangle" fill="#FFFFFF" x="11" y="0" width="6" height="6"></rect>
+                <rect id="Rectangle" x="22" y="0" width="6" height="6"></rect>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -292,6 +292,19 @@ li.-small span {
     animation: appear 1s;
 }
 
+.image-settings button {
+    width: 3.25rem;
+    height: 3.25rem;
+    position: relative;
+}
+
+.image-settings img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
 .image-settings-group {
     padding-bottom: 1rem;
 }
