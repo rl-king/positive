@@ -314,10 +314,18 @@ li.-small span {
 
 .image-settings-group {
     padding-bottom: 1rem;
+    position: relative;
 }
 
 .image-settings-group label {
     margin: .25rem;
+}
+
+.image-settings-paste {
+    width: 14rem;
+    position: absolute;
+    top: 0;
+    left: 4rem;
 }
 
 .image-settings-paste button,

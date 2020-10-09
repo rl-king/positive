@@ -277,7 +277,11 @@ update key msg model =
             ( updateSettings (\_ -> settings) model, Cmd.none )
 
         CopySettings settings ->
-            ( { model | clipboard = Just settings }, Cmd.none )
+            if Just settings == model.clipboard then
+                ( { model | clipboard = Nothing }, Cmd.none )
+
+            else
+                ( { model | clipboard = Just settings }, Cmd.none )
 
         ApplyCopyToAll filmRoll ->
             let
@@ -375,7 +379,12 @@ update key msg model =
                     )
 
         UpdateImageCropMode mode ->
-            ( { model | imageCropMode = mode, imageProcessingState = Processing }, Cmd.none )
+            ( { model
+                | imageCropMode = mode
+                , imageProcessingState = fromPreview model.imageProcessingState
+              }
+            , Cmd.none
+            )
 
         ApplyCrop imageCrop ->
             ( updateSettings (\s -> { s | iCrop = imageCrop })
@@ -461,7 +470,7 @@ update key msg model =
             ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
 
         LoadOriginal ->
-            ( { model | imageProcessingState = Processing }, Cmd.none )
+            ( { model | imageProcessingState = fromPreview model.imageProcessingState }, Cmd.none )
 
         RemoveCoordinate { ciX, ciY } ->
             ( { model | coordinateInfo = Dict.remove ( ciX, ciY ) model.coordinateInfo }
@@ -523,6 +532,16 @@ saveSettings model =
     Cmd.map (GotSaveImageSettings model.route.dir) <|
         Request.postImageSettings model.route.dir <|
             fromZipper model.poster model.ratings model.filmRoll
+
+
+fromPreview : ImageProcessingState -> ImageProcessingState
+fromPreview state =
+    case state of
+        Preview ->
+            Processing
+
+        other ->
+            other
 
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
@@ -726,9 +745,13 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessi
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ viewRangeInput (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
+                , viewRangeInput (\v -> { settings | iZones = { zones | z2 = v } }) 0.001 ( -0.25, 0.25, 0 ) "II" zones.z2
                 , viewRangeInput (\v -> { settings | iZones = { zones | z3 = v } }) 0.001 ( -0.25, 0.25, 0 ) "III" zones.z3
+                , viewRangeInput (\v -> { settings | iZones = { zones | z4 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IV" zones.z4
                 , viewRangeInput (\v -> { settings | iZones = { zones | z5 = v } }) 0.001 ( -0.25, 0.25, 0 ) "V" zones.z5
+                , viewRangeInput (\v -> { settings | iZones = { zones | z6 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VI" zones.z6
                 , viewRangeInput (\v -> { settings | iZones = { zones | z7 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VII" zones.z7
+                , viewRangeInput (\v -> { settings | iZones = { zones | z8 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VIII" zones.z8
                 , viewRangeInput (\v -> { settings | iZones = { zones | z9 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IX" zones.z9
                 ]
         , viewSettingsGroup <|
@@ -747,21 +770,24 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessi
                 , viewMaybe clipboard_ <|
                     \clipboard ->
                         div [ class "image-settings-paste" ]
-                            [ pre [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
-                            , viewClipboardButton "both" Icon.applyBoth { clipboard | iFilename = settings.iFilename }
-                            , viewClipboardButton "tone"
+                            [ viewClipboardButton (interpolate "both from {0}" [ clipboard.iFilename ])
+                                Icon.applyBoth
+                                { clipboard | iFilename = settings.iFilename }
+                            , viewClipboardButton (interpolate "tone from {0}" [ clipboard.iFilename ])
                                 Icon.applyTone
                                 { clipboard
                                     | iFilename = settings.iFilename
                                     , iRotate = settings.iRotate
                                     , iCrop = settings.iCrop
                                 }
-                            , viewClipboardButton "crop" Icon.applyCrop { settings | iCrop = clipboard.iCrop }
+                            , viewClipboardButton (interpolate "crop from {0}" [ clipboard.iFilename ])
+                                Icon.applyCrop
+                                { settings | iCrop = clipboard.iCrop }
                             , button
                                 [ onClick <|
                                     ApplyCopyToAll <|
                                         Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
-                                , title "apply to all photos"
+                                , title (interpolate "apply to all from {0}" [ clipboard.iFilename ])
                                 ]
                                 [ Icon.applyAll ]
                             ]
