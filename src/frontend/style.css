@@ -292,9 +292,17 @@ li.-small span {
     animation: appear 1s;
 }
 
+.image-settings-buttons {
+    position: absolute;
+    top: 45%;
+    left: 1rem;
+    transform: translateY(-50%);
+}
+
 .image-settings button {
     width: 3.25rem;
     height: 3.25rem;
+    display: block;
     position: relative;
 }
 
@@ -370,9 +378,9 @@ input[type="range"]::-moz-range-thumb {
 }
 
 #image-section {
-    width: calc(80% - 4rem);
+    width: 80%;
     height: 96vh;
-    margin: 2rem;
+    padding: 2rem 1rem 2rem 4.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -380,12 +388,19 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .crop-settings {
+    width: 14rem;
     padding: .75rem 1rem;
-    margin: 1rem 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
+    position: absolute;
+    top: 0;
+    left: 4.5rem;
     background-color: #333;
+}
+
+.crop-settings .range-slider {
+    margin: 0;
 }
 
 .crop-settings input[type="range"] {
@@ -394,7 +409,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .crop-settings button {
-    margin: .5rem 0 0;
+    margin: 0;
     font-size: 1rem;
 }
 

@@ -375,7 +375,7 @@ update key msg model =
                     )
 
         UpdateImageCropMode mode ->
-            ( { model | imageCropMode = mode }, Cmd.none )
+            ( { model | imageCropMode = mode, imageProcessingState = Processing }, Cmd.none )
 
         ApplyCrop imageCrop ->
             ( updateSettings (\s -> { s | iCrop = imageCrop })
@@ -737,50 +737,52 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessi
                 , viewRangeInput (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.5, 0.5, 0 ) "Blackpoint" settings.iBlackpoint
                 , viewRangeInput (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
-        , viewSettingsGroup
-            [ viewImageCropMode settings imageCropMode
-            , button [ onClick Rotate, title "rotate" ] [ Icon.rotate ]
-            ]
-        , viewSettingsGroup
-            [ button [ onClick (CopySettings settings), title "copy" ] [ Icon.copy ]
-            , viewMaybe clipboard_ <|
-                \clipboard ->
-                    div [ class "image-settings-paste" ]
-                        [ pre [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
-                        , viewClipboardButton "both" Icon.applyBoth { clipboard | iFilename = settings.iFilename }
-                        , viewClipboardButton "tone"
-                            Icon.applyTone
-                            { clipboard
-                                | iFilename = settings.iFilename
-                                , iRotate = settings.iRotate
-                                , iCrop = settings.iCrop
-                            }
-                        , viewClipboardButton "crop" Icon.applyCrop { settings | iCrop = clipboard.iCrop }
-                        , button
-                            [ onClick <|
-                                ApplyCopyToAll <|
-                                    Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
-                            , title "apply to all photos"
+        , div [ class "image-settings-buttons" ]
+            [ viewSettingsGroup
+                [ viewImageCropMode settings imageCropMode
+                , button [ onClick Rotate, title "rotate" ] [ Icon.rotate ]
+                ]
+            , viewSettingsGroup
+                [ button [ onClick (CopySettings settings), title "copy" ] [ Icon.copy ]
+                , viewMaybe clipboard_ <|
+                    \clipboard ->
+                        div [ class "image-settings-paste" ]
+                            [ pre [] [ text (interpolate "Paste settings from: {0}" [ clipboard.iFilename ]) ]
+                            , viewClipboardButton "both" Icon.applyBoth { clipboard | iFilename = settings.iFilename }
+                            , viewClipboardButton "tone"
+                                Icon.applyTone
+                                { clipboard
+                                    | iFilename = settings.iFilename
+                                    , iRotate = settings.iRotate
+                                    , iCrop = settings.iCrop
+                                }
+                            , viewClipboardButton "crop" Icon.applyCrop { settings | iCrop = clipboard.iCrop }
+                            , button
+                                [ onClick <|
+                                    ApplyCopyToAll <|
+                                        Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
+                                , title "apply to all photos"
+                                ]
+                                [ Icon.applyAll ]
                             ]
-                            [ Icon.applyAll ]
-                        ]
-            ]
-        , viewSettingsGroup
-            [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
-            , button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
-            , button [ onClick (OnImageSettingsChange (resetTone settings)), title "reset tone" ] [ Icon.resetTone ]
-            , viewIf (not (List.isEmpty undoState)) <|
-                \_ -> button [ onClick Undo, title "undo" ] [ Icon.undo ]
-            ]
-        , viewSettingsGroup
-            [ button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
-            , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
-            , viewIf (imageProcessingState == Preview) <|
-                \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
-            ]
-        , viewSettingsGroup
-            [ button [ onClick PreviousImage ] [ Icon.left ]
-            , button [ onClick NextImage ] [ Icon.right ]
+                ]
+            , viewSettingsGroup
+                [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
+                , button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
+                , button [ onClick (OnImageSettingsChange (resetTone settings)), title "reset tone" ] [ Icon.resetTone ]
+                , viewIf (not (List.isEmpty undoState)) <|
+                    \_ -> button [ onClick Undo, title "undo" ] [ Icon.undo ]
+                ]
+            , viewSettingsGroup
+                [ button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
+                , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
+                , viewIf (imageProcessingState == Preview) <|
+                    \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
+                ]
+            , viewSettingsGroup
+                [ button [ onClick NextImage ] [ Icon.right ]
+                , button [ onClick PreviousImage ] [ Icon.left ]
+                ]
             ]
         ]
 
@@ -809,17 +811,18 @@ viewImageCropMode current imageCropMode =
     in
     case imageCropMode of
         Nothing ->
-            span [] <|
-                [ button [ onClick (UpdateImageCropMode (Just current.iCrop)) ] [ Icon.crop ]
-                ]
+            button [ onClick (UpdateImageCropMode (Just current.iCrop)) ] [ Icon.crop ]
 
         Just imageCrop ->
-            div [ class "crop-settings" ] <|
-                [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop
-                , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft
-                , viewRangeInput (onWidthChange imageCrop) 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth
-                , button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.cancel ]
-                , button [ onClick (ApplyCrop imageCrop) ] [ Icon.ok ]
+            div []
+                [ button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.crop ]
+                , div [ class "crop-settings" ]
+                    [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop
+                    , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft
+                    , viewRangeInput (onWidthChange imageCrop) 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth
+                    , button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.cancel ]
+                    , button [ onClick (ApplyCrop imageCrop) ] [ Icon.ok ]
+                    ]
                 ]
 
 
@@ -878,8 +881,13 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
                     imageCropMode
 
         scale =
-            style "transform" <|
-                interpolate "scale({0})" [ String.fromFloat scale_ ]
+            case imageCropMode of
+                Just _ ->
+                    style "transform" "scale(1)"
+
+                Nothing ->
+                    style "transform" <|
+                        interpolate "scale({0})" [ String.fromFloat scale_ ]
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper" ]
