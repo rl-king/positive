@@ -294,9 +294,8 @@ li.-small span {
 
 .image-settings-buttons {
     position: absolute;
-    top: 45%;
+    top: 10%;
     left: 1rem;
-    transform: translateY(-50%);
 }
 
 .image-settings button {
@@ -317,9 +316,8 @@ li.-small span {
     padding-bottom: 1rem;
 }
 
-.image-settings-group  label {
-    margin-bottom: .5rem;
-    display: block;
+.image-settings-group label {
+    margin: .25rem;
 }
 
 .image-settings-paste button,
@@ -350,11 +348,11 @@ input[type="range"]::-webkit-slider-thumb,
 input[type="range"]::-moz-range-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 4px;
-    height: 1rem;
+    width: 2px;
+    height: .75rem;
     border: 0;
     border-radius: 0;
-    background: #999;
+    background: #fff;
     cursor: pointer;
 }
 
@@ -379,8 +377,8 @@ input[type="range"]::-moz-range-thumb {
 
 #image-section {
     width: 80%;
-    height: 96vh;
-    padding: 2rem 1rem 2rem 4.5rem;
+    height: 100vh;
+    padding: 2rem 1rem 4rem 4.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;

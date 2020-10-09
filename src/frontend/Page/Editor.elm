@@ -767,14 +767,14 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessi
                             ]
                 ]
             , viewSettingsGroup
-                [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
-                , button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
+                [ button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
                 , button [ onClick (OnImageSettingsChange (resetTone settings)), title "reset tone" ] [ Icon.resetTone ]
                 , viewIf (not (List.isEmpty undoState)) <|
                     \_ -> button [ onClick Undo, title "undo" ] [ Icon.undo ]
                 ]
             , viewSettingsGroup
-                [ button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
+                [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
+                , button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
                 , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
                 , viewIf (imageProcessingState == Preview) <|
                     \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
@@ -1056,25 +1056,25 @@ updateZoneByInt n f settings =
                     { zones | z1 = g zones.z1 }
 
                 2 ->
-                    { zones | z1 = g zones.z1 }
+                    { zones | z2 = g zones.z2 }
 
                 3 ->
                     { zones | z3 = g zones.z3 }
 
                 4 ->
-                    { zones | z3 = g zones.z3 }
+                    { zones | z4 = g zones.z4 }
 
                 5 ->
                     { zones | z5 = g zones.z5 }
 
                 6 ->
-                    { zones | z5 = g zones.z5 }
+                    { zones | z6 = g zones.z6 }
 
                 7 ->
                     { zones | z7 = g zones.z7 }
 
                 8 ->
-                    { zones | z7 = g zones.z7 }
+                    { zones | z8 = g zones.z8 }
 
                 9 ->
                     { zones | z9 = g zones.z9 }

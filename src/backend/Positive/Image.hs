@@ -42,9 +42,13 @@ processImage !is !image =
       !mul = int2Double h / int2Double w
    in HIP.map
         ( zone 0.9 is.iZones.z9
+            . zone 0.8 is.iZones.z8
             . zone 0.7 is.iZones.z7
+            . zone 0.6 is.iZones.z6
             . zone 0.5 is.iZones.z5
+            . zone 0.4 is.iZones.z4
             . zone 0.3 is.iZones.z3
+            . zone 0.2 is.iZones.z2
             . zone 0.1 is.iZones.z1
             . gamma is.iGamma
             . compress is.iBlackpoint is.iWhitepoint
