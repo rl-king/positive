@@ -12,7 +12,6 @@ import Dict exposing (Dict)
 import Generated.Data.ImageSettings
     exposing
         ( FilmRollSettings
-        , ImageCrop
         , ImageSettings
         )
 import Generated.Request as Request
@@ -20,10 +19,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Decode
-import List.Zipper as Zipper exposing (Zipper)
-import Set exposing (Set)
 import String.Interpolate exposing (interpolate)
-import Url exposing (Url)
 import Url.Builder
 import Util exposing (..)
 

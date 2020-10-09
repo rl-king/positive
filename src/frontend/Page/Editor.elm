@@ -31,10 +31,8 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
 import Process
-import Set exposing (Set)
 import String.Interpolate exposing (interpolate)
 import Task
-import Url exposing (Url)
 import Url.Builder
 import Util exposing (..)
 
@@ -51,7 +49,7 @@ port previewReady : (String -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
-subscriptions { coordinateInfo, imageCropMode, route, clipboard, filmRoll } =
+subscriptions { imageCropMode, clipboard, filmRoll } =
     let
         current =
             Zipper.current filmRoll
@@ -234,7 +232,7 @@ update key msg model =
         GotHistogram result ->
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
 
-        GotSaveImageSettings dir (Ok _) ->
+        GotSaveImageSettings _ (Ok _) ->
             pushNotification Normal RemoveNotification "Saved settings" model
 
         GotSaveImageSettings _ (Err _) ->
@@ -425,7 +423,7 @@ update key msg model =
         SetColumnCount scale ->
             ( { model | previewColumns = scale }, Cmd.none )
 
-        AttemptSave dir saveKey filmRoll ->
+        AttemptSave _ saveKey _ ->
             if saveKey /= model.saveKey then
                 ( model, Cmd.none )
 
@@ -489,7 +487,7 @@ update key msg model =
                     ( [ ( cX, cY ) ], Zipper.current model.filmRoll )
             )
 
-        GotCoordinateInfo element (Ok coordinateInfo) ->
+        GotCoordinateInfo _ (Ok coordinateInfo) ->
             ( { model
                 | coordinateInfo =
                     List.foldl (\c -> Dict.insert ( c.ciX, c.ciY ) c) model.coordinateInfo coordinateInfo
@@ -582,9 +580,8 @@ view model otherNotifications =
             model.previewVersions
             model.coordinateInfo
             model.imageElement
-        , Html.Lazy.lazy7 viewSettings
+        , Html.Lazy.lazy6 viewSettings
             model.filmRoll
-            model.route
             model.histogram
             model.undoState
             model.imageCropMode
@@ -703,14 +700,13 @@ viewRating filename ratings =
 
 viewSettings :
     FilmRoll
-    -> Route
     -> List Int
     -> List FilmRoll
     -> Maybe ImageCrop
     -> Maybe ImageSettings
     -> ImageProcessingState
     -> Html Msg
-viewSettings filmRoll route histogram undoState imageCropMode clipboard_ imageProcessingState =
+viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessingState =
     let
         settings =
             case imageProcessingState of
@@ -872,10 +868,6 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
     let
         current =
             Zipper.current filmRoll
-
-        currentCrop =
-            .iCrop <|
-                Zipper.current filmRoll
 
         ifCropping settings =
             Maybe.withDefault settings <|

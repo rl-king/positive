@@ -10,13 +10,10 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as Decode
-import List.Zipper as Zipper exposing (Zipper)
+import List.Zipper as Zipper
 import Page.Browser
 import Page.Editor
-import Process
 import ScrollTo
-import String.Interpolate exposing (interpolate)
-import Task
 import Url exposing (Url)
 import Url.Parser
 import Url.Parser.Query
