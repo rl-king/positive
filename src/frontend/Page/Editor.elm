@@ -551,7 +551,6 @@ updateSettings f model =
             { model
                 | imageProcessingState = Processing
                 , filmRoll = Zipper.mapCurrent f model.filmRoll
-                , undoState = model.filmRoll :: model.undoState
             }
 
         Ready ->
