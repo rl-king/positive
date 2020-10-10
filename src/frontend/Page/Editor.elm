@@ -568,10 +568,7 @@ updateSettings f model =
             }
 
         Queued n ->
-            { model
-                | imageProcessingState = Queued (Zipper.mapCurrent f n)
-                , undoState = model.filmRoll :: model.undoState
-            }
+            { model | imageProcessingState = Queued (Zipper.mapCurrent f n) }
 
 
 fromZipper : Maybe String -> Ratings -> FilmRoll -> FilmRollSettings
