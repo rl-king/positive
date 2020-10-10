@@ -32,6 +32,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
 import Process
+import ProcessingState exposing (ProcessingState(..))
 import String.Interpolate exposing (interpolate)
 import Task
 import Url.Builder
@@ -106,7 +107,7 @@ subscriptions { imageCropMode, clipboard, filmRoll } =
 
 
 type alias Model =
-    { imageProcessingState : ImageProcessingState
+    { processingState : ProcessingState
     , ratings : Ratings
     , previewVersions : PreviewVersions
     , poster : Maybe String
@@ -138,16 +139,9 @@ type alias PreviewVersions =
     Dict String Int
 
 
-type ImageProcessingState
-    = Ready
-    | Processing
-    | Queued FilmRoll
-    | Preview
-
-
 init : Route -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
-    { imageProcessingState = Preview
+    { processingState = ProcessingState.preview
     , ratings = ratings
     , poster = poster
     , filmRoll = focus route filmRoll
@@ -174,7 +168,7 @@ init route filmRoll ratings poster =
 continue : Route -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
 continue route filmRoll ratings poster model =
     { model
-        | imageProcessingState = Preview
+        | processingState = ProcessingState.preview
         , ratings = ratings
         , poster = poster
         , filmRoll = focus route filmRoll
@@ -285,11 +279,13 @@ update key msg model =
 
         ApplyCopyToAll filmRoll ->
             let
-                isLoading =
+                currentChanged =
                     Zipper.current model.filmRoll /= Zipper.current filmRoll
             in
-            if isLoading then
-                ( { model | imageProcessingState = Processing, filmRoll = filmRoll }, Cmd.none )
+            if currentChanged then
+                ( updateSettings identity { model | filmRoll = filmRoll }
+                , Cmd.none
+                )
 
             else
                 ( { model | filmRoll = filmRoll }, Cmd.none )
@@ -311,26 +307,25 @@ update key msg model =
                                 , Zipper.current model.filmRoll
                                 )
             in
-            case model.imageProcessingState of
-                Preview ->
-                    ( { model | imageProcessingState = Ready }, Cmd.none )
+            case model.processingState of
+                Preview state ->
+                    ( model, Cmd.none )
 
-                Ready ->
-                    ( { model | imageProcessingState = Ready }, Cmd.none )
+                Ready state ->
+                    ( model, Cmd.none )
 
-                Processing ->
-                    ( { model | imageProcessingState = Ready }
+                Processing state ->
+                    ( { model | processingState = ProcessingState.toReady state }
                     , Cmd.batch [ getHistogram, updateCoordinateInfo ]
                     )
 
-                Queued n ->
-                    if n == model.filmRoll then
-                        ( { model | imageProcessingState = Ready }
-                        , Cmd.batch [ getHistogram, updateCoordinateInfo ]
-                        )
-
-                    else
-                        ( { model | imageProcessingState = Processing, filmRoll = n }, Cmd.none )
+                Queued state ->
+                    ( { model
+                        | processingState = ProcessingState.toProcessing state
+                        , filmRoll = ProcessingState.toData state
+                      }
+                    , Cmd.none
+                    )
 
         OnPreviewReady filename ->
             let
@@ -381,7 +376,7 @@ update key msg model =
         UpdateImageCropMode mode ->
             ( { model
                 | imageCropMode = mode
-                , imageProcessingState = fromPreview model.imageProcessingState
+                , processingState = fromPreview model.processingState
               }
             , Cmd.none
             )
@@ -470,7 +465,7 @@ update key msg model =
             ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
 
         LoadOriginal ->
-            ( { model | imageProcessingState = fromPreview model.imageProcessingState }, Cmd.none )
+            ( { model | processingState = fromPreview model.processingState }, Cmd.none )
 
         RemoveCoordinate { ciX, ciY } ->
             ( { model | coordinateInfo = Dict.remove ( ciX, ciY ) model.coordinateInfo }
@@ -534,11 +529,11 @@ saveSettings model =
             fromZipper model.poster model.ratings model.filmRoll
 
 
-fromPreview : ImageProcessingState -> ImageProcessingState
+fromPreview : ProcessingState -> ProcessingState
 fromPreview state =
     case state of
-        Preview ->
-            Processing
+        Preview s ->
+            ProcessingState.toProcessing s
 
         other ->
             other
@@ -546,28 +541,31 @@ fromPreview state =
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
-    case model.imageProcessingState of
-        Preview ->
+    case model.processingState of
+        Preview state ->
             { model
-                | imageProcessingState = Processing
-                , filmRoll = Zipper.mapCurrent f model.filmRoll
-            }
-
-        Ready ->
-            { model
-                | imageProcessingState = Processing
+                | processingState = ProcessingState.toProcessing state
                 , filmRoll = Zipper.mapCurrent f model.filmRoll
                 , undoState = model.filmRoll :: model.undoState
             }
 
-        Processing ->
+        Ready state ->
             { model
-                | imageProcessingState = Queued (Zipper.mapCurrent f model.filmRoll)
+                | processingState = ProcessingState.toProcessing state
+                , filmRoll = Zipper.mapCurrent f model.filmRoll
                 , undoState = model.filmRoll :: model.undoState
             }
 
-        Queued n ->
-            { model | imageProcessingState = Queued (Zipper.mapCurrent f n) }
+        Processing state ->
+            { model
+                | processingState = ProcessingState.toQueued (Zipper.mapCurrent f model.filmRoll) state
+                , undoState = model.filmRoll :: model.undoState
+            }
+
+        Queued state ->
+            { model
+                | processingState = ProcessingState.map (Zipper.mapCurrent f) state
+            }
 
 
 fromZipper : Maybe String -> Ratings -> FilmRoll -> FilmRollSettings
@@ -586,13 +584,13 @@ view : Model -> List ( Level, String ) -> Html Msg
 view model otherNotifications =
     main_ []
         [ Html.Lazy.lazy viewNav model.route
-        , Html.Lazy.lazy viewLoading model.imageProcessingState
+        , Html.Lazy.lazy viewLoading model.processingState
         , Html.Lazy.lazy8 viewImage
             model.filmRoll
             model.route
             model.imageCropMode
             model.scale
-            model.imageProcessingState
+            model.processingState
             model.previewVersions
             model.coordinateInfo
             model.imageElement
@@ -602,7 +600,7 @@ view model otherNotifications =
             model.undoState
             model.imageCropMode
             model.clipboard
-            model.imageProcessingState
+            model.processingState
         , Html.Lazy.lazy6 viewCurrentFilmRoll
             model.route
             model.previewColumns
@@ -720,14 +718,14 @@ viewSettings :
     -> List FilmRoll
     -> Maybe ImageCrop
     -> Maybe ImageSettings
-    -> ImageProcessingState
+    -> ProcessingState
     -> Html Msg
-viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessingState =
+viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingState =
     let
         settings =
-            case imageProcessingState of
+            case processingState of
                 Queued queuedFilmRoll ->
-                    Zipper.current queuedFilmRoll
+                    Zipper.current (ProcessingState.toData queuedFilmRoll)
 
                 _ ->
                     Zipper.current filmRoll
@@ -798,7 +796,7 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ imageProcessi
                 [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
                 , button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
                 , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
-                , viewIf (imageProcessingState == Preview) <|
+                , viewIf (processingState == ProcessingState.preview) <|
                     \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
                 ]
             , viewSettingsGroup
@@ -887,12 +885,12 @@ viewImage :
     -> Route
     -> Maybe ImageCrop
     -> Float
-    -> ImageProcessingState
+    -> ProcessingState
     -> Dict String Int
     -> Dict ( Float, Float ) CoordinateInfo
     -> Element
     -> Html Msg
-viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersions coordinateInfo element =
+viewImage filmRoll route imageCropMode scale_ processingState previewVersions coordinateInfo element =
     let
         current =
             Zipper.current filmRoll
@@ -913,8 +911,8 @@ viewImage filmRoll route imageCropMode scale_ imageProcessingState previewVersio
     in
     section [ id "image-section" ]
         [ div [ class "image-wrapper" ]
-            [ case imageProcessingState of
-                Preview ->
+            [ case processingState of
+                Preview _ ->
                     img
                         [ style "user-select" "none"
                         , onCoordinateClick
@@ -1043,16 +1041,16 @@ viewHistogramBar index v =
 -- NOTIFICATONS
 
 
-viewLoading : ImageProcessingState -> Html msg
+viewLoading : ProcessingState -> Html msg
 viewLoading state =
     case state of
-        Ready ->
+        Ready _ ->
             text ""
 
-        Preview ->
+        Preview _ ->
             text ""
 
-        Processing ->
+        Processing _ ->
             div [ class "loading-spinner" ] []
 
         Queued _ ->
