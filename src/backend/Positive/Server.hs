@@ -92,6 +92,7 @@ handlers isDev_ chan =
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
               saGenerateHighRes = handleGenerateHighRes,
+              saOpenExternalEditor = handleOpenExternalEditor,
               saGetCoordinateInfo = handleGetCoordinateInfo,
               saGenerateWallpaper = handleGenerateWallpaper
             }
@@ -140,8 +141,7 @@ handleGenerateHighRes dir settings = do
     Right image -> do
       outputWithCount <- liftIO $ ImageSettings.pickFilename output
       liftIO . HIP.writeImage outputWithCount $ Image.processImage settings image
-      log $ "Wrote highres version of: " <> Text.pack input
-      pure NoContent
+      NoContent <$ log ("Wrote highres version of: " <> Text.pack input)
 
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
@@ -158,8 +158,20 @@ handleGenerateWallpaper dir settings = do
       log "Image read error" >> throwError err404
     Right image -> do
       liftIO . HIP.writeImage output . Image.resizeImage 2560 $ Image.processImage settings image
-      log $ "Wrote wallpaper version of: " <> Text.pack input
-      pure NoContent
+      NoContent <$ log ("Wrote wallpaper version of: " <> Text.pack input)
+
+-- OPEN EXTERNALEDITOR
+
+handleOpenExternalEditor :: Text -> ImageSettings -> PositiveT Handler NoContent
+handleOpenExternalEditor dir settings = do
+  let input = Text.unpack dir </> Text.unpack settings.iFilename
+  log $ "Opening in external editor: " <> Text.pack input
+  maybeImage <- liftIO $ Image.readImageFromDisk input
+  case maybeImage of
+    Left _ ->
+      log "Image read error" >> throwError err404
+    Right image ->
+      NoContent <$ liftIO (HIP.displayImageUsing HIP.defaultViewer False image)
 
 -- HISTOGRAM
 
@@ -178,6 +190,8 @@ handleGetSettingsHistogram dir settings =
         logDebug $ "Creating histogram for: " <> settings.iFilename
         fmap Massiv.toList . toHistogram . HIP.unImage $
           Image.processImage settings image
+
+-- COORDINATE
 
 handleGetCoordinateInfo :: Text -> ([(Double, Double)], ImageSettings) -> PositiveT Handler [CoordinateInfo]
 handleGetCoordinateInfo dir (coordinates, settings) =

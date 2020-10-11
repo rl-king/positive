@@ -6,6 +6,7 @@ module Icon exposing
     , cancel
     , copy
     , crop
+    , externalEditor
     , highres
     , left
     , ok
@@ -15,99 +16,122 @@ module Icon exposing
     , right
     , rotate
     , save
+    , starred
     , undo
+    , unstarred
     , wallpaper
     )
 
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (..)
+import String.Interpolate exposing (interpolate)
+
+
+icon : String -> Html msg
+icon name =
+    img [ src (interpolate "/dist/icons/{0}.svg" [ name ]) ] []
 
 
 left : Html msg
 left =
-    img [ src "/dist/icons/left.svg" ] []
+    icon "left"
 
 
 right : Html msg
 right =
-    img [ src "/dist/icons/right.svg" ] []
+    icon "right"
+
+
+starred : Html msg
+starred =
+    icon "starred"
+
+
+unstarred : Html msg
+unstarred =
+    icon "unstarred"
+
+
+externalEditor : Html msg
+externalEditor =
+    icon "ps"
 
 
 ok : Html msg
 ok =
-    img [ src "/dist/icons/ok.svg" ] []
+    icon "ok"
 
 
 applyAll : Html msg
 applyAll =
-    img [ src "/dist/icons/apply-all.svg" ] []
+    icon "apply-all"
 
 
 applyBoth : Html msg
 applyBoth =
-    img [ src "/dist/icons/apply-both.svg" ] []
+    icon "apply-both"
 
 
 applyTone : Html msg
 applyTone =
-    img [ src "/dist/icons/apply-tone.svg" ] []
+    icon "apply-tone"
 
 
 applyCrop : Html msg
 applyCrop =
-    img [ src "/dist/icons/apply-crop.svg" ] []
+    icon "apply-crop"
 
 
 cancel : Html msg
 cancel =
-    img [ src "/dist/icons/cancel.svg" ] []
+    icon "cancel"
 
 
 crop : Html msg
 crop =
-    img [ src "/dist/icons/crop.svg" ] []
+    icon "crop"
 
 
 rotate : Html msg
 rotate =
-    img [ src "/dist/icons/rotate.svg" ] []
+    icon "rotate"
 
 
 copy : Html msg
 copy =
-    img [ src "/dist/icons/copy.svg" ] []
+    icon "copy"
 
 
 save : Html msg
 save =
-    img [ src "/dist/icons/save.svg" ] []
+    icon "save"
 
 
 original : Html msg
 original =
-    img [ src "/dist/icons/original.svg" ] []
+    icon "original"
 
 
 wallpaper : Html msg
 wallpaper =
-    img [ src "/dist/icons/wallpaper.svg" ] []
+    icon "wallpaper"
 
 
 highres : Html msg
 highres =
-    img [ src "/dist/icons/highres.svg" ] []
+    icon "highres"
 
 
 reset : Html msg
 reset =
-    img [ src "/dist/icons/reset.svg" ] []
+    icon "reset"
 
 
 resetTone : Html msg
 resetTone =
-    img [ src "/dist/icons/reset-tone.svg" ] []
+    icon "reset-tone"
 
 
 undo : Html msg
 undo =
-    img [ src "/dist/icons/undo.svg" ] []
+    icon "undo"

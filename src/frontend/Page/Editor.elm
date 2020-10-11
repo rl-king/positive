@@ -152,7 +152,7 @@ init route filmRoll ratings poster =
     , undoState = []
     , scale = 1
     , minimumRating = 0
-    , previewColumns = 5
+    , previewColumns = 4
     , route = route
     , notifications = []
     , previewVersions = Dict.empty
@@ -219,6 +219,8 @@ type Msg
     | GotCoordinateInfo Element (HttpResult (List CoordinateInfo))
     | OnBrowserResize
     | GotElementPosition Element
+    | OpenExternalEditor
+    | GotOpenExternalEditor (HttpResult ())
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -512,6 +514,15 @@ update key msg model =
                 Browser.Dom.getElement "image"
             )
 
+        OpenExternalEditor ->
+            ( model
+            , Cmd.map GotOpenExternalEditor <|
+                Request.postImageSettingsExternaleditor model.route.dir (Zipper.current model.filmRoll)
+            )
+
+        GotOpenExternalEditor _ ->
+            ( model, Cmd.none )
+
 
 type Key a
     = Key Int
@@ -601,7 +612,7 @@ view model otherNotifications =
             model.imageCropMode
             model.clipboard
             model.processingState
-        , Html.Lazy.lazy6 viewCurrentFilmRoll
+        , Html.Lazy.lazy6 viewFiles
             model.route
             model.previewColumns
             model.minimumRating
@@ -631,8 +642,8 @@ viewNav route =
 -- FILES
 
 
-viewCurrentFilmRoll : Route -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
-viewCurrentFilmRoll route columns minimumRating previewVersions ratings filmRoll =
+viewFiles : Route -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
+viewFiles route columns minimumRating previewVersions ratings filmRoll =
     section [ class "files" ]
         [ viewRangeInput (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
         , viewRangeInput (SetMinRating << floor) 1 ( 0, 5, 0 ) "Rating" (toFloat minimumRating) -- FIXME: remove floats
@@ -640,15 +651,15 @@ viewCurrentFilmRoll route columns minimumRating previewVersions ratings filmRoll
             List.map (\( _, filename, x ) -> ( filename, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
                     List.concat
-                        [ List.map (viewCurrentFilmRollLink False route.dir columns previewVersions ratings) (Zipper.before filmRoll)
-                        , [ viewCurrentFilmRollLink True route.dir columns previewVersions ratings (Zipper.current filmRoll) ]
-                        , List.map (viewCurrentFilmRollLink False route.dir columns previewVersions ratings) (Zipper.after filmRoll)
+                        [ List.map (viewFilesLink False route.dir columns previewVersions ratings) (Zipper.before filmRoll)
+                        , [ viewFilesLink True route.dir columns previewVersions ratings (Zipper.current filmRoll) ]
+                        , List.map (viewFilesLink False route.dir columns previewVersions ratings) (Zipper.after filmRoll)
                         ]
         ]
 
 
-viewCurrentFilmRollLink : Bool -> String -> Int -> PreviewVersions -> Ratings -> ImageSettings -> ( Int, String, Html Msg )
-viewCurrentFilmRollLink isCurrent dir columns previewVersions ratings settings =
+viewFilesLink : Bool -> String -> Int -> PreviewVersions -> Ratings -> ImageSettings -> ( Int, String, Html Msg )
+viewFilesLink isCurrent dir columns previewVersions ratings settings =
     let
         width =
             style "width" <|
@@ -659,11 +670,8 @@ viewCurrentFilmRollLink isCurrent dir columns previewVersions ratings settings =
     in
     ( Maybe.withDefault 0 (Dict.get settings.iFilename ratings)
     , settings.iFilename
-    , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 5 ) ], width ]
-        [ a
-            [ href <|
-                Util.toUrl { filename = settings.iFilename, dir = dir }
-            ]
+    , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 4 ) ], width ]
+        [ a [ href (Util.toUrl { filename = settings.iFilename, dir = dir }) ]
             [ img
                 [ src <|
                     Url.Builder.absolute
@@ -675,13 +683,13 @@ viewCurrentFilmRollLink isCurrent dir columns previewVersions ratings settings =
                 []
             ]
         , span [ class "files-file-rotate" ]
-            [ button [ onClick (RotatePreview settings.iFilename (rotate 270)) ] [ text "⇥" ]
-            , button [ onClick (RotatePreview settings.iFilename (rotate 180)) ] [ text "⇥" ]
-            , button [ onClick (RotatePreview settings.iFilename (rotate 90)) ] [ text "⇥" ]
+            [ button [ onClick (RotatePreview settings.iFilename (rotate 270)) ] [ text "⊤" ]
+            , button [ onClick (RotatePreview settings.iFilename (rotate 180)) ] [ text "⊤" ]
+            , button [ onClick (RotatePreview settings.iFilename (rotate 90)) ] [ text "⊤" ]
             ]
         , span [ class "files-file-footer" ]
             [ text settings.iFilename
-            , button [ onClick (CopySettings settings) ] [ text "copy" ]
+            , button [ onClick (CopySettings settings) ] [ Icon.copy ]
             , viewRating settings.iFilename ratings
             ]
         ]
@@ -697,14 +705,14 @@ viewRating filename ratings =
 
         gliph n =
             if n <= rating then
-                "★"
+                Icon.starred
 
             else
-                "☆"
+                Icon.unstarred
     in
     div [ class "ratings" ] <|
         List.map
-            (\n -> button [ onClick (Rate filename n) ] [ text (gliph n) ])
+            (\n -> button [ onClick (Rate filename n) ] [ gliph n ])
             (List.range 1 5)
 
 
@@ -796,6 +804,7 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingSta
                 [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
                 , button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
                 , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
+                , button [ onClick OpenExternalEditor, title "open external" ] [ Icon.externalEditor ]
                 , viewIf (processingState == ProcessingState.preview) <|
                     \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
                 ]

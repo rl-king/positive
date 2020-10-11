@@ -50,6 +50,11 @@ data SettingsApi route = SettingsApi
         :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
+    saOpenExternalEditor ::
+      route :- "image" :> "settings" :> "externaleditor"
+        :> QueryParam' '[Required, Strict] "dir" Text
+        :> ReqBody '[JSON] ImageSettings
+        :> PostNoContent '[JSON] NoContent,
     saGetCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
         :> QueryParam' '[Required, Strict] "dir" Text
