@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Positive.SingleImage where
 
@@ -6,7 +7,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
-import Positive.Image
+import qualified Positive.Image as Image
 import Positive.ImageSettings as ImageSettings
 import Positive.Prelude hiding (ByteString)
 import System.Directory
@@ -26,9 +27,9 @@ run log filepath = do
       generate log "Settings file found, generating image: " filepath settings
 
 generate :: (Text -> IO ()) -> Text -> String -> ImageSettings -> IO ()
-generate log message filepath settings = do
-  image <- readImageFromDisk filepath
+generate log message filepath is = do
+  image <- Image.fromDiskPreProcess Nothing is.iCrop filepath
   createDirectoryIfMissing False "highres"
   outputWithCount <- ImageSettings.pickFilename ("highres" </> filepath)
   log $ message <> Text.pack outputWithCount
-  either (log . tshow) (HIP.writeImage outputWithCount . processImage settings) image
+  either (log . tshow) (HIP.writeImage outputWithCount . Image.applySettings is) image

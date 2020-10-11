@@ -11,7 +11,7 @@ import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
-import Positive.Image
+import qualified Positive.Image as Image
 import Positive.ImageSettings as ImageSettings
 import Positive.Prelude hiding (ByteString)
 import System.FilePath.Posix
@@ -29,7 +29,7 @@ run log replace = do
 
 loop ::
   MVar [(FilePath, ImageSettings)] ->
-  MVar (OrdPSQ Text UTCTime MonochromeImage) ->
+  MVar (OrdPSQ Text UTCTime (ImageSettings.ImageCrop, Image.MonochromeImage)) ->
   Chan ServerEvent ->
   (Text -> IO ()) ->
   IO ()
@@ -70,11 +70,11 @@ generatePreview :: (Text -> IO ()) -> (FilePath, ImageSettings) -> IO ()
 generatePreview log (input, is) = do
   let dir = dropFileName input
       output = dir </> "previews" </> replaceExtension (Text.unpack is.iFilename) ".jpg"
-  maybeImage <- readImageFromDisk input
+  maybeImage <- Image.fromDiskPreProcess (Just 750) is.iCrop input
   case maybeImage of
     Left _ ->
       log $ Text.unwords ["Error generating preview", Text.pack output]
     Right image -> do
-      HIP.writeImage output $ processImage is (resizeImage 750 image)
+      HIP.writeImage output $ Image.applySettings is image
       insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
       log $ Text.unwords ["Generated preview", Text.pack output]

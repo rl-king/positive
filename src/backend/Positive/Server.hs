@@ -31,16 +31,17 @@ import qualified Positive.Image as Image
 import Positive.ImageSettings
   ( CoordinateInfo (..),
     FilmRollSettings,
+    ImageCrop (..),
     ImageSettings (..),
   )
 import qualified Positive.ImageSettings as ImageSettings
 import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
 import qualified Positive.Preview as Preview
+import qualified Positive.SingleImage as SingleImage
 import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
-import System.Directory
 import System.FilePath.Posix (isPathSeparator, (</>))
 
 -- POSITIVE
@@ -49,7 +50,7 @@ type PositiveT m =
   ReaderT Env m
 
 data Env = Env
-  { imageMVar :: !(MVar (OrdPSQ Text UTCTime Image.MonochromeImage)),
+  { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.MonochromeImage))),
     previewMVar :: !(MVar [(FilePath, ImageSettings)]),
     eventChan :: !(Chan ServerEvent),
     isDev :: !Bool,
@@ -102,17 +103,17 @@ handleImage :: Text -> ImageSettings -> PositiveT Handler ByteString
 handleImage dir settings = do
   env <- ask
   (image, putMVarBack) <-
-    getImage $
+    getCachedImage settings.iCrop $
       Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
   if env.isDev
     then do
-      processed <- timed "Apply" $ Image.processImage settings image
+      processed <- timed "Apply" $ Image.applySettings settings image
       encoded <- timed "Encode" =<< Image.encode "_.png" processed
       liftIO putMVarBack
       pure encoded
     else do
       log $ "Apply settings and encode: " <> settings.iFilename
-      encoded <- Image.encode "_.png" $ Image.processImage settings image
+      encoded <- Image.encode "_.png" $ Image.applySettings settings image
       liftIO putMVarBack
       pure encoded
 
@@ -130,18 +131,15 @@ handleSaveSettings dir newSettings = do
 
 handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
-  liftIO $ createDirectoryIfMissing False (Text.unpack dir </> "highres")
   let input = Text.unpack dir </> Text.unpack settings.iFilename
-      output = Text.unpack dir </> "highres" </> Text.unpack settings.iFilename
-  log $ "Generating highres version of: " <> Text.pack input
-  maybeImage <- liftIO $ Image.readImageFromDisk input
-  case maybeImage of
-    Left _ ->
-      log "Image read error" >> throwError err404
-    Right image -> do
-      outputWithCount <- liftIO $ ImageSettings.pickFilename output
-      liftIO . HIP.writeImage outputWithCount $ Image.processImage settings image
-      NoContent <$ log ("Wrote highres version of: " <> Text.pack input)
+  env <- ask
+  liftIO $
+    SingleImage.generate
+      (Log.log env.logger)
+      ("Generating highres version of: " <> Text.pack input)
+      input
+      settings
+  NoContent <$ log ("Wrote highres version of: " <> Text.pack input)
 
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
@@ -152,12 +150,12 @@ handleGenerateWallpaper dir settings = do
           <> " | "
           <> Text.unpack settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
-  maybeImage <- liftIO $ Image.readImageFromDisk input
+  maybeImage <- liftIO $ Image.fromDiskPreProcess (Just 2560) settings.iCrop input
   case maybeImage of
     Left _ ->
       log "Image read error" >> throwError err404
     Right image -> do
-      liftIO . HIP.writeImage output . Image.resizeImage 2560 $ Image.processImage settings image
+      liftIO . HIP.writeImage output $ Image.applySettings settings image
       NoContent <$ log ("Wrote wallpaper version of: " <> Text.pack input)
 
 -- OPEN EXTERNALEDITOR
@@ -166,12 +164,13 @@ handleOpenExternalEditor :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleOpenExternalEditor dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
   log $ "Opening in external editor: " <> Text.pack input
-  maybeImage <- liftIO $ Image.readImageFromDisk input
+  maybeImage <- liftIO $ Image.fromDiskPreProcess Nothing settings.iCrop input
   case maybeImage of
     Left _ ->
       log "Image read error" >> throwError err404
-    Right image ->
-      NoContent <$ liftIO (HIP.displayImageUsing HIP.defaultViewer False image)
+    Right image -> do
+      liftIO $ HIP.displayImageUsing HIP.defaultViewer False (Image.applySettings settings image)
+      pure NoContent
 
 -- HISTOGRAM
 
@@ -184,12 +183,12 @@ handleGetSettingsHistogram dir settings =
               \(HIP.PixelY p) -> Massiv.modify marr (pure . (+) 1) (fromIntegral (HIP.toWord8 p))
    in do
         (image, putMVarBack) <-
-          getImage $
+          getCachedImage settings.iCrop $
             Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
         liftIO putMVarBack
         logDebug $ "Creating histogram for: " <> settings.iFilename
         fmap Massiv.toList . toHistogram . HIP.unImage $
-          Image.processImage settings image
+          Image.applySettings settings image
 
 -- COORDINATE
 
@@ -204,8 +203,8 @@ handleGetCoordinateInfo dir (coordinates, settings) =
             (floor (int2Double (HIP.cols image) * x))
    in do
         (image, putMVarBack) <-
-          first (Image.processImage settings)
-            <$> getImage (Text.pack (Text.unpack dir </> Text.unpack settings.iFilename))
+          first (Image.applySettings settings)
+            <$> getCachedImage settings.iCrop (Text.pack (Text.unpack dir </> Text.unpack settings.iFilename))
         liftIO putMVarBack
         pure $ fmap (toInfo image) coordinates
 
@@ -217,23 +216,29 @@ handleGetSettings =
 
 -- IMAGE
 
-getImage :: Text -> PositiveT Handler (Image.MonochromeImage, IO ())
-getImage path = do
+-- | Read image from disk, normalize before crop, keep result in MVar
+getCachedImage :: ImageCrop -> Text -> PositiveT Handler (Image.MonochromeImage, IO ())
+getCachedImage crop path = do
   env <- ask
   now <- liftIO Time.getCurrentTime
   cache <- liftIO $ takeMVar env.imageMVar
   logDebug $ "Cached images: " <> tshow (OrdPSQ.size cache)
-  case OrdPSQ.lookup path cache of
-    Just (_, loadedImage) -> do
+  case checkCrop crop =<< OrdPSQ.lookup path cache of
+    Just (_, cached@(_, loadedImage)) -> do
       logDebug "From cache"
-      pure (loadedImage, putMVar env.imageMVar $ insertAndTrim path now loadedImage cache)
+      pure (loadedImage, putMVar env.imageMVar $ insertAndTrim path now cached cache)
     Nothing -> do
       logDebug "From disk"
-      maybeImage <- liftIO $ Image.readImageFromDisk (Text.unpack path)
-      case Image.resizeImage 1440 <$> maybeImage of
+      maybeImage <- liftIO $ Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
+      case maybeImage of
         Left err -> log ("Image read error: " <> tshow err) >> throwError err404
         Right image ->
-          pure (image, putMVar env.imageMVar $ insertAndTrim path now image cache)
+          pure (image, putMVar env.imageMVar $ insertAndTrim path now (crop, image) cache)
+
+checkCrop :: ImageCrop -> (UTCTime, (ImageCrop, Image.MonochromeImage)) -> Maybe (UTCTime, (ImageCrop, Image.MonochromeImage))
+checkCrop crop cached@(_, (cachedCrop, _))
+  | crop == cachedCrop = Just cached
+  | otherwise = Nothing
 
 insertAndTrim :: (Ord k, Ord p) => k -> p -> v -> OrdPSQ k p v -> OrdPSQ k p v
 insertAndTrim k v p psq =
