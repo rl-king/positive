@@ -7,3 +7,5 @@ assets
 src/frontend/Generated
 positive.cabal
 *~
+bench/medium.png
+src/backend/Scratch.hs
