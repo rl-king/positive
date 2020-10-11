@@ -291,7 +291,7 @@ li.-current {
 }
 
 li.-small span {
-    display: none;
+    /* display: none; */
 }
 
 .image-settings {
