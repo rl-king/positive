@@ -146,7 +146,7 @@ handleGenerateWallpaper dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
       output =
         "/Users/king/Documents/wallpapers/positive"
-          </> filter (not . isPathSeparator) (Text.unpack dir)
+          </> filter (\c -> not (isPathSeparator c || c == '.')) (Text.unpack dir)
           <> " | "
           <> Text.unpack settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
