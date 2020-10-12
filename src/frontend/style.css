@@ -251,12 +251,12 @@ nav {
     transform: rotate(270deg);
 }
 
-.files-file-rotate button:nth-child(3) {
+.files-file-rotate button:nth-child(2) {
     left: 50%;
     transform: translate(-50%, 1.5rem) rotate(180deg);
 }
 
-.files-file-rotate button:nth-child(2) {
+.files-file-rotate button:nth-child(3) {
     left: calc(100% - 1rem);
     transform: translate(-50%) rotate(90deg);
 }

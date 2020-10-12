@@ -37,7 +37,13 @@ parser =
                 <|> flag' Previews (long "previews" <> short 'p' <> help "generate previews")
               <*> replace
                 <|> flag' Contacts (long "contacts" <> short 'c' <> help "generate contactsheet")
-                <|> SingleImage <$> strOption (long "single" <> short 's' <> help "generate single highres image")
+                <|> SingleImage
+                  <$> strOption
+                    ( long "single"
+                        <> short 's'
+                        <> metavar "FILENAME"
+                        <> help "process fullsize image to ./highres"
+                    )
                 <|> pure Server
           )
 
