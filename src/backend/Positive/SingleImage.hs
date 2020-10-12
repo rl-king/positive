@@ -26,10 +26,12 @@ run log filepath = do
     Just settings ->
       generate log "Settings file found, generating image: " filepath settings
 
-generate :: (Text -> IO ()) -> Text -> String -> ImageSettings -> IO ()
+generate :: (Text -> IO ()) -> Text -> FilePath -> ImageSettings -> IO ()
 generate log message filepath is = do
   image <- Image.fromDiskPreProcess Nothing is.iCrop filepath
-  createDirectoryIfMissing False "highres"
-  outputWithCount <- ImageSettings.pickFilename ("highres" </> filepath)
+  createDirectoryIfMissing False (dropFileName filepath </> "highres")
+  outputWithCount <-
+    ImageSettings.pickFilename $
+      dropFileName filepath </> "highres" </> takeFileName filepath
   log $ message <> Text.pack outputWithCount
   either (log . tshow) (HIP.writeImage outputWithCount . Image.applySettings is) image

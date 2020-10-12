@@ -133,13 +133,8 @@ handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
   env <- ask
-  liftIO $
-    SingleImage.generate
-      (Log.log env.logger)
-      ("Generating highres version of: " <> Text.pack input)
-      input
-      settings
-  NoContent <$ log ("Wrote highres version of: " <> Text.pack input)
+  liftIO $ SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
+  pure NoContent
 
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
