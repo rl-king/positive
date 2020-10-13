@@ -29,7 +29,7 @@ run log replace = do
 
 loop ::
   MVar [(FilePath, ImageSettings)] ->
-  MVar (OrdPSQ Text UTCTime (ImageSettings.ImageCrop, Image.MonochromeImage)) ->
+  MVar (OrdPSQ Text UTCTime (ImageSettings.ImageCrop, Image.Monochrome)) ->
   Chan ServerEvent ->
   (Text -> IO ()) ->
   IO ()

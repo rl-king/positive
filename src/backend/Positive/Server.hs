@@ -50,7 +50,7 @@ type PositiveT m =
   ReaderT Env m
 
 data Env = Env
-  { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.MonochromeImage))),
+  { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.Monochrome))),
     previewMVar :: !(MVar [(FilePath, ImageSettings)]),
     eventChan :: !(Chan ServerEvent),
     isDev :: !Bool,
@@ -212,7 +212,7 @@ handleGetSettings =
 -- IMAGE
 
 -- | Read image from disk, normalize before crop, keep result in MVar
-getCachedImage :: ImageCrop -> Text -> PositiveT Handler (Image.MonochromeImage, IO ())
+getCachedImage :: ImageCrop -> Text -> PositiveT Handler (Image.Monochrome, IO ())
 getCachedImage crop path = do
   env <- ask
   now <- liftIO Time.getCurrentTime
@@ -230,7 +230,7 @@ getCachedImage crop path = do
         Right image ->
           pure (image, putMVar env.imageMVar $ insertAndTrim path now (crop, image) cache)
 
-checkCrop :: ImageCrop -> (UTCTime, (ImageCrop, Image.MonochromeImage)) -> Maybe (UTCTime, (ImageCrop, Image.MonochromeImage))
+checkCrop :: ImageCrop -> (UTCTime, (ImageCrop, Image.Monochrome)) -> Maybe (UTCTime, (ImageCrop, Image.Monochrome))
 checkCrop crop cached@(_, (cachedCrop, _))
   | crop == cachedCrop = Just cached
   | otherwise = Nothing
