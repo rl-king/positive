@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Main where
 
 import Criterion.Main
@@ -9,32 +11,26 @@ import Positive.Prelude
 main :: IO ()
 main =
   defaultMain
-    [ env (HIP.shrink2x2 <$> HIP.readImageY "bench/medium.png") $ \img ->
-        bgroup
-          "With medium image"
-          -- [ processingWithResize img,
-
-          [ -- resizing img
-            processing img
-          ]
+    [ env (Image.fromDisk_ "bench/large.tif") $ \img ->
+        processing img
     ]
 
 processing img =
   bgroup
     "Process"
-    [ bench "Process image" $
-        nf (Image.processImage (ImageSettings.plainImageSettings "")) img,
-      bench "Process image blur" $
-        nf (Image.processImage (ImageSettings.plainImageSettings "")) (HIP.averageBlur5x5 HIP.Edge img)
+    [ -- bench "Process image" $
+      --nf (Image.applySettings (ImageSettings.plainImageSettings "")) img,
+      bench "Process image blur" $ --4.5s
+        nf (Image.applySettings (ImageSettings.plainImageSettings "") . Image.normalize) img
     ]
 
 processingWithResize img =
   bgroup
     "Resize and process"
     [ bench "Full size" $
-        nf (Image.processImage (ImageSettings.plainImageSettings "")) img,
+        nf (Image.applySettings (ImageSettings.plainImageSettings "")) img,
       bench "1/4 size" $
-        nf (Image.processImage (ImageSettings.plainImageSettings "") . HIP.shrink2x2) img
+        nf (Image.applySettings (ImageSettings.plainImageSettings "")) img
     ]
 
 resizing img =

@@ -15,30 +15,33 @@ import Positive.Prelude hiding (ByteString)
 -- IMAGE
 
 type MonochromeImage =
+  HIP.Image HIP.Y Word16
+
+type MonochromeImageDouble =
   HIP.Image HIP.Y Double
 
 type MonochromePixel =
+  HIP.Pixel HIP.Y Word16
+
+type MonochromePixelD =
   HIP.Pixel HIP.Y Double
 
 -- LOAD
 
-fromDisk :: String -> IO (Either IOException MonochromeImage)
+fromDisk :: FilePath -> IO (Either IOException MonochromeImage)
 fromDisk =
-  tryIO . HIP.readImageY
+  tryIO . fromDisk_
+
+fromDisk_ :: FilePath -> IO MonochromeImage
+fromDisk_ =
+  HIP.readImageExact
 
 fromDiskPreProcess :: Maybe Int -> ImageCrop -> String -> IO (Either IOException MonochromeImage)
 fromDiskPreProcess targetSize imageCrop path = do
   let resize_ = maybe id resize targetSize
-  image <- fromDisk path
-  pure $ fmap (resize_ . normalize . crop imageCrop) image
+  fmap (resize_ . normalize . crop imageCrop) <$> fromDisk path
 
 -- EDIT
-
-resize :: Int -> MonochromeImage -> MonochromeImage
-resize !targetWidth !image
-  | HIP.cols image `div` targetWidth > 5 = HIP.shrink2x2 (HIP.shrink3x3 image)
-  | HIP.cols image `div` targetWidth > 3 = HIP.shrink3x3 image
-  | otherwise = HIP.shrink2x2 image
 
 applySettings :: ImageSettings -> MonochromeImage -> MonochromeImage
 applySettings !is !image =
@@ -56,7 +59,33 @@ applySettings !is !image =
               (0.8, is.iZones.z8),
               (0.9, is.iZones.z9)
             ]
-   in HIP.map (applyZones . gamma is.iGamma . compress is.iBlackpoint is.iWhitepoint . invert) $ rotate is.iRotate image
+   in HIP.map
+        ( fmap HIP.toWord16
+            . applyZones
+            . gamma is.iGamma
+            . compress is.iBlackpoint is.iWhitepoint
+            . invert
+            . fmap HIP.toDouble
+        )
+        $ rotate is.iRotate image
+{-# INLINE applySettings #-}
+
+toDoubleI :: MonochromeImage -> MonochromeImageDouble
+toDoubleI =
+  HIP.map (fmap HIP.toDouble)
+{-# INLINE toDoubleI #-}
+
+fromDoubleI :: MonochromeImageDouble -> MonochromeImage
+fromDoubleI =
+  HIP.map (fmap HIP.toWord16)
+{-# INLINE fromDoubleI #-}
+
+resize :: Int -> MonochromeImage -> MonochromeImage
+resize !targetWidth !image
+  | HIP.cols image `div` targetWidth > 5 = fromDoubleI $ HIP.shrink2x2 (HIP.shrink3x3 (toDoubleI image))
+  | HIP.cols image `div` targetWidth > 3 = fromDoubleI $ HIP.shrink3x3 (toDoubleI image)
+  | otherwise = fromDoubleI $ HIP.shrink2x2 (toDoubleI image)
+{-# INLINE resize #-}
 
 crop :: ImageCrop -> MonochromeImage -> MonochromeImage
 crop imageCrop image =
@@ -69,15 +98,20 @@ crop imageCrop image =
       cropHeight = floor $ int2Double cropWidth * mul
       mul = int2Double h / int2Double w
    in HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
+{-# INLINE crop #-}
 
--- | Due to the nature of analog scans we blur the image to average the min and max values a bit
+-- | Due to the nature of analog scans we resize the image to average the min and max values a bit
 -- Not ideal, works for now
 normalize :: MonochromeImage -> MonochromeImage
-normalize img =
-  let !res = HIP.averageBlur5x5 HIP.Edge img
-      !iMax = HIP.maxVal res
-      !iMin = HIP.minVal res
-   in HIP.map (fmap (\e -> (e - iMin) * ((HIP.maxValue - HIP.minValue) HIP.// (iMax - iMin)) + HIP.minValue)) img
+normalize image =
+  let imageDouble = toDoubleI image
+      !resized = HIP.shrink3x3 imageDouble
+      !iMax = HIP.maxVal resized
+      !iMin = HIP.minVal resized
+   in fromDoubleI $
+        HIP.map
+          (fmap (\e -> (e - iMin) * ((HIP.maxValue - HIP.minValue) HIP.// (iMax - iMin)) + HIP.minValue))
+          imageDouble
 {-# INLINE normalize #-}
 
 rotate :: Double -> MonochromeImage -> MonochromeImage
@@ -104,46 +138,24 @@ encode path image =
   liftIO . Massiv.encodeImageM Massiv.imageWriteAutoFormats path $
     HIP.unImage (HIP.toDefSpace image)
 
--- CONTACTS
-
-toContacts :: [FilePath] -> IO MonochromeImage
-toContacts images = do
-  xs <- mapM toFilmStripRow (toColumns 6 images)
-  let targetWidth = maximum $ HIP.cols <$> xs
-  pure . foldr1 HIP.topToBottom $
-    fmap (HIP.canvasSize (HIP.Fill 0.1) (\(HIP.Sz2 h _) -> (0 :. 0, HIP.Sz2 h targetWidth))) xs
-
-toFilmStripRow :: [FilePath] -> IO MonochromeImage
-toFilmStripRow images =
-  let mul i = int2Double (HIP.cols i) / int2Double (HIP.rows i)
-      resizeBic i =
-        HIP.resizeDW (HIP.Bicubic (-0.25)) HIP.Edge (HIP.Sz2 350 (round (mul i * 350))) i
-   in foldr1 HIP.leftToRight <$> traverse (fmap resizeBic . HIP.readImageY) images
-
-toColumns :: Int -> [a] -> [[a]]
-toColumns n xs =
-  case splitAt n xs of
-    (ys, zs@(_ : _)) -> ys : toColumns n zs
-    (ys, _) -> [ys]
-
 -- FILTERS
 
-invert :: MonochromePixel -> MonochromePixel
+invert :: MonochromePixelD -> MonochromePixelD
 invert =
   fmap (1 -)
 {-# INLINE invert #-}
 
-compress :: Double -> Double -> MonochromePixel -> MonochromePixel
+compress :: Double -> Double -> MonochromePixelD -> MonochromePixelD
 compress s l =
   fmap (\p -> min 1 . max 0 $ (p - s) / (l - s))
 {-# INLINE compress #-}
 
-gamma :: Double -> MonochromePixel -> MonochromePixel
+gamma :: Double -> MonochromePixelD -> MonochromePixelD
 gamma x =
   fmap (** x)
 {-# INLINE gamma #-}
 
-zone :: Double -> Double -> MonochromePixel -> MonochromePixel
+zone :: Double -> Double -> MonochromePixelD -> MonochromePixelD
 zone t i =
   let m v = curve (1 - v - t)
    in fmap (\v -> v + (m v * i))

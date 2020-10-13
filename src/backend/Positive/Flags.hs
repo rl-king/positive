@@ -16,7 +16,6 @@ data Flags = Flags
 data Mode
   = Init Replace
   | Previews Replace
-  | Contacts
   | SingleImage FilePath
   | Server
   deriving (Show, Eq)
@@ -36,7 +35,6 @@ parser =
               <*> replace
                 <|> flag' Previews (long "previews" <> short 'p' <> help "generate previews")
               <*> replace
-                <|> flag' Contacts (long "contacts" <> short 'c' <> help "generate contactsheet")
                 <|> SingleImage
                   <$> strOption
                     ( long "single"

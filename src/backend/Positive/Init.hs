@@ -11,7 +11,6 @@ run :: Bool -> IO ()
 run replace =
   let imageSettings = "image-settings.json"
       imagePreviewSettings = "previews" </> imageSettings
-      -- imageContactSettings = "contacts" </> filename
       check path = if replace then pure False else doesFileExist path
    in do
         filenames <- fmap Text.pack . filter (\x -> isExtensionOf ".tif" x || isExtensionOf ".png" x) <$> listDirectory "."
@@ -20,6 +19,3 @@ run replace =
           unlessM (check imageSettings) $ Aeson.encodeFile imageSettings settings
           createDirectoryIfMissing False (dropFileName imagePreviewSettings)
           unlessM (check imagePreviewSettings) $ Aeson.encodeFile imagePreviewSettings empty
-
--- createDirectoryIfMissing False (dropFileName imageContactSettings)
--- unlessM (check imageContactSettings) $ Aeson.encodeFile imageContactSettings empty

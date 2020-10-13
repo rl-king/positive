@@ -1,6 +1,7 @@
 module ProcessingState exposing
     ( ProcessingState(..)
     , State
+    , debug
     , map
     , preview
     , toData
@@ -43,6 +44,11 @@ type alias FilmRoll =
 preview : ProcessingState
 preview =
     Preview (State ())
+
+
+debug : ProcessingState
+debug =
+    Processing (State ())
 
 
 toReady : State b { a | toReady : Allowed } -> ProcessingState

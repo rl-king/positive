@@ -3,7 +3,6 @@
 module Main where
 
 import qualified Positive.CodeGen as CodeGen
-import qualified Positive.Contacts as Contacts
 import qualified Positive.Flags as Flags
 import qualified Positive.Init as Init
 import qualified Positive.Log as Log
@@ -25,6 +24,5 @@ main = do
       case flags.mode of
         Flags.Init replace -> Init.run replace >> Preview.run log replace
         Flags.Previews replace -> Preview.run log replace
-        Flags.Contacts -> Contacts.run log
         Flags.SingleImage filepath -> SingleImage.run log filepath
         Flags.Server -> when flags.isDev (CodeGen.run log) >> Server.run logger flags

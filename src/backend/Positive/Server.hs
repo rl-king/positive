@@ -191,7 +191,7 @@ handleGetCoordinateInfo :: Text -> ([(Double, Double)], ImageSettings) -> Positi
 handleGetCoordinateInfo dir (coordinates, settings) =
   let toInfo image (x, y) =
         CoordinateInfo x y
-          . (\(HIP.PixelY p) -> p)
+          . (\(HIP.PixelY p) -> HIP.toDouble p)
           . HIP.borderIndex Massiv.Continue image
           $ HIP.Ix2
             (floor (int2Double (HIP.rows image) * y))
