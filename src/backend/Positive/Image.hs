@@ -37,9 +37,9 @@ fromDisk_ =
   HIP.readImageExact
 
 fromDiskPreProcess :: Maybe Int -> ImageCrop -> String -> IO (Either IOException Monochrome)
-fromDiskPreProcess targetSize imageCrop path = do
-  let resize_ = maybe id resize targetSize
-  fmap (resize_ . normalize . crop imageCrop) <$> fromDisk path
+fromDiskPreProcess targetSize imageCrop path =
+  fmap (maybe fromDoubleI resize targetSize . normalize . crop imageCrop)
+    <$> fromDisk path
 
 -- EDIT
 
@@ -80,11 +80,11 @@ fromDoubleI =
   HIP.map (fmap HIP.toWord16)
 {-# INLINE fromDoubleI #-}
 
-resize :: Int -> Monochrome -> Monochrome
+resize :: Int -> MonochromeDouble -> Monochrome
 resize !targetWidth !image
-  | HIP.cols image `div` targetWidth > 5 = fromDoubleI $ HIP.shrink2x2 (HIP.shrink3x3 (toDoubleI image))
-  | HIP.cols image `div` targetWidth > 3 = fromDoubleI $ HIP.shrink3x3 (toDoubleI image)
-  | otherwise = fromDoubleI $ HIP.shrink2x2 (toDoubleI image)
+  | HIP.cols image `div` targetWidth > 5 = fromDoubleI $ HIP.shrink2x2 (HIP.shrink3x3 image)
+  | HIP.cols image `div` targetWidth > 3 = fromDoubleI $ HIP.shrink3x3 image
+  | otherwise = fromDoubleI $ HIP.shrink2x2 image
 {-# INLINE resize #-}
 
 crop :: ImageCrop -> Monochrome -> Monochrome
@@ -102,16 +102,15 @@ crop imageCrop image =
 
 -- | Due to the nature of analog scans we resize the image to average the min and max values a bit
 -- Not ideal, works for now
-normalize :: Monochrome -> Monochrome
+normalize :: Monochrome -> MonochromeDouble
 normalize image =
   let imageDouble = toDoubleI image
       !resized = HIP.shrink3x3 imageDouble
       !iMax = HIP.maxVal resized
       !iMin = HIP.minVal resized
-   in fromDoubleI $
-        HIP.map
-          (fmap (\e -> (e - iMin) * ((HIP.maxValue - HIP.minValue) HIP.// (iMax - iMin)) + HIP.minValue))
-          imageDouble
+   in HIP.map
+        (fmap (\e -> (e - iMin) * ((HIP.maxValue - HIP.minValue) HIP.// (iMax - iMin)) + HIP.minValue))
+        imageDouble
 {-# INLINE normalize #-}
 
 rotate :: Double -> Monochrome -> Monochrome
