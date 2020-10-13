@@ -35,11 +35,14 @@ run log = do
           <> Elm.jsonDefinitions @Zones
           <> Elm.jsonDefinitions @CoordinateInfo
       modules =
+        -- FIXME: spaceleak in both elm-syntax functions
         Pretty.modules $
           Simplification.simplifyDefinition
             <$> jsonDefinitions <> endpointDefinitions
   log "Removing src/frontend/Generated before generating code"
-  Directory.removeDirectoryRecursive "src/frontend/Generated"
+  whenM
+    (Directory.doesFileExist "src/frontend/Generated")
+    (Directory.removeDirectoryRecursive "src/frontend/Generated")
   for_ (HashMap.toList modules) $ \(modulePath, contents) -> do
     (filename, location) <-
       case List.reverse modulePath of
