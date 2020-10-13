@@ -1,5 +1,8 @@
 module Icon exposing
     ( applyAll
+    , applyAllCrop
+    , applyAllRotate
+    , applyAllTone
     , applyBoth
     , applyCrop
     , applyTone
@@ -65,6 +68,21 @@ ok =
 applyAll : Html msg
 applyAll =
     icon "apply-all"
+
+
+applyAllTone : Html msg
+applyAllTone =
+    icon "apply-all-tone"
+
+
+applyAllCrop : Html msg
+applyAllCrop =
+    icon "apply-all-crop"
+
+
+applyAllRotate : Html msg
+applyAllRotate =
+    icon "apply-all-rotate"
 
 
 applyBoth : Html msg

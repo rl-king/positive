@@ -792,6 +792,31 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingSta
                                 , title (interpolate "apply to all from {0}" [ clipboard.iFilename ])
                                 ]
                                 [ Icon.applyAll ]
+                            , button
+                                [ onClick <|
+                                    ApplyCopyToAll <|
+                                        Zipper.map
+                                            (\i ->
+                                                { clipboard | iFilename = i.iFilename, iRotate = i.iRotate, iCrop = i.iCrop }
+                                            )
+                                            filmRoll
+                                , title (interpolate "apply tone to all from {0}" [ clipboard.iFilename ])
+                                ]
+                                [ Icon.applyAllTone ]
+                            , button
+                                [ onClick <|
+                                    ApplyCopyToAll <|
+                                        Zipper.map (\i -> { i | iCrop = clipboard.iCrop }) filmRoll
+                                , title (interpolate "apply crop to all from {0}" [ clipboard.iFilename ])
+                                ]
+                                [ Icon.applyAllCrop ]
+                            , button
+                                [ onClick <|
+                                    ApplyCopyToAll <|
+                                        Zipper.map (\i -> { i | iRotate = clipboard.iRotate }) filmRoll
+                                , title (interpolate "apply rotate to all from {0}" [ clipboard.iFilename ])
+                                ]
+                                [ Icon.applyAllRotate ]
                             ]
                 ]
             , viewSettingsGroup
