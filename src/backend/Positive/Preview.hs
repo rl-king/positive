@@ -9,6 +9,7 @@ import Control.Concurrent.MVar
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text as Text
+import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
 import qualified Positive.Image as Image
@@ -70,6 +71,7 @@ generatePreview :: (Text -> IO ()) -> (FilePath, ImageSettings) -> IO ()
 generatePreview log (input, is) = do
   let dir = dropFileName input
       output = dir </> "previews" </> replaceExtension (Text.unpack is.iFilename) ".jpg"
+  start <- Time.getCurrentTime
   maybeImage <- Image.fromDiskPreProcess (Just 750) is.iCrop input
   case maybeImage of
     Left _ ->
@@ -77,4 +79,11 @@ generatePreview log (input, is) = do
     Right image -> do
       HIP.writeImage output $ Image.applySettings is image
       insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
-      log $ Text.unwords ["Generated preview", Text.pack output]
+      done <- liftIO Time.getCurrentTime
+      log $
+        Text.unwords
+          [ "Took",
+            tshow (Time.diffUTCTime done start),
+            "generating preview",
+            Text.pack output
+          ]
