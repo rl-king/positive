@@ -391,24 +391,16 @@ update key msg model =
 
         PreviousImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
-            , Cmd.batch
-                [ Navigation.pushUrl key <|
-                    (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
-                        Maybe.withDefault (Zipper.last model.filmRoll) (Zipper.previous model.filmRoll)
-                , Task.perform (\_ -> AttemptSave model.route.dir (nextKey model.saveKey) model.filmRoll) <|
-                    Process.sleep 10000
-                ]
+            , Navigation.pushUrl key <|
+                (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
+                    Maybe.withDefault (Zipper.last model.filmRoll) (Zipper.previous model.filmRoll)
             )
 
         NextImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
-            , Cmd.batch
-                [ Navigation.pushUrl key <|
-                    (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
-                        Maybe.withDefault (Zipper.first model.filmRoll) (Zipper.next model.filmRoll)
-                , Task.perform (\_ -> AttemptSave model.route.dir (nextKey model.saveKey) model.filmRoll) <|
-                    Process.sleep 10000
-                ]
+            , Navigation.pushUrl key <|
+                (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
+                    Maybe.withDefault (Zipper.first model.filmRoll) (Zipper.next model.filmRoll)
             )
 
         Undo ->
