@@ -277,7 +277,7 @@ update key msg model =
                 ( { model | clipboard = Nothing }, Cmd.none )
 
             else
-                ( { model | clipboard = Just settings }, Cmd.none )
+                ( { model | clipboard = Just settings, imageCropMode = Nothing }, Cmd.none )
 
         ApplyCopyToAll filmRoll ->
             let
@@ -378,6 +378,7 @@ update key msg model =
         UpdateImageCropMode mode ->
             ( { model
                 | imageCropMode = mode
+                , clipboard = Nothing
                 , processingState = fromPreview model.processingState
               }
             , Cmd.none
