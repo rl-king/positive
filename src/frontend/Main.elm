@@ -108,19 +108,6 @@ init _ url key =
         }
 
 
-fromUrl : Url -> Maybe Route
-fromUrl url =
-    let
-        parser =
-            Url.Parser.query <|
-                Url.Parser.Query.map2 (Maybe.map2 Route)
-                    (Url.Parser.Query.string "dir")
-                    (Url.Parser.Query.string "filename")
-    in
-    Maybe.andThen identity <|
-        Url.Parser.parse parser url
-
-
 
 -- UPDATE
 
@@ -130,7 +117,7 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | CancelScroll
-    | GotFilmRolls (Maybe Route) (HttpResult (List ( String, FilmRollSettings )))
+    | GotFilmRolls Route (HttpResult (List ( String, FilmRollSettings )))
     | RemoveNotification
     | OnServerMessage String
     | EditorMsg Page.Editor.Msg
@@ -180,7 +167,7 @@ update msg model =
             case model.page of
                 Browser m ->
                     mapPage model Browser BrowserMsg <|
-                        Page.Browser.update msg_ m
+                        Page.Browser.update model.key msg_ m
 
                 _ ->
                     ( model, Cmd.none )
@@ -202,17 +189,16 @@ mapPage model toPage toMsg ( page, cmds ) =
     )
 
 
-onNavigation : Maybe Route -> Model -> ( Model, Cmd Msg )
-onNavigation maybeRoute model =
+onNavigation : Route -> Model -> ( Model, Cmd Msg )
+onNavigation route model =
     let
         toSortedZipper filmRoll =
             Zipper.fromList (List.sortBy .iFilename (Dict.values filmRoll.frsSettings))
                 |> Maybe.map (\x -> ( x, filmRoll.frsRatings, filmRoll.frsPoster ))
 
-        toFilmRoll filmRolls =
-            Maybe.andThen (\{ dir } -> Dict.get dir filmRolls) maybeRoute
+        toFilmRoll data filmRolls =
+            Dict.get data.dir filmRolls
                 |> Maybe.andThen toSortedZipper
-                |> Maybe.map2 Tuple.pair maybeRoute
     in
     checkScrollPosition model.page <|
         case .filmRolls (extractUpdates model) of
@@ -224,27 +210,35 @@ onNavigation maybeRoute model =
 
             Unknown ->
                 ( { model | filmRolls = Requested }
-                , Cmd.map (GotFilmRolls maybeRoute) Request.getImageSettings
+                , Cmd.map (GotFilmRolls route) Request.getImageSettings
                 )
 
             Success filmRolls ->
-                case toFilmRoll filmRolls of
-                    Nothing ->
-                        ( { model | page = Browser (Page.Browser.init filmRolls) }
+                case route of
+                    Util.Browser data ->
+                        ( { model | page = Browser (Page.Browser.init data filmRolls) }
                         , Cmd.none
                         )
 
-                    Just ( route, ( filmRoll, ratings, poster ) ) ->
-                        case model.page of
-                            Editor m ->
-                                ( { model | page = Editor (Page.Editor.continue route filmRoll ratings poster m) }
-                                , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                                )
+                    Util.Editor data ->
+                        case toFilmRoll data filmRolls of
+                            Nothing ->
+                                pushNotification Warning RemoveNotification "Error loading filmroll" model
 
-                            _ ->
-                                ( { model | page = Editor (Page.Editor.init route filmRoll ratings poster) }
-                                , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                                )
+                            Just ( filmRoll, ratings, poster ) ->
+                                case model.page of
+                                    Editor m ->
+                                        ( { model | page = Editor (Page.Editor.continue data filmRoll ratings poster m) }
+                                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                                        )
+
+                                    _ ->
+                                        ( { model | page = Editor (Page.Editor.init data filmRoll ratings poster) }
+                                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                                        )
+
+                    Util.DecodeError err ->
+                        pushNotification Warning RemoveNotification err model
 
 
 extractUpdates : Model -> Model

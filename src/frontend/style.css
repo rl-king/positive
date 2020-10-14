@@ -131,6 +131,16 @@ nav {
     padding: 2rem 0 4rem 0;
 }
 
+.browser header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+}
+
+.browser .range-slider {
+    width: 18rem;
+}
+
 .browser-filmrolls {
     display: flex;
     flex-wrap: wrap;
@@ -177,6 +187,17 @@ nav {
     left: 0;
     background-position: center center;
     background-size: cover;
+}
+
+.browser-rated-images {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.browser-rated-images a {
+    width: 10rem;
+    margin-right: 1rem;
+    display: inline-block;
 }
 
 .files {

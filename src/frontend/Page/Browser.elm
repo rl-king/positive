@@ -8,6 +8,7 @@ module Page.Browser exposing
     )
 
 import Browser.Events
+import Browser.Navigation
 import Dict exposing (Dict)
 import Generated.Data.ImageSettings
     exposing
@@ -18,6 +19,7 @@ import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Input
 import Json.Decode as Decode
 import String.Interpolate exposing (interpolate)
 import Url.Builder
@@ -47,6 +49,7 @@ subscriptions model =
 type alias Model =
     { filmRolls : FilmRolls
     , filmRollHover : Maybe ( String, Float )
+    , minimumRating : Maybe Int
     }
 
 
@@ -54,10 +57,11 @@ type alias FilmRolls =
     Dict String FilmRollSettings
 
 
-init : FilmRolls -> Model
-init filmRolls =
+init : { minimumRating : Maybe Int } -> FilmRolls -> Model
+init { minimumRating } filmRolls =
     { filmRolls = filmRolls
     , filmRollHover = Nothing
+    , minimumRating = minimumRating
     }
 
 
@@ -71,10 +75,11 @@ type Msg
     | OnFilmRollHoverEnd
     | SetPoster String (Maybe String)
     | GotSaveImageSettings String (HttpResult FilmRollSettings)
+    | SetMinRating Int
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : Browser.Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
+update key msg model =
     case msg of
         OnFilmRollHoverStart id offset ->
             ( { model | filmRollHover = Just ( id, offset ) }, Cmd.none )
@@ -105,6 +110,18 @@ update msg model =
                             { filmRoll | frsPoster = poster }
                     )
 
+        SetMinRating 0 ->
+            ( model
+            , Browser.Navigation.pushUrl key <|
+                toUrl (Browser { minimumRating = Nothing })
+            )
+
+        SetMinRating val ->
+            ( model
+            , Browser.Navigation.pushUrl key <|
+                toUrl (Browser { minimumRating = Just val })
+            )
+
 
 
 -- VIEW
@@ -112,15 +129,20 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    main_ [] [ viewFilmRollBrowser model.filmRollHover model.filmRolls ]
+    main_ []
+        [ viewFilmRollBrowser
+            model.minimumRating
+            model.filmRollHover
+            model.filmRolls
+        ]
 
 
 
 -- FILE BROWSER
 
 
-viewFilmRollBrowser : Maybe ( String, Float ) -> FilmRolls -> Html Msg
-viewFilmRollBrowser filmRollHover filmRolls =
+viewFilmRollBrowser : Maybe Int -> Maybe ( String, Float ) -> FilmRolls -> Html Msg
+viewFilmRollBrowser minimumRating filmRollHover filmRolls =
     let
         down ( a, _ ) ( b, _ ) =
             case compare a b of
@@ -134,11 +156,44 @@ viewFilmRollBrowser filmRollHover filmRolls =
                     GT
     in
     section [ class "browser" ] <|
-        [ h1 [] [ text "Browser" ]
-        , div [ class "browser-filmrolls" ] <|
-            List.map (viewFilmRollBrowserRoll filmRollHover) <|
-                List.sortWith down <|
-                    Dict.toList filmRolls
+        [ header []
+            [ h1 [] [ text "Browser" ]
+            , Input.viewRange (SetMinRating << floor) 1 ( 0, 5, 0 ) "Minimum rating" (toFloat (Maybe.withDefault 0 minimumRating))
+            ]
+        , case minimumRating of
+            Nothing ->
+                div [ class "browser-filmrolls" ] <|
+                    List.map (viewFilmRollBrowserRoll filmRollHover) <|
+                        List.sortWith down <|
+                            Dict.toList filmRolls
+
+            Just n ->
+                div [ class "browser-rated" ] <|
+                    List.map (viewFilmRollBrowserRated n) <|
+                        List.sortWith down <|
+                            Dict.toList filmRolls
+        ]
+
+
+viewFilmRollBrowserRated : Int -> ( String, FilmRollSettings ) -> Html Msg
+viewFilmRollBrowserRated minimumRating ( dir, filmRoll ) =
+    case List.filter ((<=) minimumRating << Tuple.second) (Dict.toList filmRoll.frsRatings) of
+        [] ->
+            div [] []
+
+        rated ->
+            div []
+                [ h2 [] [ text dir ]
+                , div [ class "browser-rated-images" ] <|
+                    List.map (viewRatedImage dir) rated
+                ]
+
+
+viewRatedImage : String -> ( String, Int ) -> Html msg
+viewRatedImage dir ( filename, rating ) =
+    a [ href (toUrl (Editor { dir = dir, filename = filename })) ]
+        [ img [ src (toPreviewUrl dir filename) ] []
+        , text filename
         ]
 
 
@@ -181,9 +236,6 @@ viewFilmRollBrowserRoll filmRollHover ( dir, filmRoll ) =
 viewFilmRollBrowserImage : String -> String -> Html Msg
 viewFilmRollBrowserImage dir filename =
     let
-        previewExtension x =
-            String.dropRight 3 x ++ "jpg"
-
         decodeOffset f =
             Decode.map2 (\a b -> f (a / b))
                 (Decode.field "offsetX" Decode.float)
@@ -196,18 +248,26 @@ viewFilmRollBrowserImage dir filename =
             decodeOffset OnFilmRollHoverMove
         , on "mouseleave" <|
             Decode.succeed OnFilmRollHoverEnd
-        , href (toUrl { dir = dir, filename = filename })
+        , href (toUrl (Editor { dir = dir, filename = filename }))
         ]
         [ span
             [ style "background-image" <|
                 interpolate "url(\"{0}\")" <|
-                    [ Url.Builder.absolute
-                        [ dir, "previews", previewExtension filename ]
-                        []
-                    ]
+                    [ toPreviewUrl dir filename ]
             ]
             []
         ]
+
+
+toPreviewUrl : String -> String -> String
+toPreviewUrl dir filename =
+    let
+        previewExtension x =
+            String.dropRight 3 x ++ "jpg"
+    in
+    Url.Builder.absolute
+        [ dir, "previews", previewExtension filename ]
+        []
 
 
 

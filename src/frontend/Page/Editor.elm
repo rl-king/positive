@@ -28,6 +28,7 @@ import Html.Events exposing (..)
 import Html.Keyed
 import Html.Lazy
 import Icon
+import Input
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
@@ -120,7 +121,7 @@ type alias Model =
     , scale : Float
     , minimumRating : Int
     , previewColumns : Int
-    , route : Route
+    , route : EditorRoute
     , notifications : List ( Level, String )
     , imageElement : Element
     , coordinateInfo : Dict ( Float, Float ) CoordinateInfo
@@ -139,7 +140,7 @@ type alias PreviewVersions =
     Dict String Int
 
 
-init : Route -> FilmRoll -> Ratings -> Maybe String -> Model
+init : EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
     { processingState = ProcessingState.preview
     , ratings = ratings
@@ -165,7 +166,7 @@ init route filmRoll ratings poster =
     }
 
 
-continue : Route -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
+continue : EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
 continue route filmRoll ratings poster model =
     { model
         | processingState = ProcessingState.preview
@@ -177,7 +178,7 @@ continue route filmRoll ratings poster model =
     }
 
 
-focus : Route -> FilmRoll -> FilmRoll
+focus : EditorRoute -> FilmRoll -> FilmRoll
 focus route filmRoll =
     Maybe.withDefault filmRoll <|
         Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
@@ -393,14 +394,14 @@ update key msg model =
         PreviousImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Navigation.pushUrl key <|
-                (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
+                (toUrl << Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
                     Maybe.withDefault (Zipper.last model.filmRoll) (Zipper.previous model.filmRoll)
             )
 
         NextImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Navigation.pushUrl key <|
-                (Util.toUrl << Route model.route.dir << .iFilename << Zipper.current) <|
+                (toUrl << Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
                     Maybe.withDefault (Zipper.first model.filmRoll) (Zipper.next model.filmRoll)
             )
 
@@ -620,7 +621,7 @@ view model otherNotifications =
 -- NAV
 
 
-viewNav : Route -> Html Msg
+viewNav : EditorRoute -> Html Msg
 viewNav route =
     nav []
         [ a [ href "/" ] [ text "browser" ]
@@ -635,11 +636,11 @@ viewNav route =
 -- FILES
 
 
-viewFiles : Route -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
+viewFiles : EditorRoute -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
 viewFiles route columns minimumRating previewVersions ratings filmRoll =
     section [ class "files" ]
-        [ viewRangeInput (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
-        , viewRangeInput (SetMinRating << floor) 1 ( 0, 5, 0 ) "Rating" (toFloat minimumRating) -- FIXME: remove floats
+        [ Input.viewRange (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
+        , Input.viewRange (SetMinRating << floor) 1 ( 0, 5, 0 ) "Rating" (toFloat minimumRating) -- FIXME: remove floats
         , Html.Keyed.ul [] <|
             List.map (\( _, filename, x ) -> ( filename, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
@@ -664,7 +665,7 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
     ( Maybe.withDefault 0 (Dict.get settings.iFilename ratings)
     , settings.iFilename
     , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 4 ) ], width ]
-        [ a [ href (Util.toUrl { filename = settings.iFilename, dir = dir }) ]
+        [ a [ href (toUrl (Editor { filename = settings.iFilename, dir = dir })) ]
             [ img
                 [ src <|
                     Url.Builder.absolute
@@ -739,21 +740,21 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingSta
             [ Html.Lazy.lazy viewHistogram histogram ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
-                [ viewRangeInput (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
-                , viewRangeInput (\v -> { settings | iZones = { zones | z2 = v } }) 0.001 ( -0.25, 0.25, 0 ) "II" zones.z2
-                , viewRangeInput (\v -> { settings | iZones = { zones | z3 = v } }) 0.001 ( -0.25, 0.25, 0 ) "III" zones.z3
-                , viewRangeInput (\v -> { settings | iZones = { zones | z4 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IV" zones.z4
-                , viewRangeInput (\v -> { settings | iZones = { zones | z5 = v } }) 0.001 ( -0.25, 0.25, 0 ) "V" zones.z5
-                , viewRangeInput (\v -> { settings | iZones = { zones | z6 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VI" zones.z6
-                , viewRangeInput (\v -> { settings | iZones = { zones | z7 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VII" zones.z7
-                , viewRangeInput (\v -> { settings | iZones = { zones | z8 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VIII" zones.z8
-                , viewRangeInput (\v -> { settings | iZones = { zones | z9 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IX" zones.z9
+                [ Input.viewRange (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
+                , Input.viewRange (\v -> { settings | iZones = { zones | z2 = v } }) 0.001 ( -0.25, 0.25, 0 ) "II" zones.z2
+                , Input.viewRange (\v -> { settings | iZones = { zones | z3 = v } }) 0.001 ( -0.25, 0.25, 0 ) "III" zones.z3
+                , Input.viewRange (\v -> { settings | iZones = { zones | z4 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IV" zones.z4
+                , Input.viewRange (\v -> { settings | iZones = { zones | z5 = v } }) 0.001 ( -0.25, 0.25, 0 ) "V" zones.z5
+                , Input.viewRange (\v -> { settings | iZones = { zones | z6 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VI" zones.z6
+                , Input.viewRange (\v -> { settings | iZones = { zones | z7 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VII" zones.z7
+                , Input.viewRange (\v -> { settings | iZones = { zones | z8 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VIII" zones.z8
+                , Input.viewRange (\v -> { settings | iZones = { zones | z9 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IX" zones.z9
                 ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
-                [ viewRangeInput (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
-                , viewRangeInput (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.5, 0.5, 0 ) "Blackpoint" settings.iBlackpoint
-                , viewRangeInput (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
+                [ Input.viewRange (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
+                , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.5, 0.5, 0 ) "Blackpoint" settings.iBlackpoint
+                , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
         , div [ class "image-settings-buttons" ]
             [ viewSettingsGroup
@@ -864,43 +865,13 @@ viewImageCropMode current imageCropMode =
             div []
                 [ button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.crop ]
                 , div [ class "crop-settings" ]
-                    [ viewRangeInput (onTopChange imageCrop) 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop
-                    , viewRangeInput (onLeftChange imageCrop) 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft
-                    , viewRangeInput (onWidthChange imageCrop) 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth
+                    [ Input.viewRange (onTopChange imageCrop) 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop
+                    , Input.viewRange (onLeftChange imageCrop) 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft
+                    , Input.viewRange (onWidthChange imageCrop) 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth
                     , button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.cancel ]
                     , button [ onClick (ApplyCrop imageCrop) ] [ Icon.ok ]
                     ]
                 ]
-
-
-viewRangeInput : (Float -> msg) -> Float -> ( Float, Float, Float ) -> String -> Float -> Html msg
-viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
-    let
-        deDupe v =
-            if v == val then
-                Decode.fail "Is same as val"
-
-            else
-                Decode.succeed (toMsg v)
-    in
-    div
-        [ class "range-slider"
-        , on "dblclick" <|
-            Decode.andThen deDupe (Decode.succeed startingValue)
-        ]
-        [ label [] [ span [] [ text title ], span [] [ text (String.fromFloat val) ] ]
-        , input
-            [ type_ "range"
-            , value (String.fromFloat val)
-            , step (String.fromFloat stepSize)
-            , Attributes.min (String.fromFloat min)
-            , Attributes.max (String.fromFloat max)
-            , on "input" <|
-                Decode.andThen deDupe <|
-                    Decode.at [ "target", "valueAsNumber" ] Decode.float
-            ]
-            []
-        ]
 
 
 
@@ -909,7 +880,7 @@ viewRangeInput toMsg stepSize ( min, max, startingValue ) title val =
 
 viewImage :
     FilmRoll
-    -> Route
+    -> EditorRoute
     -> Maybe ImageCrop
     -> Float
     -> ProcessingState
@@ -988,7 +959,7 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
                         []
             ]
         , section [ class "zones" ]
-            [ viewRangeInput UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" scale_ ]
+            [ Input.viewRange UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" scale_ ]
         ]
 
 

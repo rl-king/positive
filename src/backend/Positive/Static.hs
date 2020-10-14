@@ -17,17 +17,26 @@ import Servant
 serve :: Bool -> Tagged (m :: Type -> Type) Application
 serve isDev
   | isDev =
-    pure $ \req resp -> staticApp (defaultFileServerSettings "./") req resp
-  | otherwise =
     pure $ \req resp ->
+      case Wai.pathInfo req of
+        "editor" : _ ->
+          resp $ Wai.responseFile Http.status200 [] "./index.html" Nothing
+        [] ->
+          resp $ Wai.responseFile Http.status200 [] "./index.html" Nothing
+        _ ->
+          staticApp (defaultFileServerSettings "./") req resp
+  | otherwise =
+    pure $ \req resp -> do
       let assets = HashMap.fromList (fmap (first Text.pack) static)
        in case Wai.pathInfo req of
-            [] ->
-              resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
             "dist" : "icons" : rest ->
               resp $ toFile [(Http.hContentType, "image/svg+xml")] ("icons" : rest) assets
             "dist" : rest ->
               resp $ toFile [] rest assets
+            "editor" : _ ->
+              resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
+            [] ->
+              resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
             _ ->
               staticApp (defaultFileServerSettings "./") req resp
 
