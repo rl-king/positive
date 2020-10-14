@@ -141,7 +141,7 @@ type alias PreviewVersions =
 
 init : Route -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
-    { processingState = ProcessingState.debug
+    { processingState = ProcessingState.preview
     , ratings = ratings
     , poster = poster
     , filmRoll = focus route filmRoll
