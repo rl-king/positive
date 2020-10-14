@@ -338,6 +338,7 @@ viewCancelScroll scrollTo =
             span
                 [ on "wheel" (Decode.succeed CancelScroll)
                 , on "touchstart" (Decode.succeed CancelScroll)
+                , on "click" (Decode.succeed CancelScroll)
                 , class "scroll-cancel-overlay"
                 ]
                 []

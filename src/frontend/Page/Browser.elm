@@ -19,6 +19,7 @@ import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Icon
 import Input
 import Json.Decode as Decode
 import String.Interpolate exposing (interpolate)
@@ -175,6 +176,10 @@ viewFilmRollBrowser minimumRating filmRollHover filmRolls =
         ]
 
 
+
+-- RATED
+
+
 viewFilmRollBrowserRated : Int -> ( String, FilmRollSettings ) -> Html Msg
 viewFilmRollBrowserRated minimumRating ( dir, filmRoll ) =
     case List.filter ((<=) minimumRating << Tuple.second) (Dict.toList filmRoll.frsRatings) of
@@ -182,7 +187,7 @@ viewFilmRollBrowserRated minimumRating ( dir, filmRoll ) =
             div [] []
 
         rated ->
-            div []
+            div [ class "browser-rated-roll" ]
                 [ h2 [] [ text dir ]
                 , div [ class "browser-rated-images" ] <|
                     List.map (viewRatedImage dir) rated
@@ -191,10 +196,24 @@ viewFilmRollBrowserRated minimumRating ( dir, filmRoll ) =
 
 viewRatedImage : String -> ( String, Int ) -> Html msg
 viewRatedImage dir ( filename, rating ) =
+    let
+        gliph n =
+            if n <= rating then
+                Icon.starred
+
+            else
+                Icon.unstarred
+    in
     a [ href (toUrl (Editor { dir = dir, filename = filename })) ]
         [ img [ src (toPreviewUrl dir filename) ] []
         , text filename
+        , div [ class "browser-rated-rating" ] <|
+            List.map (\n -> span [] [ gliph n ]) (List.range 1 5)
         ]
+
+
+
+-- ROLLS
 
 
 viewFilmRollBrowserRoll : Maybe ( String, Float ) -> ( String, FilmRollSettings ) -> Html Msg
