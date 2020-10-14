@@ -34,6 +34,7 @@ import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
 import Process
 import ProcessingState exposing (ProcessingState(..))
+import Route
 import String.Interpolate exposing (interpolate)
 import Task
 import Url.Builder
@@ -121,7 +122,7 @@ type alias Model =
     , scale : Float
     , minimumRating : Int
     , previewColumns : Int
-    , route : EditorRoute
+    , route : Route.EditorRoute
     , notifications : List ( Level, String )
     , imageElement : Element
     , coordinateInfo : Dict ( Float, Float ) CoordinateInfo
@@ -140,7 +141,7 @@ type alias PreviewVersions =
     Dict String Int
 
 
-init : EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model
+init : Route.EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
     { processingState = ProcessingState.preview
     , ratings = ratings
@@ -166,7 +167,7 @@ init route filmRoll ratings poster =
     }
 
 
-continue : EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
+continue : Route.EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
 continue route filmRoll ratings poster model =
     { model
         | processingState = ProcessingState.preview
@@ -178,7 +179,7 @@ continue route filmRoll ratings poster model =
     }
 
 
-focus : EditorRoute -> FilmRoll -> FilmRoll
+focus : Route.EditorRoute -> FilmRoll -> FilmRoll
 focus route filmRoll =
     Maybe.withDefault filmRoll <|
         Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
@@ -394,14 +395,14 @@ update key msg model =
         PreviousImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Navigation.pushUrl key <|
-                (toUrl << Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
+                (Route.toUrl << Route.Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
                     Maybe.withDefault (Zipper.last model.filmRoll) (Zipper.previous model.filmRoll)
             )
 
         NextImage ->
             ( { model | undoState = [], saveKey = nextKey model.saveKey }
             , Navigation.pushUrl key <|
-                (toUrl << Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
+                (Route.toUrl << Route.Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
                     Maybe.withDefault (Zipper.first model.filmRoll) (Zipper.next model.filmRoll)
             )
 
@@ -621,7 +622,7 @@ view model otherNotifications =
 -- NAV
 
 
-viewNav : EditorRoute -> Html Msg
+viewNav : Route.EditorRoute -> Html Msg
 viewNav route =
     nav []
         [ a [ href "/" ] [ text "browser" ]
@@ -636,7 +637,7 @@ viewNav route =
 -- FILES
 
 
-viewFiles : EditorRoute -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
+viewFiles : Route.EditorRoute -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
 viewFiles route columns minimumRating previewVersions ratings filmRoll =
     section [ class "files" ]
         [ Input.viewRange (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
@@ -665,7 +666,7 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
     ( Maybe.withDefault 0 (Dict.get settings.iFilename ratings)
     , settings.iFilename
     , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 4 ) ], width ]
-        [ a [ href (toUrl (Editor { filename = settings.iFilename, dir = dir })) ]
+        [ a [ href (Route.toUrl (Route.Editor { filename = settings.iFilename, dir = dir })) ]
             [ img
                 [ src <|
                     Url.Builder.absolute
@@ -880,7 +881,7 @@ viewImageCropMode current imageCropMode =
 
 viewImage :
     FilmRoll
-    -> EditorRoute
+    -> Route.EditorRoute
     -> Maybe ImageCrop
     -> Float
     -> ProcessingState

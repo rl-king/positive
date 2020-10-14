@@ -22,6 +22,7 @@ import Html.Events exposing (..)
 import Icon
 import Input
 import Json.Decode as Decode
+import Route
 import String.Interpolate exposing (interpolate)
 import Url.Builder
 import Util exposing (..)
@@ -114,13 +115,13 @@ update key msg model =
         SetMinRating 0 ->
             ( model
             , Browser.Navigation.pushUrl key <|
-                toUrl (Browser { minimumRating = Nothing })
+                Route.toUrl (Route.Browser { minimumRating = Nothing })
             )
 
         SetMinRating val ->
             ( model
             , Browser.Navigation.pushUrl key <|
-                toUrl (Browser { minimumRating = Just val })
+                Route.toUrl (Route.Browser { minimumRating = Just val })
             )
 
 
@@ -158,7 +159,7 @@ viewFilmRollBrowser minimumRating filmRollHover filmRolls =
     in
     section [ class "browser" ] <|
         [ header []
-            [ h1 [] [ text "Browser" ]
+            [ h1 [] [ text "Route.Browser" ]
             , Input.viewRange (SetMinRating << floor) 1 ( 0, 5, 0 ) "Minimum rating" (toFloat (Maybe.withDefault 0 minimumRating))
             ]
         , case minimumRating of
@@ -204,7 +205,7 @@ viewRatedImage dir ( filename, rating ) =
             else
                 Icon.unstarred
     in
-    a [ href (toUrl (Editor { dir = dir, filename = filename })) ]
+    a [ href (Route.toUrl (Route.Editor { dir = dir, filename = filename })) ]
         [ img [ src (toPreviewUrl dir filename) ] []
         , text filename
         , div [ class "browser-rated-rating" ] <|
@@ -267,7 +268,7 @@ viewFilmRollBrowserImage dir filename =
             decodeOffset OnFilmRollHoverMove
         , on "mouseleave" <|
             Decode.succeed OnFilmRollHoverEnd
-        , href (toUrl (Editor { dir = dir, filename = filename }))
+        , href (Route.toUrl (Route.Editor { dir = dir, filename = filename }))
         ]
         [ span
             [ style "background-image" <|

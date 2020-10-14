@@ -13,6 +13,7 @@ import Json.Decode as Decode
 import List.Zipper as Zipper
 import Page.Browser
 import Page.Editor
+import Route exposing (Route)
 import ScrollTo
 import Url exposing (Url)
 import Url.Parser
@@ -99,7 +100,7 @@ type alias FilmRolls =
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
-    onNavigation (fromUrl url)
+    onNavigation (Route.fromUrl url)
         { filmRolls = Unknown
         , page = Loading
         , key = key
@@ -134,7 +135,7 @@ update msg model =
             ( model, Navigation.load href )
 
         UrlChanged url ->
-            onNavigation (fromUrl url) model
+            onNavigation (Route.fromUrl url) model
 
         ScrollToMsg scrollToMsg ->
             let
@@ -215,12 +216,12 @@ onNavigation route model =
 
             Success filmRolls ->
                 case route of
-                    Util.Browser data ->
+                    Route.Browser data ->
                         ( { model | page = Browser (Page.Browser.init data filmRolls) }
                         , Cmd.none
                         )
 
-                    Util.Editor data ->
+                    Route.Editor data ->
                         case toFilmRoll data filmRolls of
                             Nothing ->
                                 pushNotification Warning RemoveNotification "Error loading filmroll" model
@@ -237,7 +238,7 @@ onNavigation route model =
                                         , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                                         )
 
-                    Util.DecodeError err ->
+                    Route.DecodeError err ->
                         pushNotification Warning RemoveNotification err model
 
 
