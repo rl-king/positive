@@ -22,14 +22,21 @@ serve isDev
     pure $ \req resp ->
       let assets = HashMap.fromList (fmap (first Text.pack) static)
        in case Wai.pathInfo req of
-            [] -> resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
+            [] ->
+              resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
+            "dist" : "icons" : rest ->
+              resp $ toFile [(Http.hContentType, "image/svg+xml")] ("icons" : rest) assets
             "dist" : rest ->
-              resp
-                . maybe
-                  (Wai.responseLBS Http.status404 [] "Not found - 404")
-                  (Wai.responseLBS Http.status200 [] . fromStrict)
-                $ HashMap.lookup (Text.intercalate "/" rest) assets
-            _ -> staticApp (defaultFileServerSettings "./") req resp
+              resp $ toFile [] rest assets
+            _ ->
+              staticApp (defaultFileServerSettings "./") req resp
+
+toFile :: Http.ResponseHeaders -> [Text] -> HashMap Text ByteString -> Wai.Response
+toFile headers path assets =
+  maybe
+    (Wai.responseLBS Http.status404 [] "Not found - 404")
+    (Wai.responseLBS Http.status200 headers . fromStrict)
+    $ HashMap.lookup (Text.intercalate "/" path) assets
 
 indexHtml :: ByteString
 indexHtml =
