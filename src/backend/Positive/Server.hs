@@ -116,7 +116,7 @@ handleImage dir settings = do
       pure encoded
     else do
       log $ "Apply settings and encode: " <> settings.iFilename
-      encoded <- Image.encode "_.png" $ Image.applySettings settings image
+      !encoded <- Image.encode "_.png" $ Image.applySettings settings image
       liftIO putMVarBack
       logSSE $ "Processed image " <> settings.iFilename
       pure encoded

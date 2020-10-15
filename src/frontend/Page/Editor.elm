@@ -459,7 +459,13 @@ update key msg model =
             ( { model | minimumRating = rating }, Cmd.none )
 
         RemoveNotification ->
-            ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
+            ( { model
+                | notifications =
+                    List.take (List.length model.notifications - 1)
+                        model.notifications
+              }
+            , Cmd.none
+            )
 
         LoadOriginal ->
             ( { model | processingState = fromPreview model.processingState }, Cmd.none )
@@ -515,8 +521,11 @@ update key msg model =
                 Request.postImageSettingsExternaleditor model.route.dir (Zipper.current model.filmRoll)
             )
 
-        GotOpenExternalEditor _ ->
-            ( model, Cmd.none )
+        GotOpenExternalEditor (Ok _) ->
+            pushNotification Normal RemoveNotification "Opening external editor" model
+
+        GotOpenExternalEditor (Err _) ->
+            pushNotification Warning RemoveNotification "Error opening external editor" model
 
 
 type Key a

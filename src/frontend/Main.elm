@@ -159,7 +159,13 @@ update msg model =
             pushNotification Warning RemoveNotification "Error gettings filmroll settings" model
 
         RemoveNotification ->
-            ( { model | notifications = List.drop 1 model.notifications }, Cmd.none )
+            ( { model
+                | notifications =
+                    List.take (List.length model.notifications - 1)
+                        model.notifications
+              }
+            , Cmd.none
+            )
 
         OnServerMessage message ->
             pushNotification Server RemoveNotification message model
