@@ -50,7 +50,7 @@ addCount log xs t =
 
 -- FIND
 
-findMissingPreviews :: Bool -> IO [(FilePath, ImageSettings)]
+findMissingPreviews :: MonadIO m => Bool -> m [(FilePath, ImageSettings)]
 findMissingPreviews replace =
   let toSettings dir =
         if replace
@@ -58,8 +58,9 @@ findMissingPreviews replace =
             maybe (fail "Something went wrong reading the settings file") pure
               =<< Aeson.decodeFileStrict (dir </> "image-settings.json")
           else diffedPreviewSettings dir (dir </> "previews")
-   in fmap (sortOn fst . concat) . mapM (\dir -> prependDir dir <$> toSettings dir)
-        =<< fmap dropFileName <$> findImageSettingFiles
+   in liftIO $
+        fmap (sortOn fst . concat) . mapM (\dir -> prependDir dir <$> toSettings dir)
+          =<< fmap dropFileName <$> findImageSettingFiles
 
 prependDir :: FilePath -> FilmRollSettings -> [(FilePath, ImageSettings)]
 prependDir dir settings =

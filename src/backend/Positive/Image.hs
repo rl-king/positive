@@ -28,15 +28,20 @@ type MonochromePixelDouble =
 
 -- LOAD
 
-fromDisk :: FilePath -> IO (Either IOException Monochrome)
+fromDisk :: MonadIO m => FilePath -> m (Either IOException Monochrome)
 fromDisk =
-  tryIO . fromDisk_
+  liftIO . tryIO . fromDisk_
 
-fromDisk_ :: FilePath -> IO Monochrome
+fromDisk_ :: MonadIO m => FilePath -> m Monochrome
 fromDisk_ =
   HIP.readImageExact
 
-fromDiskPreProcess :: Maybe Int -> ImageCrop -> String -> IO (Either IOException Monochrome)
+fromDiskPreProcess ::
+  MonadIO m =>
+  Maybe Int ->
+  ImageCrop ->
+  String ->
+  m (Either IOException Monochrome)
 fromDiskPreProcess targetSize imageCrop path =
   fmap (maybe fromDoubleI resize targetSize . normalize . crop imageCrop)
     <$> fromDisk path

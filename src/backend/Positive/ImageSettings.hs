@@ -33,7 +33,7 @@ data FilmRollSettings = FilmRollSettings
     frsRatings :: !(HashMap Text Int),
     frsSettings :: !(HashMap Text ImageSettings)
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq)
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData, Show, Eq)
 
 instance Aeson.FromJSON FilmRollSettings where
   parseJSON =
@@ -143,7 +143,15 @@ data ImageSettings = ImageSettings
     iBlackpoint :: !Double,
     iWhitepoint :: !Double
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.ToJSON)
+  deriving
+    ( Generic,
+      SOP.Generic,
+      SOP.HasDatatypeInfo,
+      NFData,
+      Show,
+      Eq,
+      Aeson.ToJSON
+    )
 
 instance Aeson.FromJSON ImageSettings where
   parseJSON =
@@ -200,7 +208,16 @@ data Zones = Zones
     z8 :: !Double,
     z9 :: !Double
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+  deriving
+    ( Generic,
+      SOP.Generic,
+      SOP.HasDatatypeInfo,
+      NFData,
+      Show,
+      Eq,
+      Aeson.FromJSON,
+      Aeson.ToJSON
+    )
 
 initZones :: Zones
 initZones =
@@ -225,7 +242,16 @@ data ImageCrop = ImageCrop
     icLeft :: !Double,
     icWidth :: !Double
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
+  deriving
+    ( Generic,
+      SOP.Generic,
+      SOP.HasDatatypeInfo,
+      NFData,
+      Show,
+      Eq,
+      Aeson.FromJSON,
+      Aeson.ToJSON
+    )
 
 noCrop :: ImageCrop
 noCrop =
@@ -266,24 +292,26 @@ instance Elm.HasElmEncoder Aeson.Value CoordinateInfo where
 
 -- FS
 
-findImageSettings :: IO (HashMap Text FilmRollSettings)
+findImageSettings :: MonadIO m => m (HashMap Text FilmRollSettings)
 findImageSettings = do
   settingFiles <- findImageSettingFiles
   filmRollSettings <-
-    traverse
-      (\path -> (,) <$> pure (Text.pack (makeRelative "./" (takeDirectory path))) <*> Aeson.decodeFileStrict path)
-      settingFiles
+    liftIO $
+      traverse
+        (\path -> (,) <$> pure (Text.pack (makeRelative "./" (takeDirectory path))) <*> Aeson.decodeFileStrict path)
+        settingFiles
   pure $
     foldr
       (\(path, maybeSettings) acc -> maybe acc (\settings -> HashMap.insert path settings acc) maybeSettings)
       mempty
       filmRollSettings
 
-findImageSettingFiles :: IO [FilePath]
+findImageSettingFiles :: MonadIO m => m [FilePath]
 findImageSettingFiles =
-  (++)
-    <$> Glob.glob "./**/[Roll]*/image-settings.json"
-    <*> Glob.glob "./image-settings.json"
+  liftIO $
+    (<>)
+      <$> Glob.glob "./**/[Roll]*/image-settings.json"
+      <*> Glob.glob "./image-settings.json"
 
 diffedPreviewSettings :: FilePath -> FilePath -> IO FilmRollSettings
 diffedPreviewSettings a b = do
@@ -300,9 +328,9 @@ insertPreviewSettings ps settings = do
     (Aeson.encodeFile ps . insert settings)
     previewSettings
 
-pickFilename :: FilePath -> IO FilePath
+pickFilename :: MonadIO m => FilePath -> m FilePath
 pickFilename filepath = do
-  current <- Glob.glob (dropExtension filepath <> "*")
+  current <- liftIO $ Glob.glob (dropExtension filepath <> "*")
   pure $
     if null current
       then filepath

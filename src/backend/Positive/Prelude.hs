@@ -10,6 +10,9 @@ where
 import Control.Applicative as X ((<|>))
 import Control.Category as X ((>>>))
 import Control.Concurrent as X (forkIO, threadDelay)
+import Control.Concurrent.Chan as X (Chan)
+import Control.Concurrent.MVar as X (MVar)
+import Control.DeepSeq as X (NFData)
 import Control.Exception.Safe as X (SomeException, catch, throwIO, try, tryAny)
 import Control.Monad as X (foldM, forM, forever, guard, join, unless, when, (<=<))
 import Control.Monad.IO.Class as X

@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,8 +10,9 @@ module Positive.Server
   )
 where
 
-import Control.Concurrent.Chan
-import Control.Concurrent.MVar
+import qualified Control.Concurrent.Chan as Chan
+import qualified Control.Concurrent.MVar as MVar
+import qualified Control.DeepSeq as DeepSeq
 import Control.Exception (evaluate)
 import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import qualified Data.Aeson as Aeson
@@ -67,9 +69,9 @@ run logger_ flags =
             (Log.log logger_ ("listening on port " <> tshow @Int 8080))
             defaultSettings
    in do
-        imageMVar_ <- newMVar OrdPSQ.empty
-        previewMVar_ <- newEmptyMVar
-        eventChan_ <- newChan
+        imageMVar_ <- MVar.newMVar OrdPSQ.empty
+        previewMVar_ <- MVar.newEmptyMVar
+        eventChan_ <- Chan.newChan
         let env = Env imageMVar_ previewMVar_ eventChan_ flags.isDev logger_
         Preview.loop previewMVar_ imageMVar_ eventChan_ (Log.log logger_)
         runSettings settings (genericServeT (`runReaderT` env) (handlers flags.isDev eventChan_))
@@ -101,6 +103,7 @@ handlers isDev_ chan =
 
 handleImage :: Text -> ImageSettings -> PositiveT Handler ByteString
 handleImage dir settings = do
+  logSSE $ "Requested image " <> settings.iFilename
   env <- ask
   (image, putMVarBack) <-
     getCachedImage settings.iCrop $
@@ -115,6 +118,7 @@ handleImage dir settings = do
       log $ "Apply settings and encode: " <> settings.iFilename
       encoded <- Image.encode "_.png" $ Image.applySettings settings image
       liftIO putMVarBack
+      logSSE $ "Processed image " <> settings.iFilename
       pure encoded
 
 handleSaveSettings :: Text -> FilmRollSettings -> PositiveT Handler FilmRollSettings
@@ -122,8 +126,8 @@ handleSaveSettings dir newSettings = do
   liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
   logDebug "Wrote settings"
   env <- ask
-  missing <- liftIO $ Preview.findMissingPreviews False
-  void . liftIO $ tryPutMVar env.previewMVar missing
+  missing <- Preview.findMissingPreviews False
+  void . liftIO $ MVar.tryPutMVar env.previewMVar missing
   logDebug $ "Updating " <> tshow (length missing) <> " preview(s)"
   pure newSettings
 
@@ -133,7 +137,7 @@ handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
   env <- ask
-  liftIO $ SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
+  SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
   pure NoContent
 
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
@@ -145,13 +149,11 @@ handleGenerateWallpaper dir settings = do
           <> " | "
           <> Text.unpack settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
-  maybeImage <- liftIO $ Image.fromDiskPreProcess (Just 2560) settings.iCrop input
-  case maybeImage of
-    Left _ ->
-      log "Image read error" >> throwError err404
-    Right image -> do
-      liftIO . HIP.writeImage output $ Image.applySettings settings image
-      NoContent <$ log ("Wrote wallpaper version of: " <> Text.pack input)
+  image <-
+    handleNothing $
+      Image.fromDiskPreProcess (Just 2560) settings.iCrop input
+  HIP.writeImage output $ Image.applySettings settings image
+  NoContent <$ log ("Wrote wallpaper version of: " <> Text.pack input)
 
 -- OPEN EXTERNALEDITOR
 
@@ -159,13 +161,11 @@ handleOpenExternalEditor :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleOpenExternalEditor dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
   log $ "Opening in external editor: " <> Text.pack input
-  maybeImage <- liftIO $ Image.fromDiskPreProcess Nothing settings.iCrop input
-  case maybeImage of
-    Left _ ->
-      log "Image read error" >> throwError err404
-    Right image -> do
-      liftIO $ HIP.displayImageUsing HIP.defaultViewer False (Image.applySettings settings image)
-      pure NoContent
+  image <-
+    handleNothing $
+      Image.fromDiskPreProcess Nothing settings.iCrop input
+  HIP.displayImageUsing HIP.defaultViewer False (Image.applySettings settings image)
+  pure NoContent
 
 -- HISTOGRAM
 
@@ -187,7 +187,10 @@ handleGetSettingsHistogram dir settings =
 
 -- COORDINATE
 
-handleGetCoordinateInfo :: Text -> ([(Double, Double)], ImageSettings) -> PositiveT Handler [CoordinateInfo]
+handleGetCoordinateInfo ::
+  Text ->
+  ([(Double, Double)], ImageSettings) ->
+  PositiveT Handler [CoordinateInfo]
 handleGetCoordinateInfo dir (coordinates, settings) =
   let toInfo image (x, y) =
         CoordinateInfo x y
@@ -199,7 +202,8 @@ handleGetCoordinateInfo dir (coordinates, settings) =
    in do
         (image, putMVarBack) <-
           first (Image.applySettings settings)
-            <$> getCachedImage settings.iCrop (Text.pack (Text.unpack dir </> Text.unpack settings.iFilename))
+            <$> getCachedImage settings.iCrop
+              (Text.pack (Text.unpack dir </> Text.unpack settings.iFilename))
         liftIO putMVarBack
         pure $ fmap (toInfo image) coordinates
 
@@ -207,7 +211,13 @@ handleGetCoordinateInfo dir (coordinates, settings) =
 
 handleGetSettings :: PositiveT Handler [(Text, FilmRollSettings)]
 handleGetSettings =
-  HashMap.toList <$> liftIO ImageSettings.findImageSettings
+  HashMap.toList <$> ImageSettings.findImageSettings
+
+-- HANDLER HELPERS
+
+handleNothing :: PositiveT Handler (Either err a) -> PositiveT Handler a
+handleNothing m =
+  m >>= either (\(_ :: err) -> log "Image read error" >> throwError err404) pure
 
 -- IMAGE
 
@@ -216,21 +226,31 @@ getCachedImage :: ImageCrop -> Text -> PositiveT Handler (Image.Monochrome, IO (
 getCachedImage crop path = do
   env <- ask
   now <- liftIO Time.getCurrentTime
-  cache <- liftIO $ takeMVar env.imageMVar
-  logDebug $ "Cached images: " <> tshow (OrdPSQ.size cache)
+  cache <- liftIO $ MVar.takeMVar env.imageMVar
+  log $ "Cached images: " <> tshow (OrdPSQ.size cache)
   case checkCrop crop =<< OrdPSQ.lookup path cache of
     Just (_, cached@(_, loadedImage)) -> do
       logDebug "From cache"
-      pure (loadedImage, putMVar env.imageMVar $ insertAndTrim path now cached cache)
+      pure
+        ( loadedImage,
+          MVar.putMVar env.imageMVar
+            =<< evaluate (DeepSeq.force (insertAndTrim path now cached cache))
+        )
     Nothing -> do
       logDebug "From disk"
-      maybeImage <- liftIO $ Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
-      case maybeImage of
-        Left err -> log ("Image read error: " <> tshow err) >> throwError err404
-        Right image ->
-          pure (image, putMVar env.imageMVar $ insertAndTrim path now (crop, image) cache)
+      image <-
+        handleNothing $
+          Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
+      pure
+        ( image,
+          MVar.putMVar env.imageMVar
+            =<< evaluate (DeepSeq.force (insertAndTrim path now (crop, image) cache))
+        )
 
-checkCrop :: ImageCrop -> (UTCTime, (ImageCrop, Image.Monochrome)) -> Maybe (UTCTime, (ImageCrop, Image.Monochrome))
+checkCrop ::
+  ImageCrop ->
+  (UTCTime, (ImageCrop, Image.Monochrome)) ->
+  Maybe (UTCTime, (ImageCrop, Image.Monochrome))
 checkCrop crop cached@(_, (cachedCrop, _))
   | crop == cachedCrop = Just cached
   | otherwise = Nothing
@@ -243,17 +263,21 @@ insertAndTrim k v p psq =
 -- LOG
 
 log :: MonadIO m => Text -> PositiveT m ()
-log msg = do
+log !msg = do
   env <- ask
-  liftIO . writeChan env.eventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
   liftIO . env.logger $ Log.format "info" msg
 
 logDebug :: MonadIO m => Text -> PositiveT m ()
-logDebug msg = do
+logDebug !msg = do
   env <- ask
-  when env.isDev $ do
-    liftIO . writeChan env.eventChan $ ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
+  when env.isDev $
     liftIO . env.logger $ Log.format "debug" msg
+
+logSSE :: MonadIO m => Text -> PositiveT m ()
+logSSE !msg = do
+  env <- ask
+  liftIO . Chan.writeChan env.eventChan $
+    ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
 
 -- PROFILE
 

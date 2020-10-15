@@ -23,6 +23,7 @@ dependencies:
   - aeson
   - base64-bytestring
   - bytestring
+  - deepseq
   - directory
   - elm-syntax
   - fast-logger

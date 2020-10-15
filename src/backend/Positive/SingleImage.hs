@@ -26,10 +26,10 @@ run log filepath = do
     Just settings ->
       generate log "Settings file found, generating image: " filepath settings
 
-generate :: (Text -> IO ()) -> Text -> FilePath -> ImageSettings -> IO ()
+generate :: MonadIO m => (Text -> m ()) -> Text -> FilePath -> ImageSettings -> m ()
 generate log message filepath is = do
   image <- Image.fromDiskPreProcess Nothing is.iCrop filepath
-  createDirectoryIfMissing False (dropFileName filepath </> "highres")
+  liftIO $ createDirectoryIfMissing False (dropFileName filepath </> "highres")
   outputWithCount <-
     ImageSettings.pickFilename $
       dropFileName filepath </> "highres" </> takeFileName filepath
