@@ -172,8 +172,9 @@ handleOpenExternalEditor dir settings = do
 handleGetSettingsHistogram :: Text -> ImageSettings -> PositiveT Handler [Int]
 handleGetSettingsHistogram dir settings =
   let toHistogram arr =
-        liftIO . Massiv.Mutable.createArrayS_ @Massiv.P @_ @Int (Massiv.Sz1 255) $
-          \marr ->
+        Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
+          (Massiv.Sz1 (1 + fromIntegral (maxBound :: Word8)))
+          $ \marr ->
             Massiv.forM_ arr $
               \(HIP.PixelY p) -> Massiv.modify marr (pure . (+) 1) (fromIntegral (HIP.toWord8 p))
    in do
@@ -182,7 +183,7 @@ handleGetSettingsHistogram dir settings =
             Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
         liftIO putMVarBack
         logDebug $ "Creating histogram for: " <> settings.iFilename
-        fmap Massiv.toList . toHistogram . HIP.unImage $
+        pure . Massiv.toList . toHistogram . HIP.unImage $
           Image.applySettings settings image
 
 -- COORDINATE
