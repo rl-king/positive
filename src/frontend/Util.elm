@@ -60,7 +60,7 @@ viewNotifications notifications =
                     "normal"
     in
     div [ class "notifications" ] <|
-        List.map (\( l, x ) -> span [ class (levelToClass l) ] [ text x ]) (List.reverse notifications)
+        List.map (\( l, x ) -> span [ class (levelToClass l) ] [ text x ]) notifications
 
 
 choice : List (Maybe a) -> Maybe a

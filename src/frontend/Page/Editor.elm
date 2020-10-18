@@ -76,7 +76,8 @@ subscriptions { imageCropMode, clipboard, filmRoll } =
                 , matchKey "6" (UpdateScale 0.6)
                 , matchKey "7" (UpdateScale 0.7)
                 , matchKey "8" (UpdateScale 0.8)
-                , matchKey "9" (UpdateScale 0.9)
+                , matchKey "0" (UpdateScale 1)
+                , matchKey "f" ToggleFullscreen
                 ]
         , maybe
             (\clipboard_ ->
@@ -126,6 +127,7 @@ type alias Model =
     , notifications : List ( Level, String )
     , imageElement : Element
     , coordinateInfo : Dict ( Float, Float ) CoordinateInfo
+    , fullscreen : Bool
     }
 
 
@@ -164,6 +166,7 @@ init route filmRoll ratings poster =
         , element = { x = 0, y = 0, width = 0, height = 0 }
         }
     , coordinateInfo = Dict.empty
+    , fullscreen = False
     }
 
 
@@ -223,6 +226,7 @@ type Msg
     | GotElementPosition Element
     | OpenExternalEditor
     | GotOpenExternalEditor (HttpResult ())
+    | ToggleFullscreen
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -488,6 +492,7 @@ update key msg model =
             in
             ( { model
                 | imageElement = imageElement
+                , processingState = fromPreview model.processingState
                 , coordinateInfo = Dict.insert ( cX, cY ) (CoordinateInfo cX cY 0) model.coordinateInfo
               }
             , Cmd.map (GotCoordinateInfo imageElement) <|
@@ -526,6 +531,9 @@ update key msg model =
 
         GotOpenExternalEditor (Err _) ->
             pushNotification Warning RemoveNotification "Error opening external editor" model
+
+        ToggleFullscreen ->
+            ( { model | fullscreen = not model.fullscreen }, Cmd.none )
 
 
 type Key a
@@ -597,7 +605,7 @@ fromZipper poster ratings =
 
 view : Model -> List ( Level, String ) -> Html Msg
 view model otherNotifications =
-    main_ []
+    main_ [ classList [ ( "fullscreen", model.fullscreen ) ] ]
         [ Html.Lazy.lazy viewNav model.route
         , Html.Lazy.lazy viewLoading model.processingState
         , Html.Lazy.lazy8 viewImage
@@ -763,8 +771,8 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingSta
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ Input.viewRange (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
-                , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.5, 0.5, 0 ) "Blackpoint" settings.iBlackpoint
-                , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.5, 1.5, 1 ) "Whitepoint" settings.iWhitepoint
+                , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
+                , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
         , div [ class "image-settings-buttons" ]
             [ viewSettingsGroup
