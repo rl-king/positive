@@ -37,6 +37,7 @@ dependencies:
   - http-media
   - http-types
   - massiv
+  - megaparsec
   - massiv-io
   - mtl
   - optparse-applicative
@@ -78,6 +79,19 @@ executables:
     - -Wincomplete-record-updates
     - -Wincomplete-uni-patterns
     - -Wredundant-constraints
+
+tests:
+  spec:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - positive
+    - hspec
+    - hspec-expectations
 
 benchmarks:
   pos-benchmark:

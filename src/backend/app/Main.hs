@@ -5,6 +5,7 @@ module Main where
 import qualified Positive.CodeGen as CodeGen
 import qualified Positive.Flags as Flags
 import qualified Positive.Init as Init
+import qualified Positive.Language as Language
 import qualified Positive.Log as Log
 import Positive.Prelude
 import qualified Positive.Preview as Preview
@@ -16,6 +17,9 @@ import qualified System.Log.FastLogger as FastLogger
 
 main :: IO ()
 main = do
+  either putStrLn (print . Language.eval 1 1) $
+    Language.parse "(p * -10) + n"
+
   timeCache <- FastLogger.newTimeCache FastLogger.simpleTimeFormat
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
