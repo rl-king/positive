@@ -59,11 +59,11 @@ expr =
 
 pixel :: Parser Expr
 pixel =
-  lexe $ Pixel <$ char 'p'
+  Pixel <$ lexe (char 'p')
 
 var :: Parser Expr
 var =
-  lexe $ Var <$ char 'n'
+  Var <$ lexe (char 'n')
 
 binOp :: Parser Expr
 binOp = do
@@ -77,12 +77,12 @@ operator =
   lexe $
     Plu <$ char '+'
       <|> Min <$ char '-'
+      <|> Exp <$ try (char '*' <* char '*')
       <|> Mul <$ char '*'
-      <|> Exp <$ char '*' <* char '*'
 
 num :: Parser Expr
 num =
-  Num <$> Lexer.signed ws (Lexer.decimal <|> Lexer.float)
+  Num <$> lexe (Lexer.signed ws (Lexer.decimal <|> Lexer.float))
     <?> "float"
 
 parens :: Parser a -> Parser a
