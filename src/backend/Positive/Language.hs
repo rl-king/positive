@@ -16,6 +16,7 @@ data Expr
   | Var
   | Num Double
   | BinOp Expr Op Expr
+  | Fun Fun Expr
   deriving (Show)
 
 data Op
@@ -23,6 +24,13 @@ data Op
   | Min
   | Mul
   | Exp
+  deriving (Show)
+
+data Fun
+  = Sin
+  | Cos
+  | Neg
+  | Sqrt
   deriving (Show)
 
 -- EVAL
@@ -33,6 +41,7 @@ eval p v = \case
   Var -> v
   Num n -> n
   BinOp a op b -> fromOp op (eval p v a) (eval p v b)
+  Fun f a -> fromFun f (eval p v a)
 
 fromOp :: Op -> Double -> Double -> Double
 fromOp = \case
@@ -40,6 +49,13 @@ fromOp = \case
   Min -> (-)
   Mul -> (*)
   Exp -> (**)
+
+fromFun :: Fun -> Double -> Double
+fromFun = \case
+  Sin -> sin
+  Cos -> cos
+  Neg -> negate
+  Sqrt -> sqrt
 
 -- RUN
 
@@ -53,7 +69,7 @@ parse =
 
 expr :: Parser Expr
 expr =
-  try binOp <|> var <|> pixel <|> num
+  try binOp <|> try fun <|> var <|> pixel <|> num
 
 -- PARSE
 
@@ -79,6 +95,20 @@ operator =
       <|> Min <$ char '-'
       <|> Exp <$ try (char '*' <* char '*')
       <|> Mul <$ char '*'
+
+fun :: Parser Expr
+fun = do
+  name <- funName
+  a <- pixel <|> var <|> num <|> parens expr
+  lexe . pure $ Fun name a
+
+funName :: Parser Fun
+funName =
+  lexe $
+    Sin <$ chunk "sin"
+      <|> Cos <$ chunk "cos"
+      <|> Neg <$ chunk "neg"
+      <|> Sqrt <$ chunk "sqrt"
 
 num :: Parser Expr
 num =
