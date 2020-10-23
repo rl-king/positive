@@ -34,6 +34,7 @@ run log = do
           <> Elm.jsonDefinitions @FilmRollSettings
           <> Elm.jsonDefinitions @Zones
           <> Elm.jsonDefinitions @CoordinateInfo
+          <> Elm.jsonDefinitions @Expression
       modules =
         -- FIXME: spaceleak in both elm-syntax functions
         Pretty.modules $

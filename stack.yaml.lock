@@ -12,20 +12,6 @@ packages:
   original:
     hackage: elm-syntax-0.3.0.0@sha256:8fd57f8e15e499c11b78983bce3c4b237eb2f22e467a55d51702b43a18c61323,2257
 - completed:
-    hackage: haskell-to-elm-0.3.0.0@sha256:b8a016087523596c7420fc0b78611b2ffa9b8094c8c5930b89ef7bbec82401a5,3614
-    pantry-tree:
-      size: 505
-      sha256: 50eacf6c6c0386453d8504bcfff3803f9df8867b8802e12013c9146fd29624b3
-  original:
-    hackage: haskell-to-elm-0.3.0.0@sha256:b8a016087523596c7420fc0b78611b2ffa9b8094c8c5930b89ef7bbec82401a5,3614
-- completed:
-    hackage: servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
-    pantry-tree:
-      size: 386
-      sha256: 3d45dc52822a30de2ee524358bf91ad77c041c4385ab75d636effa17e02e351e
-  original:
-    hackage: servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
-- completed:
     hackage: Color-0.2.0@sha256:94c43c4d8f943ba0642ee58a9b8a665b01a3ac2893c40a16ffdabaacb956c58f,8159
     pantry-tree:
       size: 6965
@@ -40,6 +26,13 @@ packages:
   original:
     hackage: massiv-io-0.3.0.1@sha256:393df632ea8c3b0549a2b3a2fbaa6a9ef1202a05dd9b3f44555a9f6a31327652,3667
 - completed:
+    hackage: servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
+    pantry-tree:
+      size: 386
+      sha256: 3d45dc52822a30de2ee524358bf91ad77c041c4385ab75d636effa17e02e351e
+  original:
+    hackage: servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
+- completed:
     name: servant-to-elm
     version: 0.4.1.0
     git: git@github.com:folq/servant-to-elm.git
@@ -50,6 +43,17 @@ packages:
   original:
     git: git@github.com:folq/servant-to-elm.git
     commit: 6c34971ae3076858135f447540780ba861c2d94e
+- completed:
+    name: haskell-to-elm
+    version: 0.3.1.0
+    git: git@github.com:folq/haskell-to-elm.git
+    pantry-tree:
+      size: 853
+      sha256: 64809c056019fbe4ffa203329ca83425ba2336c99075fbeecf013eb928fd215e
+    commit: 57faee3020b52b80e3a528e9b84e73d923e23501
+  original:
+    git: git@github.com:folq/haskell-to-elm.git
+    commit: 57faee3020b52b80e3a528e9b84e73d923e23501
 - completed:
     subdir: hip
     name: hip

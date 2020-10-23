@@ -21,6 +21,7 @@ import qualified Generics.SOP as SOP
 import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
+import qualified Positive.Language as Language
 import Positive.Prelude
 import Servant
 import qualified System.FilePath.Glob as Glob
@@ -93,7 +94,7 @@ difference (FilmRollSettings pa sa a) (FilmRollSettings pb sb b) =
 
 plainImageSettings :: Text -> ImageSettings
 plainImageSettings x =
-  ImageSettings x 0 noCrop 2.2 initZones 0 1
+  ImageSettings x 0 noCrop 2.2 initZones 0 1 mempty
 
 instance Elm.HasElmType FilmRollSettings where
   elmDefinition =
@@ -141,7 +142,8 @@ data ImageSettings = ImageSettings
     iGamma :: !Double,
     iZones :: !Zones,
     iBlackpoint :: !Double,
-    iWhitepoint :: !Double
+    iWhitepoint :: !Double,
+    iExpressions :: !(Vector Expression)
   }
   deriving
     ( Generic,
@@ -166,6 +168,7 @@ instance Aeson.FromJSON ImageSettings where
       zones <- o .:? "iZones" .!= Zones zone1 0 0 0 zone5 0 0 0 zone9
       blackpoint <- o .: "iBlackpoint"
       whitepoint <- o .: "iWhitepoint"
+      expressions <- o .:? "iExpressions" .!= mempty
       pure $
         ImageSettings
           { iFilename = filename,
@@ -174,7 +177,8 @@ instance Aeson.FromJSON ImageSettings where
             iGamma = gamma,
             iZones = zones,
             iBlackpoint = blackpoint,
-            iWhitepoint = whitepoint
+            iWhitepoint = whitepoint,
+            iExpressions = expressions
           }
 
 instance FromHttpApiData ImageSettings where
@@ -234,6 +238,40 @@ instance Elm.HasElmDecoder Aeson.Value Zones where
 instance Elm.HasElmEncoder Aeson.Value Zones where
   elmEncoderDefinition =
     Just $ Elm.deriveElmJSONEncoder @Zones Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeZones"
+
+-- EXPR
+
+data Expression = Expression
+  { eValue :: !Double,
+    eLabel :: !Text,
+    eExpr :: !Text
+  }
+  deriving
+    ( Generic,
+      SOP.Generic,
+      SOP.HasDatatypeInfo,
+      NFData,
+      Show,
+      Eq,
+      Aeson.FromJSON,
+      Aeson.ToJSON
+    )
+
+emptyExpression :: Expression
+emptyExpression =
+  Expression 0 "" ""
+
+instance Elm.HasElmType Expression where
+  elmDefinition =
+    Just $ Elm.deriveElmTypeDefinition @Expression Elm.defaultOptions "Generated.Data.ImageSettings.Expression"
+
+instance Elm.HasElmDecoder Aeson.Value Expression where
+  elmDecoderDefinition =
+    Just $ Elm.deriveElmJSONDecoder @Expression Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeExpression"
+
+instance Elm.HasElmEncoder Aeson.Value Expression where
+  elmEncoderDefinition =
+    Just $ Elm.deriveElmJSONEncoder @Expression Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeExpression"
 
 -- CROP
 
