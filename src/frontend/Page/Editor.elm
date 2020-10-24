@@ -8,6 +8,7 @@ port module Page.Editor exposing
     , view
     )
 
+import Array exposing (Array)
 import Base64
 import Browser.Dom exposing (Element)
 import Browser.Events
@@ -16,6 +17,7 @@ import Dict exposing (Dict)
 import Generated.Data.ImageSettings as ImageSettings
     exposing
         ( CoordinateInfo
+        , Expression
         , FilmRollSettings
         , ImageCrop
         , ImageSettings
@@ -63,38 +65,23 @@ subscriptions { imageCropMode, clipboard, filmRoll } =
     in
     Sub.batch
         [ Browser.Events.onKeyDown <|
-            Decode.oneOf
-                [ matchKey "s" SaveSettings
-                , matchKey "u" Undo
-                , matchKey "c" (CopySettings current)
-                , matchKey "r" Rotate
-                , matchKey "h" PreviousImage
-                , matchKey "l" NextImage
-                , matchKey "3" (UpdateScale 0.3)
-                , matchKey "4" (UpdateScale 0.4)
-                , matchKey "5" (UpdateScale 0.5)
-                , matchKey "6" (UpdateScale 0.6)
-                , matchKey "7" (UpdateScale 0.7)
-                , matchKey "8" (UpdateScale 0.8)
-                , matchKey "0" (UpdateScale 1)
-                , matchKey "f" ToggleFullscreen
-                ]
-        , maybe
-            (\clipboard_ ->
-                Decode.map OnImageSettingsChange <|
-                    withCtrl <|
-                        Decode.oneOf
-                            [ matchKey "a" { clipboard_ | iFilename = current.iFilename }
-                            , matchKey "c" { current | iCrop = clipboard_.iCrop }
-                            , matchKey "t"
-                                { clipboard_
-                                    | iFilename = current.iFilename
-                                    , iRotate = current.iRotate
-                                    , iCrop = current.iCrop
-                                }
-                            ]
-            )
-            clipboard
+            withCtrl <|
+                Decode.oneOf
+                    [ matchKey "s" SaveSettings
+                    , matchKey "u" Undo
+                    , matchKey "c" (CopySettings current)
+                    , matchKey "r" Rotate
+                    , matchKey "h" PreviousImage
+                    , matchKey "l" NextImage
+                    , matchKey "3" (UpdateScale 0.3)
+                    , matchKey "4" (UpdateScale 0.4)
+                    , matchKey "5" (UpdateScale 0.5)
+                    , matchKey "6" (UpdateScale 0.6)
+                    , matchKey "7" (UpdateScale 0.7)
+                    , matchKey "8" (UpdateScale 0.8)
+                    , matchKey "0" (UpdateScale 1)
+                    , matchKey "f" ToggleFullscreen
+                    ]
         , maybe
             (always <|
                 matchKey "Escape" (UpdateImageCropMode Nothing)
@@ -113,6 +100,7 @@ type alias Model =
     { processingState : ProcessingState
     , ratings : Ratings
     , previewVersions : PreviewVersions
+    , draftExpressions : DraftExpressions
     , poster : Maybe String
     , filmRoll : FilmRoll
     , saveKey : Key { saveKey : () }
@@ -143,12 +131,17 @@ type alias PreviewVersions =
     Dict String Int
 
 
+type alias DraftExpressions =
+    Array Expression
+
+
 init : Route.EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
     { processingState = ProcessingState.preview
     , ratings = ratings
     , poster = poster
     , filmRoll = focus route filmRoll
+    , draftExpressions = .iExpressions (Zipper.current filmRoll)
     , saveKey = Key 0
     , imageCropMode = Nothing
     , clipboard = Nothing
@@ -176,6 +169,7 @@ continue route filmRoll ratings poster model =
         | processingState = ProcessingState.preview
         , ratings = ratings
         , poster = poster
+        , draftExpressions = .iExpressions (Zipper.current filmRoll)
         , filmRoll = focus route filmRoll
         , route = route
         , coordinateInfo = Dict.empty
@@ -198,6 +192,10 @@ type Msg
     | GotHistogram (HttpResult (List Int))
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
+    | OnExpressionChange Int Expression
+    | AddExpression Int
+    | CheckExpressions
+    | GotCheckExpressions (HttpResult (Array Expression))
     | OnImageLoad String ImageSettings
     | SaveSettings
     | GenerateHighres
@@ -277,6 +275,34 @@ update key msg model =
 
         OnImageSettingsChange settings ->
             ( updateSettings (\_ -> settings) model, Cmd.none )
+
+        OnExpressionChange index val ->
+            ( { model | draftExpressions = Array.set index val model.draftExpressions }
+            , Cmd.none
+            )
+
+        AddExpression _ ->
+            ( { model
+                | draftExpressions =
+                    Array.push emptyExpression model.draftExpressions
+              }
+            , Cmd.none
+            )
+
+        CheckExpressions ->
+            ( model
+            , Cmd.map GotCheckExpressions <|
+                Request.postImageSettingsExpressions model.draftExpressions
+            )
+
+        GotCheckExpressions (Ok expressions) ->
+            ( updateSettings (\settings -> { settings | iExpressions = expressions })
+                { model | draftExpressions = expressions }
+            , Cmd.none
+            )
+
+        GotCheckExpressions (Err _) ->
+            pushNotification Warning RemoveNotification "Expression error" model
 
         CopySettings settings ->
             if Just settings == model.clipboard then
@@ -617,8 +643,9 @@ view model otherNotifications =
             model.previewVersions
             model.coordinateInfo
             model.imageElement
-        , Html.Lazy.lazy6 viewSettings
+        , Html.Lazy.lazy7 viewSettings
             model.filmRoll
+            model.draftExpressions
             model.histogram
             model.undoState
             model.imageCropMode
@@ -734,13 +761,14 @@ viewRating filename ratings =
 
 viewSettings :
     FilmRoll
+    -> DraftExpressions
     -> List Int
     -> List FilmRoll
     -> Maybe ImageCrop
     -> Maybe ImageSettings
     -> ProcessingState
     -> Html Msg
-viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingState =
+viewSettings filmRoll draftexpressions histogram undoState imageCropMode clipboard_ processingState =
     let
         settings =
             case processingState of
@@ -756,6 +784,14 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingSta
     section [ class "image-settings" ]
         [ viewSettingsGroup
             [ Html.Lazy.lazy viewHistogram histogram ]
+        , viewSettingsGroup <|
+            List.concat
+                [ List.indexedMap viewExpressionEditor <|
+                    Array.toList draftexpressions
+                , [ button [ onClick (AddExpression 0) ] [ text "add" ]
+                  , button [ onClick CheckExpressions ] [ text "apply" ]
+                  ]
+                ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ Input.viewRange (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
@@ -850,6 +886,21 @@ viewSettings filmRoll histogram undoState imageCropMode clipboard_ processingSta
                 , button [ onClick PreviousImage ] [ Icon.left ]
                 ]
             ]
+        ]
+
+
+viewExpressionEditor : Int -> Expression -> Html Msg
+viewExpressionEditor index expression =
+    let
+        onRangeInput v =
+            OnExpressionChange index { expression | eValue = v }
+
+        onTextInput v =
+            OnExpressionChange index { expression | eExpr = v }
+    in
+    div []
+        [ Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "Value" expression.eValue
+        , textarea [ onInput onTextInput ] []
         ]
 
 
@@ -1133,12 +1184,31 @@ previewExtension x =
 
 resetAll : ImageSettings -> ImageSettings
 resetAll current =
-    ImageSettings current.iFilename 0 (ImageCrop 0 0 100) 2.2 (Zones 0 0 0 0 0 0 0 0 0) 0 1
+    ImageSettings current.iFilename
+        0
+        (ImageCrop 0 0 100)
+        2.2
+        (Zones 0 0 0 0 0 0 0 0 0)
+        0
+        1
+        Array.empty
 
 
 resetTone : ImageSettings -> ImageSettings
 resetTone current =
-    ImageSettings current.iFilename current.iRotate current.iCrop 2.2 (Zones 0 0 0 0 0 0 0 0 0) 0 1
+    ImageSettings current.iFilename
+        current.iRotate
+        current.iCrop
+        2.2
+        (Zones 0 0 0 0 0 0 0 0 0)
+        0
+        1
+        Array.empty
+
+
+emptyExpression : Expression
+emptyExpression =
+    Expression 0 "" ""
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter

@@ -37,6 +37,10 @@ data SettingsApi route = SettingsApi
         :> QueryParam' '[Required, Strict] "dir" Text
         :> ReqBody '[JSON] FilmRollSettings
         :> Post '[JSON] FilmRollSettings,
+    saCheckExpressions ::
+      route :- "image" :> "settings" :> "expressions"
+        :> ReqBody '[JSON] (Vector Expression)
+        :> Post '[JSON] (Vector Expression),
     saGetSettings ::
       route :- "image" :> "settings"
         :> Get '[JSON] [(Text, FilmRollSettings)],

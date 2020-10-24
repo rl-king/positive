@@ -32,11 +32,13 @@ import Positive.Flags (Flags (..))
 import qualified Positive.Image as Image
 import Positive.ImageSettings
   ( CoordinateInfo (..),
+    Expression (..),
     FilmRollSettings,
     ImageCrop (..),
     ImageSettings (..),
   )
 import qualified Positive.ImageSettings as ImageSettings
+import qualified Positive.Language as Language
 import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
 import qualified Positive.Preview as Preview
@@ -92,6 +94,7 @@ handlers isDev_ chan =
         genericServerT
           SettingsApi
             { saSaveSettings = handleSaveSettings,
+              saCheckExpressions = handleCheckExpressions,
               saGetSettings = handleGetSettings,
               saGetSettingsHistogram = handleGetSettingsHistogram,
               saGenerateHighRes = handleGenerateHighRes,
@@ -130,6 +133,14 @@ handleSaveSettings dir newSettings = do
   void . liftIO $ MVar.tryPutMVar env.previewMVar missing
   logDebug $ "Updating " <> tshow (length missing) <> " preview(s)"
   pure newSettings
+
+-- CHECK EXPRESSIONS
+
+handleCheckExpressions :: Vector Expression -> PositiveT Handler (Vector Expression)
+handleCheckExpressions expressions =
+  case traverse (Language.parse . eExpr) expressions of
+    Left err -> log (tshow err) >> throwError err400
+    Right _ -> pure expressions
 
 -- GENERATE PREVIEWS
 
