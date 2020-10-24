@@ -337,32 +337,33 @@ li.-small span {
     /* display: none; */
 }
 
-.image-settings {
+.image-settings-right {
     width: 20%;
-    padding: 1rem;
+    padding: 1rem 0 0 1rem;
     animation: appear 1s;
 }
 
-.image-settings-buttons {
+.image-settings-left {
     position: absolute;
     top: 4rem;
     left: 1rem;
+    animation: appear 1s;
 }
 
 @media (min-width: 1441px) {
-    .image-settings-buttons {
+    .image-settings-left {
         top: 10%;
     }
 }
 
-.image-settings button {
+.image-settings-left button {
     width: 3.25rem;
     height: 3.25rem;
     display: block;
     position: relative;
 }
 
-.image-settings img {
+.image-settings-left img {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -390,10 +391,26 @@ li.-small span {
     font-size: .875rem;
 }
 
+.expression-editor {
+}
+
+.expression-editor button {
+    width: initial;
+}
+
+.expression-editor-hint {
+    padding: .25rem .75rem;
+    display: block;
+    font-family: var(--mono);
+    font-size: 1rem;
+    background-color: #444;
+}
+
 textarea {
-    padding: .25rem .5rem;
+    padding: .5rem 1rem;
+    margin: 0;
     border: none;
-    border-radius: 2px;
+    border-radius: 0 0 2px 2px;
     font-family: var(--mono);
     font-size: 1rem;
     color: #fff;
@@ -759,7 +776,7 @@ img {
 
 .fullscreen .coordinate,
 .fullscreen nav,
-.fullscreen .image-settings,
+.fullscreen .image-settings-right,
 .fullscreen .files {
     display: none;
 }

@@ -13,14 +13,14 @@ spec =
       testErr d s =
         it d $ eval 1 1 <$> parse s `shouldSatisfy` isLeft
    in describe "Parse and eval" $ do
-        test "Number" "1" 1.0
-        test "Number neg" "-1" (-1.0)
-        testErr "Pixel" "prr"
-        test "Pixel plus " "p + 1" 2.0
-        test "Var" "n + 1" 2.0
-        test "Plus" "1 + 1" 2.0
-        test "Min" "1 - 1" 0.0
+        testErr "Only Number" "1"
+        testErr "Only Pixel" "prr"
+        testErr "Only Var" "n"
+        test "Pixel" "p + 0.5" 1.5
+        test "Var" "n + 0.5" 1.5
+        test "Min" "1 - 0.5" 0.5
         test "Mul" "2 * 2" 4.0
+        test "Div" "2 / 2" 1.0
         test "Exp" "2 ** 2" 4.0
         test "Parens" "2 + (3 * 2)" 8.0
         test "Sin" "sin 2" 0.9092974268256817

@@ -60,7 +60,7 @@ subscriptions { imageCropMode, clipboard, filmRoll } =
         current =
             Zipper.current filmRoll
 
-        maybe f =
+        ifJust f =
             Maybe.withDefault Sub.none << Maybe.map (Browser.Events.onKeyDown << f)
     in
     Sub.batch
@@ -82,7 +82,7 @@ subscriptions { imageCropMode, clipboard, filmRoll } =
                     , matchKey "0" (UpdateScale 1)
                     , matchKey "f" ToggleFullscreen
                     ]
-        , maybe
+        , ifJust
             (always <|
                 matchKey "Escape" (UpdateImageCropMode Nothing)
             )
@@ -650,7 +650,15 @@ view model otherNotifications =
             model.previewVersions
             model.coordinateInfo
             model.imageElement
-        , Html.Lazy.lazy7 viewSettings
+        , Html.Lazy.lazy7 viewSettingsLeft
+            model.filmRoll
+            model.draftExpressions
+            model.histogram
+            model.undoState
+            model.imageCropMode
+            model.clipboard
+            model.processingState
+        , Html.Lazy.lazy7 viewSettingsRight
             model.filmRoll
             model.draftExpressions
             model.histogram
@@ -766,7 +774,7 @@ viewRating filename ratings =
 -- IMAGE SETTINGS
 
 
-viewSettings :
+viewSettingsRight :
     FilmRoll
     -> DraftExpressions
     -> List Int
@@ -775,7 +783,7 @@ viewSettings :
     -> Maybe ImageSettings
     -> ProcessingState
     -> Html Msg
-viewSettings filmRoll draftexpressions histogram undoState imageCropMode clipboard_ processingState =
+viewSettingsRight filmRoll draftexpressions histogram undoState imageCropMode clipboard_ processingState =
     let
         settings =
             case processingState of
@@ -788,12 +796,12 @@ viewSettings filmRoll draftexpressions histogram undoState imageCropMode clipboa
         zones =
             settings.iZones
     in
-    section [ class "image-settings" ]
+    section [ class "image-settings-right" ]
         [ viewSettingsGroup
             [ Html.Lazy.lazy viewHistogram histogram ]
         , viewSettingsGroup <|
             List.concat
-                [ List.indexedMap viewExpressionEditor <|
+                [ List.indexedMap (viewExpressionEditor settings) <|
                     Array.toList draftexpressions
                 , [ button [ onClick (AddExpression 0) ] [ text "add" ]
                   , button [ onClick CheckExpressions ] [ text "apply" ]
@@ -817,96 +825,129 @@ viewSettings filmRoll draftexpressions histogram undoState imageCropMode clipboa
                 , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
                 , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
-        , div [ class "image-settings-buttons" ]
-            [ viewSettingsGroup
-                [ viewImageCropMode settings imageCropMode
-                , button [ onClick Rotate, title "rotate" ] [ Icon.rotate ]
-                ]
-            , viewSettingsGroup
-                [ button [ onClick (CopySettings settings), title "copy" ] [ Icon.copy ]
-                , viewMaybe clipboard_ <|
-                    \clipboard ->
-                        div [ class "image-settings-paste" ]
-                            [ viewClipboardButton (interpolate "both from {0}" [ clipboard.iFilename ])
-                                Icon.applyBoth
-                                { clipboard | iFilename = settings.iFilename }
-                            , viewClipboardButton (interpolate "tone from {0}" [ clipboard.iFilename ])
-                                Icon.applyTone
-                                { clipboard
-                                    | iFilename = settings.iFilename
-                                    , iRotate = settings.iRotate
-                                    , iCrop = settings.iCrop
-                                }
-                            , viewClipboardButton (interpolate "crop from {0}" [ clipboard.iFilename ])
-                                Icon.applyCrop
-                                { settings | iCrop = clipboard.iCrop }
-                            , button
-                                [ onClick <|
-                                    ApplyCopyToAll <|
-                                        Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
-                                , title (interpolate "apply to all from {0}" [ clipboard.iFilename ])
-                                ]
-                                [ Icon.applyAll ]
-                            , button
-                                [ onClick <|
-                                    ApplyCopyToAll <|
-                                        Zipper.map
-                                            (\i ->
-                                                { clipboard | iFilename = i.iFilename, iRotate = i.iRotate, iCrop = i.iCrop }
-                                            )
-                                            filmRoll
-                                , title (interpolate "apply tone to all from {0}" [ clipboard.iFilename ])
-                                ]
-                                [ Icon.applyAllTone ]
-                            , button
-                                [ onClick <|
-                                    ApplyCopyToAll <|
-                                        Zipper.map (\i -> { i | iCrop = clipboard.iCrop }) filmRoll
-                                , title (interpolate "apply crop to all from {0}" [ clipboard.iFilename ])
-                                ]
-                                [ Icon.applyAllCrop ]
-                            , button
-                                [ onClick <|
-                                    ApplyCopyToAll <|
-                                        Zipper.map (\i -> { i | iRotate = clipboard.iRotate }) filmRoll
-                                , title (interpolate "apply rotate to all from {0}" [ clipboard.iFilename ])
-                                ]
-                                [ Icon.applyAllRotate ]
+        ]
+
+
+viewSettingsLeft :
+    FilmRoll
+    -> DraftExpressions
+    -> List Int
+    -> List FilmRoll
+    -> Maybe ImageCrop
+    -> Maybe ImageSettings
+    -> ProcessingState
+    -> Html Msg
+viewSettingsLeft filmRoll draftexpressions histogram undoState imageCropMode clipboard_ processingState =
+    let
+        settings =
+            case processingState of
+                Queued queuedFilmRoll ->
+                    Zipper.current (ProcessingState.toData queuedFilmRoll)
+
+                _ ->
+                    Zipper.current filmRoll
+
+        zones =
+            settings.iZones
+    in
+    div [ class "image-settings-left" ]
+        [ viewSettingsGroup
+            [ viewImageCropMode settings imageCropMode
+            , button [ onClick Rotate, title "rotate" ] [ Icon.rotate ]
+            ]
+        , viewSettingsGroup
+            [ button [ onClick (CopySettings settings), title "copy" ] [ Icon.copy ]
+            , viewMaybe clipboard_ <|
+                \clipboard ->
+                    div [ class "image-settings-paste" ]
+                        [ viewClipboardButton (interpolate "both from {0}" [ clipboard.iFilename ])
+                            Icon.applyBoth
+                            { clipboard | iFilename = settings.iFilename }
+                        , viewClipboardButton (interpolate "tone from {0}" [ clipboard.iFilename ])
+                            Icon.applyTone
+                            { clipboard
+                                | iFilename = settings.iFilename
+                                , iRotate = settings.iRotate
+                                , iCrop = settings.iCrop
+                            }
+                        , viewClipboardButton (interpolate "crop from {0}" [ clipboard.iFilename ])
+                            Icon.applyCrop
+                            { settings | iCrop = clipboard.iCrop }
+                        , button
+                            [ onClick <|
+                                ApplyCopyToAll <|
+                                    Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
+                            , title (interpolate "apply to all from {0}" [ clipboard.iFilename ])
                             ]
-                ]
-            , viewSettingsGroup
-                [ button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
-                , button [ onClick (OnImageSettingsChange (resetTone settings)), title "reset tone" ] [ Icon.resetTone ]
-                , viewIf (not (List.isEmpty undoState)) <|
-                    \_ -> button [ onClick Undo, title "undo" ] [ Icon.undo ]
-                ]
-            , viewSettingsGroup
-                [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
-                , button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
-                , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
-                , button [ onClick OpenExternalEditor, title "open external" ] [ Icon.externalEditor ]
-                , viewIf (processingState == ProcessingState.preview) <|
-                    \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
-                ]
-            , viewSettingsGroup
-                [ button [ onClick NextImage ] [ Icon.right ]
-                , button [ onClick PreviousImage ] [ Icon.left ]
-                ]
+                            [ Icon.applyAll ]
+                        , button
+                            [ onClick <|
+                                ApplyCopyToAll <|
+                                    Zipper.map
+                                        (\i ->
+                                            { clipboard | iFilename = i.iFilename, iRotate = i.iRotate, iCrop = i.iCrop }
+                                        )
+                                        filmRoll
+                            , title (interpolate "apply tone to all from {0}" [ clipboard.iFilename ])
+                            ]
+                            [ Icon.applyAllTone ]
+                        , button
+                            [ onClick <|
+                                ApplyCopyToAll <|
+                                    Zipper.map (\i -> { i | iCrop = clipboard.iCrop }) filmRoll
+                            , title (interpolate "apply crop to all from {0}" [ clipboard.iFilename ])
+                            ]
+                            [ Icon.applyAllCrop ]
+                        , button
+                            [ onClick <|
+                                ApplyCopyToAll <|
+                                    Zipper.map (\i -> { i | iRotate = clipboard.iRotate }) filmRoll
+                            , title (interpolate "apply rotate to all from {0}" [ clipboard.iFilename ])
+                            ]
+                            [ Icon.applyAllRotate ]
+                        ]
+            ]
+        , viewSettingsGroup
+            [ button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
+            , button [ onClick (OnImageSettingsChange (resetTone settings)), title "reset tone" ] [ Icon.resetTone ]
+            , viewIf (not (List.isEmpty undoState)) <|
+                \_ -> button [ onClick Undo, title "undo" ] [ Icon.undo ]
+            ]
+        , viewSettingsGroup
+            [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
+            , button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
+            , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
+            , button [ onClick OpenExternalEditor, title "open external" ] [ Icon.externalEditor ]
+            , viewIf (processingState == ProcessingState.preview) <|
+                \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
+            ]
+        , viewSettingsGroup
+            [ button [ onClick NextImage ] [ Icon.right ]
+            , button [ onClick PreviousImage ] [ Icon.left ]
             ]
         ]
 
 
-viewExpressionEditor : Int -> Expression -> Html Msg
-viewExpressionEditor index expression =
+viewExpressionEditor : ImageSettings -> Int -> Expression -> Html Msg
+viewExpressionEditor settings index expression =
     let
         onRangeInput v =
-            OnExpressionChange index { expression | eValue = v }
+            OnImageSettingsChange
+                { settings
+                    | iExpressions =
+                        Array.set index
+                            { expression | eValue = v }
+                            settings.iExpressions
+                }
 
         onTextInput v =
             OnExpressionChange index { expression | eExpr = v }
     in
-    div []
-        [ Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "Value" expression.eValue
+    div [ class "expression-editor" ]
+        [ Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" <|
+            maybe 0 .eValue <|
+                Array.get index settings.iExpressions
+        , span [ class "expression-editor-hint" ] [ text "\\p n ->" ]
         , textarea
             [ onInput onTextInput
             , spellcheck False
@@ -1235,3 +1276,8 @@ toImageUrlParams =
 fractionalModBy : Float -> Float -> Float
 fractionalModBy m v =
     v - m * Basics.toFloat (Basics.floor (v / m))
+
+
+maybe : a -> (b -> a) -> Maybe b -> a
+maybe def f =
+    Maybe.withDefault def << Maybe.map f

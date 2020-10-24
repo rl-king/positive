@@ -24,6 +24,7 @@ data Op
   = Plu
   | Min
   | Mul
+  | Div
   | Exp
   deriving (Show)
 
@@ -49,6 +50,7 @@ fromOp = \case
   Plu -> (+)
   Min -> (-)
   Mul -> (*)
+  Div -> (/)
   Exp -> (**)
 
 fromFun :: Fun -> Double -> Double
@@ -96,6 +98,7 @@ operator =
       <|> Min <$ char '-'
       <|> Exp <$ try (char '*' <* char '*')
       <|> Mul <$ char '*'
+      <|> Div <$ char '/'
 
 fun :: Parser Expr
 fun = do
@@ -113,7 +116,7 @@ funName =
 
 num :: Parser Expr
 num =
-  Num <$> lexe (Lexer.signed ws (Lexer.decimal <|> Lexer.float))
+  Num <$> lexe (Lexer.signed ws (try Lexer.float <|> Lexer.decimal))
     <?> "float"
 
 parens :: Parser a -> Parser a

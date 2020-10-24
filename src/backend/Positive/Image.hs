@@ -10,6 +10,7 @@ import qualified Data.Massiv.Array.IO as Massiv
 import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
 import Positive.ImageSettings as ImageSettings
+import qualified Positive.Language as Language
 import Positive.Prelude hiding (ByteString)
 
 -- IMAGE
@@ -64,9 +65,18 @@ applySettings !is !image =
               (0.8, is.iZones.z8),
               (0.9, is.iZones.z9)
             ]
+      expressions =
+        either (const id) (foldr (.) id) $
+          traverse
+            ( \e ->
+                (\expr p -> Language.eval p e.eValue expr)
+                  <$> Language.parse e.eExpr
+            )
+            is.iExpressions
    in HIP.map
         ( fmap HIP.toWord16
             . applyZones
+            . fmap expressions
             . gamma is.iGamma
             . compress is.iBlackpoint is.iWhitepoint
             . invert
