@@ -26,7 +26,7 @@ module Icon exposing
     )
 
 import Html exposing (..)
-import Html.Attributes as Attributes exposing (..)
+import Html.Attributes exposing (..)
 import String.Interpolate exposing (interpolate)
 
 

@@ -16,10 +16,6 @@ import Http
 import Json.Decode as Decode
 import Process
 import Task
-import Url exposing (Url)
-import Url.Builder
-import Url.Parser exposing ((</>), (<?>))
-import Url.Parser.Query
 
 
 type alias HttpResult a =

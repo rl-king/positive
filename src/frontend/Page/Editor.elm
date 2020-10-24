@@ -25,7 +25,7 @@ import Generated.Data.ImageSettings as ImageSettings
         )
 import Generated.Request as Request
 import Html exposing (..)
-import Html.Attributes as Attributes exposing (..)
+import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed
 import Html.Lazy
@@ -34,7 +34,6 @@ import Input
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
-import Process
 import ProcessingState exposing (ProcessingState(..))
 import Route
 import String.Interpolate exposing (interpolate)
@@ -55,7 +54,7 @@ port previewReady : (String -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
-subscriptions { imageCropMode, clipboard, filmRoll } =
+subscriptions { imageCropMode, filmRoll } =
     let
         current =
             Zipper.current filmRoll
@@ -213,7 +212,6 @@ type Msg
     | Undo
     | UpdateScale Float
     | SetColumnCount Int
-    | AttemptSave String (Key { saveKey : () }) FilmRoll
     | Rate String Int
     | SetMinRating Int
     | Rotate
@@ -349,10 +347,10 @@ update key msg model =
                                 )
             in
             case model.processingState of
-                Preview state ->
+                Preview _ ->
                     ( model, Cmd.none )
 
-                Ready state ->
+                Ready _ ->
                     ( model, Cmd.none )
 
                 Processing state ->
@@ -461,15 +459,6 @@ update key msg model =
 
         SetColumnCount scale ->
             ( { model | previewColumns = scale }, Cmd.none )
-
-        AttemptSave _ saveKey _ ->
-            if saveKey /= model.saveKey then
-                ( model, Cmd.none )
-
-            else
-                ( model
-                , saveSettings model
-                )
 
         Rate filename rating ->
             let
@@ -650,21 +639,16 @@ view model otherNotifications =
             model.previewVersions
             model.coordinateInfo
             model.imageElement
-        , Html.Lazy.lazy7 viewSettingsLeft
+        , Html.Lazy.lazy5 viewSettingsLeft
             model.filmRoll
-            model.draftExpressions
-            model.histogram
             model.undoState
             model.imageCropMode
             model.clipboard
             model.processingState
-        , Html.Lazy.lazy7 viewSettingsRight
+        , Html.Lazy.lazy4 viewSettingsRight
             model.filmRoll
             model.draftExpressions
             model.histogram
-            model.undoState
-            model.imageCropMode
-            model.clipboard
             model.processingState
         , Html.Lazy.lazy6 viewFiles
             model.route
@@ -778,12 +762,9 @@ viewSettingsRight :
     FilmRoll
     -> DraftExpressions
     -> List Int
-    -> List FilmRoll
-    -> Maybe ImageCrop
-    -> Maybe ImageSettings
     -> ProcessingState
     -> Html Msg
-viewSettingsRight filmRoll draftexpressions histogram undoState imageCropMode clipboard_ processingState =
+viewSettingsRight filmRoll draftexpressions histogram processingState =
     let
         settings =
             case processingState of
@@ -830,14 +811,12 @@ viewSettingsRight filmRoll draftexpressions histogram undoState imageCropMode cl
 
 viewSettingsLeft :
     FilmRoll
-    -> DraftExpressions
-    -> List Int
     -> List FilmRoll
     -> Maybe ImageCrop
     -> Maybe ImageSettings
     -> ProcessingState
     -> Html Msg
-viewSettingsLeft filmRoll draftexpressions histogram undoState imageCropMode clipboard_ processingState =
+viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
     let
         settings =
             case processingState of
@@ -846,9 +825,6 @@ viewSettingsLeft filmRoll draftexpressions histogram undoState imageCropMode cli
 
                 _ ->
                     Zipper.current filmRoll
-
-        zones =
-            settings.iZones
     in
     div [ class "image-settings-left" ]
         [ viewSettingsGroup

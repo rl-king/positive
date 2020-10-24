@@ -11,7 +11,7 @@ module ProcessingState exposing
     )
 
 import Generated.Data.ImageSettings exposing (ImageSettings)
-import List.Zipper as Zipper exposing (Zipper)
+import List.Zipper exposing (Zipper)
 
 
 
@@ -52,12 +52,12 @@ debug =
 
 
 toReady : State b { a | toReady : Allowed } -> ProcessingState
-toReady (State s) =
+toReady (State _) =
     Ready (State ())
 
 
 toProcessing : State b { a | toProcessing : Allowed } -> ProcessingState
-toProcessing (State s) =
+toProcessing (State _) =
     Processing (State ())
 
 

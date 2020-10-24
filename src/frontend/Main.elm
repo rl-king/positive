@@ -16,8 +16,6 @@ import Page.Editor
 import Route exposing (Route)
 import ScrollTo
 import Url exposing (Url)
-import Url.Parser
-import Url.Parser.Query
 import Util exposing (..)
 
 
