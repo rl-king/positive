@@ -70,7 +70,7 @@ parse =
 
 expr :: Parser Expr
 expr =
-  try binOp <|> try fun <|> var <|> pixel <|> num
+  try binOp <|> try fun
 
 -- PARSE
 

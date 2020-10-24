@@ -9,12 +9,14 @@ import Test.Hspec
 spec :: Spec
 spec =
   let test d s r =
-        it d $
-          eval 1 1 <$> parse s `shouldBe` Right r
+        it d $ eval 1 1 <$> parse s `shouldBe` Right r
+      testErr d s =
+        it d $ eval 1 1 <$> parse s `shouldSatisfy` isLeft
    in describe "Parse and eval" $ do
         test "Number" "1" 1.0
         test "Number neg" "-1" (-1.0)
-        test "Pixel" "p + 1" 2.0
+        testErr "Pixel" "prr"
+        test "Pixel plus " "p + 1" 2.0
         test "Var" "n + 1" 2.0
         test "Plus" "1 + 1" 2.0
         test "Min" "1 - 1" 0.0
