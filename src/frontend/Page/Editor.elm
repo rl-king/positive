@@ -137,11 +137,15 @@ type alias DraftExpressions =
 
 init : Route.EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
+    let
+        focussed =
+            focus route filmRoll
+    in
     { processingState = ProcessingState.preview
     , ratings = ratings
     , poster = poster
-    , filmRoll = focus route filmRoll
-    , draftExpressions = .iExpressions (Zipper.current filmRoll)
+    , filmRoll = focussed
+    , draftExpressions = .iExpressions (Zipper.current focussed)
     , saveKey = Key 0
     , imageCropMode = Nothing
     , clipboard = Nothing
@@ -301,8 +305,11 @@ update key msg model =
             , Cmd.none
             )
 
-        GotCheckExpressions (Err _) ->
-            pushNotification Warning RemoveNotification "Expression error" model
+        GotCheckExpressions (Err ( _, Just { body } )) ->
+            pushNotification Warning RemoveNotification ("Expression error: " ++ body) model
+
+        GotCheckExpressions (Err ( _, Nothing )) ->
+            pushNotification Warning RemoveNotification "Unknown expression error" model
 
         CopySettings settings ->
             if Just settings == model.clipboard then
@@ -900,7 +907,13 @@ viewExpressionEditor index expression =
     in
     div []
         [ Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "Value" expression.eValue
-        , textarea [ onInput onTextInput ] []
+        , textarea
+            [ onInput onTextInput
+            , spellcheck False
+            , autocomplete False
+            , value expression.eExpr
+            ]
+            []
         ]
 
 

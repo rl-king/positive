@@ -3,6 +3,7 @@
 module Positive.Language where
 
 import Control.Applicative hiding (many)
+import qualified Data.Text as Text
 import Positive.Prelude
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -62,9 +63,9 @@ fromFun = \case
 type Parser a =
   Parsec Void Text a
 
-parse :: Text -> Either String Expr
+parse :: Text -> Either Text Expr
 parse =
-  first errorBundlePretty
+  first (Text.pack . errorBundlePretty)
     . runParser (ws *> expr) ""
 
 expr :: Parser Expr

@@ -23,6 +23,8 @@ import qualified Data.Massiv.Array as Massiv
 import qualified Data.Massiv.Array.Mutable as Massiv.Mutable
 import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
+import qualified Data.Text.Lazy as TextLazy
+import qualified Data.Text.Lazy.Encoding as TextLazy
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
@@ -139,7 +141,9 @@ handleSaveSettings dir newSettings = do
 handleCheckExpressions :: Vector Expression -> PositiveT Handler (Vector Expression)
 handleCheckExpressions expressions =
   case traverse (Language.parse . eExpr) expressions of
-    Left err -> log (tshow err) >> throwError err400
+    Left err ->
+      log err
+        >> throwError (err400 {errBody = TextLazy.encodeUtf8 $ TextLazy.fromStrict err})
     Right _ -> pure expressions
 
 -- GENERATE PREVIEWS
