@@ -920,9 +920,8 @@ viewExpressionEditor settings index expression =
             OnExpressionChange index { expression | eExpr = v }
     in
     div [ class "expression-editor" ]
-        [ Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" <|
-            maybe 0 .eValue <|
-                Array.get index settings.iExpressions
+        [ viewMaybe (Array.get index settings.iExpressions) <|
+            (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue)
         , span [ class "expression-editor-hint" ] [ text "\\p n ->" ]
         , textarea
             [ onInput onTextInput
@@ -1252,8 +1251,3 @@ toImageUrlParams =
 fractionalModBy : Float -> Float -> Float
 fractionalModBy m v =
     v - m * Basics.toFloat (Basics.floor (v / m))
-
-
-maybe : a -> (b -> a) -> Maybe b -> a
-maybe def f =
-    Maybe.withDefault def << Maybe.map f
