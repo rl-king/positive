@@ -243,6 +243,8 @@ instance Elm.HasElmEncoder Aeson.Value Zones where
 
 data Expression = Expression
   { eValue :: !Double,
+    eMin :: !Double,
+    eMax :: !Double,
     eLabel :: !Text,
     eExpr :: !Text
   }
@@ -259,7 +261,7 @@ data Expression = Expression
 
 emptyExpression :: Expression
 emptyExpression =
-  Expression 0 "" ""
+  Expression 0 (-1) 1 "" ""
 
 instance Elm.HasElmType Expression where
   elmDefinition =

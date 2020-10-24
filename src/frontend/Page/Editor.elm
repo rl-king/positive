@@ -767,12 +767,7 @@ viewSettingsRight :
 viewSettingsRight filmRoll draftexpressions histogram processingState =
     let
         settings =
-            case processingState of
-                Queued queuedFilmRoll ->
-                    Zipper.current (ProcessingState.toData queuedFilmRoll)
-
-                _ ->
-                    Zipper.current filmRoll
+            settingsFromState processingState filmRoll
 
         zones =
             settings.iZones
@@ -790,21 +785,24 @@ viewSettingsRight filmRoll draftexpressions histogram processingState =
                 ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
-                [ Input.viewRange (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
-                , Input.viewRange (\v -> { settings | iZones = { zones | z2 = v } }) 0.001 ( -0.25, 0.25, 0 ) "II" zones.z2
-                , Input.viewRange (\v -> { settings | iZones = { zones | z3 = v } }) 0.001 ( -0.25, 0.25, 0 ) "III" zones.z3
-                , Input.viewRange (\v -> { settings | iZones = { zones | z4 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IV" zones.z4
-                , Input.viewRange (\v -> { settings | iZones = { zones | z5 = v } }) 0.001 ( -0.25, 0.25, 0 ) "V" zones.z5
-                , Input.viewRange (\v -> { settings | iZones = { zones | z6 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VI" zones.z6
-                , Input.viewRange (\v -> { settings | iZones = { zones | z7 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VII" zones.z7
-                , Input.viewRange (\v -> { settings | iZones = { zones | z8 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VIII" zones.z8
-                , Input.viewRange (\v -> { settings | iZones = { zones | z9 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IX" zones.z9
-                ]
-        , viewSettingsGroup <|
-            List.map (Html.map OnImageSettingsChange)
                 [ Input.viewRange (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
                 , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
                 , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
+                ]
+        , viewSettingsGroup <|
+            List.map (Html.map OnImageSettingsChange)
+                [ -- Input.viewRange (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
+                  Input.viewRange (\v -> { settings | iZones = { zones | z2 = v } }) 0.001 ( -0.25, 0.25, 0 ) "II" zones.z2
+
+                -- , Input.viewRange (\v -> { settings | iZones = { zones | z3 = v } }) 0.001 ( -0.25, 0.25, 0 ) "III" zones.z3
+                -- , Input.viewRange (\v -> { settings | iZones = { zones | z4 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IV" zones.z4
+                , Input.viewRange (\v -> { settings | iZones = { zones | z5 = v } }) 0.001 ( -0.25, 0.25, 0 ) "V" zones.z5
+
+                -- , Input.viewRange (\v -> { settings | iZones = { zones | z6 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VI" zones.z6
+                -- , Input.viewRange (\v -> { settings | iZones = { zones | z7 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VII" zones.z7
+                , Input.viewRange (\v -> { settings | iZones = { zones | z8 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VIII" zones.z8
+
+                -- , Input.viewRange (\v -> { settings | iZones = { zones | z9 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IX" zones.z9
                 ]
         ]
 
@@ -819,12 +817,7 @@ viewSettingsLeft :
 viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
     let
         settings =
-            case processingState of
-                Queued queuedFilmRoll ->
-                    Zipper.current (ProcessingState.toData queuedFilmRoll)
-
-                _ ->
-                    Zipper.current filmRoll
+            settingsFromState processingState filmRoll
     in
     div [ class "image-settings-left" ]
         [ viewSettingsGroup
@@ -928,6 +921,7 @@ viewExpressionEditor settings index expression =
             , spellcheck False
             , autocomplete False
             , value expression.eExpr
+            , rows (List.length (String.lines expression.eExpr))
             ]
             []
         ]
@@ -1237,7 +1231,7 @@ resetTone current =
 
 emptyExpression : Expression
 emptyExpression =
-    Expression 0 "" ""
+    Expression 0 -1 1 "" ""
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
@@ -1251,3 +1245,13 @@ toImageUrlParams =
 fractionalModBy : Float -> Float -> Float
 fractionalModBy m v =
     v - m * Basics.toFloat (Basics.floor (v / m))
+
+
+settingsFromState : ProcessingState -> FilmRoll -> ImageSettings
+settingsFromState processingState filmRoll =
+    case processingState of
+        Queued queuedFilmRoll ->
+            Zipper.current (ProcessingState.toData queuedFilmRoll)
+
+        _ ->
+            Zipper.current filmRoll
