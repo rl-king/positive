@@ -8,6 +8,7 @@ import Positive.Prelude
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
+import Text.Megaparsec.Debug
 
 -- DEFINTIONS
 
@@ -16,7 +17,7 @@ data Expr
   | Var
   | Num Double
   | BinOp Expr Op Expr
-  | Fun Fun Expr
+  | Fun Text [Expr]
   deriving (Show)
 
 data Op
@@ -27,13 +28,6 @@ data Op
   | Exp
   deriving (Show)
 
-data Fun
-  = Sin
-  | Cos
-  | Neg
-  | Sqrt
-  deriving (Show)
-
 -- EVAL
 
 eval :: Double -> Double -> Expr -> Double
@@ -42,7 +36,7 @@ eval p v = \case
   Var -> v
   Num n -> n
   BinOp a op b -> fromOp op (eval p v a) (eval p v b)
-  Fun f a -> fromFun f (eval p v a)
+  Fun f as -> fromFun f (fmap (eval p v) as)
 
 fromOp :: Op -> Double -> Double -> Double
 fromOp = \case
@@ -52,12 +46,16 @@ fromOp = \case
   Div -> (/)
   Exp -> (**)
 
-fromFun :: Fun -> Double -> Double
-fromFun = \case
-  Sin -> sin
-  Cos -> cos
-  Neg -> negate
-  Sqrt -> sqrt
+fromFun :: Text -> [Double] -> Double
+fromFun f as =
+  case (f, as) of
+    ("sin", [x]) -> sin x
+    ("cos", [x]) -> cos x
+    ("neg", [x]) -> negate x
+    ("sqrt", [x]) -> sqrt x
+    ("min", [x, y]) -> min x y
+    ("max", [x, y]) -> max x y
+    _ -> error ": ("
 
 -- RUN
 
@@ -67,7 +65,7 @@ type Parser a =
 parse :: Text -> Either Text Expr
 parse =
   first (Text.pack . errorBundlePretty)
-    . runParser (ws *> expr) ""
+    . runParser (ws *> expr <* eof) ""
 
 expr :: Parser Expr
 expr =
@@ -101,17 +99,9 @@ operator =
 
 fun :: Parser Expr
 fun = do
-  name <- funName
-  a <- pixel <|> var <|> num <|> parens expr
+  name <- lexe $ takeWhileP (Just "a function name") (/= ' ')
+  a <- sepBy1 (pixel <|> var <|> num <|> parens expr) (lookAhead ws)
   lexe . pure $ Fun name a
-
-funName :: Parser Fun
-funName =
-  lexe $
-    Sin <$ chunk "sin"
-      <|> Cos <$ chunk "cos"
-      <|> Neg <$ chunk "neg"
-      <|> Sqrt <$ chunk "sqrt"
 
 num :: Parser Expr
 num =

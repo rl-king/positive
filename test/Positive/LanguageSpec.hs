@@ -16,6 +16,7 @@ spec =
         testErr "Only Number" "1"
         testErr "Only Pixel" "prr"
         testErr "Only Var" "n"
+        testErr "Too much" "1 + 1 + 1"
         test "Pixel" "p + 0.5" 1.5
         test "Var" "n + 0.5" 1.5
         test "Min" "1 - 0.5" 0.5
