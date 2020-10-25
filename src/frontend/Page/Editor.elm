@@ -916,14 +916,17 @@ viewExpressionEditor settings index expression =
         [ viewMaybe (Array.get index settings.iExpressions) <|
             (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue)
         , span [ class "expression-editor-hint" ] [ text "\\p n ->" ]
-        , textarea
-            [ onInput onTextInput
-            , spellcheck False
-            , autocomplete False
-            , value expression.eExpr
-            , rows (List.length (String.lines expression.eExpr))
+        , Html.form
+            [ onSubmit CheckExpressions ]
+            [ textarea
+                [ onInput onTextInput
+                , spellcheck False
+                , autocomplete False
+                , value expression.eExpr
+                , rows (List.length (String.lines expression.eExpr))
+                ]
+                []
             ]
-            []
         ]
 
 

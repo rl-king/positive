@@ -375,10 +375,6 @@ li.-small span {
     position: relative;
 }
 
-.image-settings-group label {
-    margin: .25rem .25rem 0;
-}
-
 .image-settings-paste {
     width: 14rem;
     position: absolute;
@@ -425,10 +421,10 @@ input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    height: 1rem;
-    opacity: 0.9;
-    border-top: 2px solid #444;
-    background-color: #222;
+    height: 2rem;
+    margin: 0;
+    border-radius: 2px;
+    background-color: #333;
     outline: none;
 }
 
@@ -441,30 +437,32 @@ input[type="range"]::-moz-range-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 2px;
-    height: .75rem;
+    height: 2rem;
     border: 0;
     border-radius: 0;
-    background: #fff;
+    background: #eee;
     cursor: pointer;
 }
 
 .range-slider {
     width: 100%;
+    margin-top: 1rem;
+    position: relative;
 }
 
-@media (min-width: 1441px) {
-    .range-slider {
-        margin-bottom: .5rem;
-    }
+.range-slider label {
+    width: 100%;
+    padding: .16rem .5rem;
+    display: flex;
+    justify-content: space-between;
+    position: absolute;
+    top: 0;
+    color: #999;
+    pointer-events: none;
 }
 
 .range-slider:hover label span:last-child {
     color: #fff;
-}
-
-.range-slider label {
-    display: flex;
-    justify-content: space-between;
 }
 
 .range-slider label span:last-child {
