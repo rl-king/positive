@@ -989,9 +989,7 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
             OnExpressionChange index { expression | eExpr = v }
     in
     div [ class "expression-editor" ]
-        [ viewMaybe (Index.withIndex Array.get index settings.iExpressions) <|
-            (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue)
-        , span [ class "expression-editor-hint" ]
+        [ span [ class "expression-editor-hint" ]
             [ text "λ"
             , button
                 [ onClick (RemoveExpression index)
@@ -1008,6 +1006,8 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
             , rows (List.length (String.lines expression.eExpr))
             ]
             []
+        , viewMaybe (Index.withIndex Array.get index settings.iExpressions) <|
+            (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue)
         , viewMaybe expressionResult <|
             \result ->
                 pre [] <|
