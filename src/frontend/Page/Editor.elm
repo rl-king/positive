@@ -271,7 +271,7 @@ update key msg model =
                         )
                         model.filmRoll
             in
-            ( { model | filmRoll = filmRoll, saveKey = nextKey model.saveKey }
+            ( { model | filmRoll = filmRoll }
             , Cmd.none
             )
 
@@ -428,14 +428,14 @@ update key msg model =
             )
 
         PreviousImage ->
-            ( { model | undoState = [], saveKey = nextKey model.saveKey }
+            ( { model | undoState = [] }
             , Navigation.pushUrl key <|
                 (Route.toUrl << Route.Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
                     Maybe.withDefault (Zipper.last model.filmRoll) (Zipper.previous model.filmRoll)
             )
 
         NextImage ->
-            ( { model | undoState = [], saveKey = nextKey model.saveKey }
+            ( { model | undoState = [] }
             , Navigation.pushUrl key <|
                 (Route.toUrl << Route.Editor << (\x -> { dir = model.route.dir, filename = x.iFilename }) << Zipper.current) <|
                     Maybe.withDefault (Zipper.first model.filmRoll) (Zipper.next model.filmRoll)
