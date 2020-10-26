@@ -21,7 +21,6 @@ import qualified Generics.SOP as SOP
 import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
-import qualified Positive.Language as Language
 import Positive.Prelude
 import Servant
 import qualified System.FilePath.Glob as Glob
@@ -275,6 +274,34 @@ instance Elm.HasElmEncoder Aeson.Value Expression where
   elmEncoderDefinition =
     Just $ Elm.deriveElmJSONEncoder @Expression Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeExpression"
 
+-- EXPR RESULT
+
+data ExpressionResult
+  = SyntaxError Text
+  | SampleEval [Double]
+  deriving
+    ( Generic,
+      SOP.Generic,
+      SOP.HasDatatypeInfo,
+      NFData,
+      Show,
+      Eq,
+      Aeson.FromJSON,
+      Aeson.ToJSON
+    )
+
+instance Elm.HasElmType ExpressionResult where
+  elmDefinition =
+    Just $ Elm.deriveElmTypeDefinition @ExpressionResult Elm.defaultOptions "Generated.Data.ImageSettings.ExpressionResult"
+
+instance Elm.HasElmDecoder Aeson.Value ExpressionResult where
+  elmDecoderDefinition =
+    Just $ Elm.deriveElmJSONDecoder @ExpressionResult Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeExpressionResult"
+
+instance Elm.HasElmEncoder Aeson.Value ExpressionResult where
+  elmEncoderDefinition =
+    Just $ Elm.deriveElmJSONEncoder @ExpressionResult Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeExpressionResult"
+
 -- CROP
 
 data ImageCrop = ImageCrop
@@ -338,7 +365,7 @@ findImageSettings = do
   filmRollSettings <-
     liftIO $
       traverse
-        (\path -> (,) <$> pure (Text.pack (makeRelative "./" (takeDirectory path))) <*> Aeson.decodeFileStrict path)
+        (\path -> pure ((,) (Text.pack (makeRelative "./" (takeDirectory path)))) <*> Aeson.decodeFileStrict path)
         settingFiles
   pure $
     foldr

@@ -33,6 +33,7 @@ import qualified Positive.Image as Image
 import Positive.ImageSettings
   ( CoordinateInfo (..),
     Expression (..),
+    ExpressionResult (..),
     FilmRollSettings,
     ImageCrop (..),
     ImageSettings (..),
@@ -136,11 +137,10 @@ handleSaveSettings dir newSettings = do
 
 -- CHECK EXPRESSIONS
 
-handleCheckExpressions :: Vector Expression -> PositiveT Handler (Vector Expression)
-handleCheckExpressions expressions =
-  case traverse (Language.parse . eExpr) expressions of
-    Left err -> log err >> throwError (err400 {errBody = Aeson.encode err})
-    Right _ -> pure expressions
+handleCheckExpressions :: [Expression] -> PositiveT Handler [ExpressionResult]
+handleCheckExpressions =
+  let eval v expr = SampleEval [Language.eval p v expr | p <- [0.0, 0.1 .. 1.0]]
+   in pure . fmap (\e -> either SyntaxError (eval e.eValue) (Language.parse e.eExpr))
 
 -- GENERATE PREVIEWS
 

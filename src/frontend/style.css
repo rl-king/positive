@@ -438,10 +438,12 @@ input[type="range"]::-moz-range-thumb {
     appearance: none;
     width: 2px;
     height: 2rem;
+    position: relative;
     border: 0;
     border-radius: 0;
     background: #eee;
     cursor: pointer;
+    z-index: 98;
 }
 
 .range-slider {

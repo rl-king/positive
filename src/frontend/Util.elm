@@ -1,6 +1,7 @@
 module Util exposing
     ( HttpResult
     , Level(..)
+    , Status(..)
     , choice
     , matchKey
     , pushNotification
@@ -16,6 +17,13 @@ import Http
 import Json.Decode as Decode
 import Process
 import Task
+
+
+type Status a
+    = Success a
+    | Error Http.Error
+    | Requested
+    | Unknown
 
 
 type alias HttpResult a =

@@ -35,6 +35,7 @@ run log = do
           <> Elm.jsonDefinitions @Zones
           <> Elm.jsonDefinitions @CoordinateInfo
           <> Elm.jsonDefinitions @Expression
+          <> Elm.jsonDefinitions @ExpressionResult
       modules =
         -- FIXME: spaceleak in both elm-syntax functions
         Pretty.modules $

@@ -39,8 +39,8 @@ data SettingsApi route = SettingsApi
         :> Post '[JSON] FilmRollSettings,
     saCheckExpressions ::
       route :- "image" :> "settings" :> "expressions"
-        :> ReqBody '[JSON] (Vector Expression)
-        :> Post '[JSON] (Vector Expression),
+        :> ReqBody '[JSON] [Expression]
+        :> Post '[JSON] [ExpressionResult],
     saGetSettings ::
       route :- "image" :> "settings"
         :> Get '[JSON] [(Text, FilmRollSettings)],

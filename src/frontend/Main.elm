@@ -85,13 +85,6 @@ type Page
     | Loading
 
 
-type Status a
-    = Success a
-    | Error Http.Error
-    | Requested
-    | Unknown
-
-
 type alias FilmRolls =
     Dict String FilmRollSettings
 

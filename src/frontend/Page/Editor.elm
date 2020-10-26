@@ -18,6 +18,7 @@ import Generated.Data.ImageSettings as ImageSettings
     exposing
         ( CoordinateInfo
         , Expression
+        , ExpressionResult(..)
         , FilmRollSettings
         , ImageCrop
         , ImageSettings
@@ -34,7 +35,9 @@ import Input
 import Json.Decode as Decode
 import Json.Encode as Encode
 import List.Zipper as Zipper exposing (Zipper)
+import Process
 import ProcessingState exposing (ProcessingState(..))
+import Reorderable exposing (Reorderable)
 import Route
 import String.Interpolate exposing (interpolate)
 import Task
@@ -102,7 +105,7 @@ type alias Model =
     , draftExpressions : DraftExpressions
     , poster : Maybe String
     , filmRoll : FilmRoll
-    , saveKey : Key { saveKey : () }
+    , checkExpressionsKey : Key { checkExpressionsKey : () }
     , imageCropMode : Maybe ImageCrop
     , clipboard : Maybe ImageSettings
     , histogram : List Int
@@ -131,7 +134,7 @@ type alias PreviewVersions =
 
 
 type alias DraftExpressions =
-    Array Expression
+    Reorderable ( Maybe ExpressionResult, Expression )
 
 
 init : Route.EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model
@@ -144,8 +147,8 @@ init route filmRoll ratings poster =
     , ratings = ratings
     , poster = poster
     , filmRoll = focussed
-    , draftExpressions = .iExpressions (Zipper.current focussed)
-    , saveKey = Key 0
+    , draftExpressions = fromArray (.iExpressions (Zipper.current focussed))
+    , checkExpressionsKey = Key 0
     , imageCropMode = Nothing
     , clipboard = Nothing
     , histogram = List.repeat 255 0
@@ -168,12 +171,16 @@ init route filmRoll ratings poster =
 
 continue : Route.EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model -> Model
 continue route filmRoll ratings poster model =
+    let
+        focussed =
+            focus route filmRoll
+    in
     { model
         | processingState = ProcessingState.preview
         , ratings = ratings
         , poster = poster
-        , draftExpressions = .iExpressions (Zipper.current filmRoll)
-        , filmRoll = focus route filmRoll
+        , draftExpressions = fromArray (.iExpressions (Zipper.current focussed))
+        , filmRoll = focussed
         , route = route
         , coordinateInfo = Dict.empty
     }
@@ -196,9 +203,9 @@ type Msg
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
     | OnExpressionChange Int Expression
-    | AddExpression Int
-    | CheckExpressions
-    | GotCheckExpressions (HttpResult (Array Expression))
+    | OnExpressionsChange DraftExpressions
+    | CheckExpressions (Key { checkExpressionsKey : () })
+    | GotCheckExpressions (HttpResult (List ExpressionResult))
     | OnImageLoad String ImageSettings
     | SaveSettings
     | GenerateHighres
@@ -279,34 +286,63 @@ update key msg model =
             ( updateSettings (\_ -> settings) model, Cmd.none )
 
         OnExpressionChange index val ->
-            ( { model | draftExpressions = Array.set index val model.draftExpressions }
-            , Cmd.none
-            )
-
-        AddExpression _ ->
             ( { model
-                | draftExpressions =
-                    Array.push emptyExpression model.draftExpressions
+                | checkExpressionsKey = nextKey model.checkExpressionsKey
+                , draftExpressions =
+                    Reorderable.update index
+                        (Tuple.mapSecond (always val))
+                        model.draftExpressions
               }
-            , Cmd.none
+            , Task.perform (\_ -> CheckExpressions (nextKey model.checkExpressionsKey)) <|
+                Process.sleep 1000
             )
 
-        CheckExpressions ->
-            ( model
-            , Cmd.map GotCheckExpressions <|
-                Request.postImageSettingsExpressions model.draftExpressions
-            )
+        OnExpressionsChange expressions ->
+            ( { model | draftExpressions = expressions }, Cmd.none )
 
-        GotCheckExpressions (Ok expressions) ->
-            ( updateSettings (\settings -> { settings | iExpressions = expressions })
-                { model | draftExpressions = expressions }
-            , Cmd.none
-            )
+        CheckExpressions checkExpressionsKey ->
+            if checkExpressionsKey /= model.checkExpressionsKey then
+                ( model, Cmd.none )
 
-        GotCheckExpressions (Err ( _, Just { body } )) ->
-            pushNotification Warning RemoveNotification ("Expression error: " ++ body) model
+            else
+                ( model
+                , Cmd.map GotCheckExpressions <|
+                    Request.postImageSettingsExpressions <|
+                        List.map Tuple.second <|
+                            Reorderable.toList model.draftExpressions
+                )
 
-        GotCheckExpressions (Err ( _, Nothing )) ->
+        GotCheckExpressions (Ok result) ->
+            let
+                isError r =
+                    case r of
+                        SampleEval _ ->
+                            False
+
+                        SyntaxError _ ->
+                            True
+
+                toArray =
+                    Array.fromList << List.map Tuple.second << Reorderable.toList
+
+                draftExpressions =
+                    Tuple.second <|
+                        List.foldl (\x ( i, acc ) -> ( i + 1, Reorderable.update i (Tuple.mapFirst (always (Just x))) acc ))
+                            ( 0, model.draftExpressions )
+                            result
+            in
+            if List.isEmpty (List.filter isError result) then
+                ( updateSettings (\settings -> { settings | iExpressions = toArray model.draftExpressions })
+                    { model | draftExpressions = draftExpressions }
+                , Cmd.none
+                )
+
+            else
+                ( { model | draftExpressions = draftExpressions }
+                , Cmd.none
+                )
+
+        GotCheckExpressions (Err _) ->
             pushNotification Warning RemoveNotification "Unknown expression error" model
 
         CopySettings settings ->
@@ -764,7 +800,7 @@ viewSettingsRight :
     -> List Int
     -> ProcessingState
     -> Html Msg
-viewSettingsRight filmRoll draftexpressions histogram processingState =
+viewSettingsRight filmRoll draftExpressions histogram processingState =
     let
         settings =
             settingsFromState processingState filmRoll
@@ -776,19 +812,19 @@ viewSettingsRight filmRoll draftexpressions histogram processingState =
         [ viewSettingsGroup
             [ Html.Lazy.lazy viewHistogram histogram ]
         , viewSettingsGroup <|
-            List.concat
-                [ List.indexedMap (viewExpressionEditor settings) <|
-                    Array.toList draftexpressions
-                , [ button [ onClick (AddExpression 0) ] [ text "add" ]
-                  , button [ onClick CheckExpressions ] [ text "apply" ]
-                  ]
-                ]
-        , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ Input.viewRange (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
-                , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
-                , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
+
+                -- , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
+                -- , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
                 ]
+        , viewSettingsGroup
+            [ Html.Keyed.node "div" [] <|
+                List.indexedMap (Tuple.mapSecond << viewExpressionEditor settings draftExpressions) <|
+                    Reorderable.toKeyedList draftExpressions
+            , button [ onClick (OnExpressionsChange (Reorderable.push ( Nothing, emptyExpression ) draftExpressions)) ]
+                [ text "+ Expr" ]
+            ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ -- Input.viewRange (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
@@ -897,8 +933,8 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
         ]
 
 
-viewExpressionEditor : ImageSettings -> Int -> Expression -> Html Msg
-viewExpressionEditor settings index expression =
+viewExpressionEditor : ImageSettings -> DraftExpressions -> Int -> ( Maybe ExpressionResult, Expression ) -> Html Msg
+viewExpressionEditor settings draftExpressions index ( expressionResult, expression ) =
     let
         onRangeInput v =
             OnImageSettingsChange
@@ -916,17 +952,32 @@ viewExpressionEditor settings index expression =
         [ viewMaybe (Array.get index settings.iExpressions) <|
             (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue)
         , span [ class "expression-editor-hint" ] [ text "\\p n ->" ]
-        , Html.form
-            [ onSubmit CheckExpressions ]
-            [ textarea
-                [ onInput onTextInput
-                , spellcheck False
-                , autocomplete False
-                , value expression.eExpr
-                , rows (List.length (String.lines expression.eExpr))
-                ]
-                []
+        , textarea
+            [ onInput onTextInput
+            , spellcheck False
+            , autocomplete False
+            , value expression.eExpr
+            , rows (List.length (String.lines expression.eExpr))
             ]
+            []
+        , viewMaybe expressionResult <|
+            \result ->
+                pre [] <|
+                    case result of
+                        SampleEval xs ->
+                            [ text <|
+                                String.join ", " <|
+                                    List.map (String.fromFloat << threeDecimalFloat) xs
+                            ]
+
+                        SyntaxError err ->
+                            [ text err ]
+        , button
+            [ onClick <|
+                OnExpressionsChange <|
+                    Reorderable.drop index draftExpressions
+            ]
+            [ text "x" ]
         ]
 
 
@@ -1258,3 +1309,9 @@ settingsFromState processingState filmRoll =
 
         _ ->
             Zipper.current filmRoll
+
+
+fromArray : Array a -> Reorderable ( Maybe b, a )
+fromArray =
+    Array.foldl Reorderable.push Reorderable.empty
+        << Array.map (Tuple.pair Nothing)
