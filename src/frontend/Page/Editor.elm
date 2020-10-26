@@ -31,6 +31,7 @@ import Html.Events exposing (..)
 import Html.Keyed
 import Html.Lazy
 import Icon
+import Index exposing (Index)
 import Input
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -137,6 +138,10 @@ type alias DraftExpressions =
     Reorderable ( Maybe ExpressionResult, Expression )
 
 
+type alias EditorIndex =
+    Index { editor : () }
+
+
 init : Route.EditorRoute -> FilmRoll -> Ratings -> Maybe String -> Model
 init route filmRoll ratings poster =
     let
@@ -202,8 +207,9 @@ type Msg
     | GotHistogram (HttpResult (List Int))
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
-    | OnExpressionChange Int Expression
-    | OnExpressionsChange DraftExpressions
+    | OnExpressionChange EditorIndex Expression
+    | AddExpression
+    | RemoveExpression EditorIndex
     | CheckExpressions (Key { checkExpressionsKey : () })
     | GotCheckExpressions (HttpResult (List ExpressionResult))
     | OnImageLoad String ImageSettings
@@ -289,7 +295,8 @@ update key msg model =
             ( { model
                 | checkExpressionsKey = nextKey model.checkExpressionsKey
                 , draftExpressions =
-                    Reorderable.update index
+                    Index.withIndex Reorderable.update
+                        index
                         (Tuple.mapSecond (always val))
                         model.draftExpressions
               }
@@ -297,8 +304,27 @@ update key msg model =
                 Process.sleep 1000
             )
 
-        OnExpressionsChange expressions ->
-            ( { model | draftExpressions = expressions }, Cmd.none )
+        AddExpression ->
+            ( { model
+                | draftExpressions =
+                    Reorderable.push ( Nothing, emptyExpression ) model.draftExpressions
+              }
+            , Cmd.none
+            )
+
+        RemoveExpression index ->
+            let
+                remove i arr =
+                    Array.append
+                        (Array.slice 0 i arr)
+                        (Array.slice (i + 1) (Array.length arr) arr)
+            in
+            ( updateSettings (\settings -> { settings | iExpressions = Index.withIndex remove index settings.iExpressions })
+                { model
+                    | draftExpressions = Index.withIndex Reorderable.drop index model.draftExpressions
+                }
+            , Cmd.none
+            )
 
         CheckExpressions checkExpressionsKey ->
             if checkExpressionsKey /= model.checkExpressionsKey then
@@ -817,6 +843,9 @@ viewSettingsRight filmRoll draftExpressions histogram processingState =
 
         zones =
             settings.iZones
+
+        zoneInput f value name =
+            Input.viewRange (\v -> { settings | iZones = f v }) 0.001 ( -0.25, 0.25, 0 ) name value
     in
     section [ class "image-settings-right" ]
         [ viewSettingsGroup
@@ -824,32 +853,26 @@ viewSettingsRight filmRoll draftExpressions histogram processingState =
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ Input.viewRange (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
-
-                -- , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
-                -- , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
+                , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
+                , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
+                ]
+        , viewSettingsGroup <|
+            List.map (Html.map OnImageSettingsChange) <|
+                [ zoneInput (\v -> { zones | z1 = v }) zones.z1 "I"
+                , zoneInput (\v -> { zones | z2 = v }) zones.z2 "II"
+                , zoneInput (\v -> { zones | z3 = v }) zones.z3 "III"
+                , zoneInput (\v -> { zones | z4 = v }) zones.z4 "IV"
+                , zoneInput (\v -> { zones | z5 = v }) zones.z5 "V"
+                , zoneInput (\v -> { zones | z6 = v }) zones.z6 "VI"
+                , zoneInput (\v -> { zones | z7 = v }) zones.z7 "VII"
+                , zoneInput (\v -> { zones | z8 = v }) zones.z8 "VIII"
+                , zoneInput (\v -> { zones | z9 = v }) zones.z9 "IX"
                 ]
         , viewSettingsGroup
             [ Html.Keyed.node "div" [] <|
-                List.indexedMap (Tuple.mapSecond << viewExpressionEditor settings draftExpressions) <|
+                Index.indexedMap List.indexedMap (Tuple.mapSecond << viewExpressionEditor settings draftExpressions) <|
                     Reorderable.toKeyedList draftExpressions
-            , button [ onClick (OnExpressionsChange (Reorderable.push ( Nothing, emptyExpression ) draftExpressions)) ]
-                [ text "+ Expr" ]
             ]
-        , viewSettingsGroup <|
-            List.map (Html.map OnImageSettingsChange)
-                [ -- Input.viewRange (\v -> { settings | iZones = { zones | z1 = v } }) 0.001 ( -0.25, 0.25, 0 ) "I" zones.z1
-                  Input.viewRange (\v -> { settings | iZones = { zones | z2 = v } }) 0.001 ( -0.25, 0.25, 0 ) "II" zones.z2
-
-                -- , Input.viewRange (\v -> { settings | iZones = { zones | z3 = v } }) 0.001 ( -0.25, 0.25, 0 ) "III" zones.z3
-                -- , Input.viewRange (\v -> { settings | iZones = { zones | z4 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IV" zones.z4
-                , Input.viewRange (\v -> { settings | iZones = { zones | z5 = v } }) 0.001 ( -0.25, 0.25, 0 ) "V" zones.z5
-
-                -- , Input.viewRange (\v -> { settings | iZones = { zones | z6 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VI" zones.z6
-                -- , Input.viewRange (\v -> { settings | iZones = { zones | z7 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VII" zones.z7
-                , Input.viewRange (\v -> { settings | iZones = { zones | z8 = v } }) 0.001 ( -0.25, 0.25, 0 ) "VIII" zones.z8
-
-                -- , Input.viewRange (\v -> { settings | iZones = { zones | z9 = v } }) 0.001 ( -0.25, 0.25, 0 ) "IX" zones.z9
-                ]
         ]
 
 
@@ -869,6 +892,7 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
         [ viewSettingsGroup
             [ viewImageCropMode settings imageCropMode
             , button [ onClick Rotate, title "rotate" ] [ Icon.rotate ]
+            , button [ onClick AddExpression ] [ Icon.lambda ]
             ]
         , viewSettingsGroup
             [ button [ onClick (CopySettings settings), title "copy" ] [ Icon.copy ]
@@ -943,14 +967,20 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
         ]
 
 
-viewExpressionEditor : ImageSettings -> DraftExpressions -> Int -> ( Maybe ExpressionResult, Expression ) -> Html Msg
+viewExpressionEditor :
+    ImageSettings
+    -> DraftExpressions
+    -> EditorIndex
+    -> ( Maybe ExpressionResult, Expression )
+    -> Html Msg
 viewExpressionEditor settings draftExpressions index ( expressionResult, expression ) =
     let
         onRangeInput v =
             OnImageSettingsChange
                 { settings
                     | iExpressions =
-                        Array.set index
+                        Index.withIndex Array.set
+                            index
                             { expression | eValue = v }
                             settings.iExpressions
                 }
@@ -959,9 +989,17 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
             OnExpressionChange index { expression | eExpr = v }
     in
     div [ class "expression-editor" ]
-        [ viewMaybe (Array.get index settings.iExpressions) <|
+        [ viewMaybe (Index.withIndex Array.get index settings.iExpressions) <|
             (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue)
-        , span [ class "expression-editor-hint" ] [ text "\\p n ->" ]
+        , span [ class "expression-editor-hint" ]
+            [ text "λ"
+            , button
+                [ onClick (RemoveExpression index)
+                , class "expression-editor-remove"
+                , title "remove"
+                ]
+                []
+            ]
         , textarea
             [ onInput onTextInput
             , spellcheck False
@@ -982,12 +1020,6 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
 
                         SyntaxError err ->
                             [ text err ]
-        , button
-            [ onClick <|
-                OnExpressionsChange <|
-                    Reorderable.drop index draftExpressions
-            ]
-            [ text "x" ]
         ]
 
 

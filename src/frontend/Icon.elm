@@ -11,6 +11,7 @@ module Icon exposing
     , crop
     , externalEditor
     , highres
+    , lambda
     , left
     , ok
     , original
@@ -58,6 +59,11 @@ unstarred =
 externalEditor : Html msg
 externalEditor =
     icon "ps"
+
+
+lambda : Html msg
+lambda =
+    icon "lambda"
 
 
 ok : Html msg

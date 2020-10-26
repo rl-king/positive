@@ -15,6 +15,7 @@
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
             "lukewestby/elm-string-interpolate": "1.0.4",
+            "rl-king/elm-index": "1.0.0",
             "rl-king/elm-scroll-to": "1.1.1",
             "truqu/elm-base64": "2.0.4",
             "wernerdegroot/listzipper": "4.0.0",
