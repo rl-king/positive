@@ -512,8 +512,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .crop-settings input[type="range"] {
-    border-top: 2px solid #555;
-    background-color: #333;
+    background-color: #444;
 }
 
 .crop-settings button {
