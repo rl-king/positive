@@ -622,20 +622,30 @@ fromPreview state =
 
 updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
+    let
+        unlessUnchanged old new =
+            if old.filmRoll == new.filmRoll then
+                old
+
+            else
+                new
+    in
     case model.processingState of
         Preview state ->
-            { model
-                | processingState = ProcessingState.toProcessing state
-                , filmRoll = Zipper.mapCurrent f model.filmRoll
-                , undoState = model.filmRoll :: model.undoState
-            }
+            unlessUnchanged model
+                { model
+                    | processingState = ProcessingState.toProcessing state
+                    , filmRoll = Zipper.mapCurrent f model.filmRoll
+                    , undoState = model.filmRoll :: model.undoState
+                }
 
         Ready state ->
-            { model
-                | processingState = ProcessingState.toProcessing state
-                , filmRoll = Zipper.mapCurrent f model.filmRoll
-                , undoState = model.filmRoll :: model.undoState
-            }
+            unlessUnchanged model
+                { model
+                    | processingState = ProcessingState.toProcessing state
+                    , filmRoll = Zipper.mapCurrent f model.filmRoll
+                    , undoState = model.filmRoll :: model.undoState
+                }
 
         Processing state ->
             { model
