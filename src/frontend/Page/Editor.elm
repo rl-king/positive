@@ -314,13 +314,13 @@ update key msg model =
 
         GotCheckExpressions (Ok result) ->
             let
-                isError r =
+                isOk r =
                     case r of
                         SampleEval _ ->
-                            False
+                            True
 
                         SyntaxError _ ->
-                            True
+                            False
 
                 toArray =
                     Array.fromList << List.map Tuple.second << Reorderable.toList
@@ -331,7 +331,7 @@ update key msg model =
                             ( 0, model.draftExpressions )
                             result
             in
-            if List.isEmpty (List.filter isError result) then
+            if List.all isOk result then
                 ( updateSettings (\settings -> { settings | iExpressions = toArray model.draftExpressions })
                     { model | draftExpressions = draftExpressions }
                 , Cmd.none
