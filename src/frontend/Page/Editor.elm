@@ -776,8 +776,8 @@ viewNav route =
 viewFiles : Route.EditorRoute -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
 viewFiles route columns minimumRating previewVersions ratings filmRoll =
     section [ class "files" ]
-        [ Input.viewRange (SetColumnCount << floor) 1 ( 2, 13, 5 ) "Columns" (toFloat columns) -- FIXME: remove floats
-        , Input.viewRange (SetMinRating << floor) 1 ( 0, 5, 0 ) "Rating" (toFloat minimumRating) -- FIXME: remove floats
+        [ Input.viewRangeInt SetColumnCount 1 ( 2, 13, 5 ) "Columns" columns
+        , Input.viewRangeInt SetMinRating 1 ( 0, 5, 0 ) "Rating" minimumRating
         , Html.Keyed.ul [] <|
             List.map (\( _, filename, x ) -> ( filename, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
