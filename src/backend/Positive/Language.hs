@@ -28,6 +28,32 @@ data Op
   | Exp
   deriving (Show)
 
+-- CHECK
+
+check :: Expr -> Either Text Expr
+check e =
+  case e of
+    Fun f as -> e <$ (checkFun f =<< traverse check as)
+    _ -> Right e
+
+checkFun :: Text -> [Expr] -> Either Text ()
+checkFun f as =
+  case (f, as) of
+    ("sin", [_]) -> Right ()
+    ("cos", [_]) -> Right ()
+    ("neg", [_]) -> Right ()
+    ("sqrt", [_]) -> Right ()
+    ("min", [_, _]) -> Right ()
+    ("max", [_, _]) -> Right ()
+    (name, args) ->
+      Left $
+        Text.unwords
+          [ "Unknown function:",
+            tshow name,
+            "or unexpected amount of arguments:",
+            tshow (length args)
+          ]
+
 -- EVAL
 
 eval :: Double -> Double -> Expr -> Double
@@ -35,19 +61,19 @@ eval p v = \case
   Pixel -> p
   Var -> v
   Num n -> n
-  BinOp a op b -> fromOp op (eval p v a) (eval p v b)
-  Fun f as -> fromFun f (fmap (eval p v) as)
+  BinOp a op b -> evalOp op (eval p v a) (eval p v b)
+  Fun f as -> evalFun f (fmap (eval p v) as)
 
-fromOp :: Op -> Double -> Double -> Double
-fromOp = \case
+evalOp :: Op -> Double -> Double -> Double
+evalOp = \case
   Plu -> (+)
   Min -> (-)
   Mul -> (*)
   Div -> (/)
   Exp -> (**)
 
-fromFun :: Text -> [Double] -> Double
-fromFun f as =
+evalFun :: Text -> [Double] -> Double
+evalFun f as =
   case (f, as) of
     ("sin", [x]) -> sin x
     ("cos", [x]) -> cos x
