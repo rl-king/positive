@@ -105,6 +105,8 @@ handlers isDev_ chan =
             }
     }
 
+-- IMAGE
+
 handleImage :: Text -> ImageSettings -> PositiveT Handler ByteString
 handleImage dir settings = do
   logSSE $ "Requested image " <> settings.iFilename
@@ -124,6 +126,8 @@ handleImage dir settings = do
       liftIO putMVarBack
       logSSE $ "Processed image " <> settings.iFilename
       pure encoded
+
+-- SAVE
 
 handleSaveSettings :: Text -> FilmRollSettings -> PositiveT Handler FilmRollSettings
 handleSaveSettings dir newSettings = do
@@ -145,7 +149,7 @@ handleCheckExpressions exprs =
         first TypeError . Language.check =<< first SyntaxError (Language.parse e.eExpr)
    in pure [either id (eval e.eValue) (parseAndCheck e) | e <- exprs]
 
--- GENERATE PREVIEWS
+-- GENERATE
 
 handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
@@ -164,7 +168,7 @@ handleGenerateWallpaper dir settings = do
           <> Text.unpack settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
   image <-
-    handleNothing $
+    handleLeft $
       Image.fromDiskPreProcess (Just 2560) settings.iCrop input
   HIP.writeImage output $ Image.applySettings settings image
   NoContent <$ log ("Wrote wallpaper version of: " <> Text.pack input)
@@ -176,7 +180,7 @@ handleOpenExternalEditor dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
   log $ "Opening in external editor: " <> Text.pack input
   image <-
-    handleNothing $
+    handleLeft $
       Image.fromDiskPreProcess Nothing settings.iCrop input
   HIP.displayImageUsing HIP.defaultViewer False (Image.applySettings settings image)
   pure NoContent
@@ -230,11 +234,9 @@ handleGetSettings =
 
 -- HANDLER HELPERS
 
-handleNothing :: PositiveT Handler (Either err a) -> PositiveT Handler a
-handleNothing m =
+handleLeft :: PositiveT Handler (Either err a) -> PositiveT Handler a
+handleLeft m =
   m >>= either (\(_ :: err) -> log "Image read error" >> throwError err404) pure
-
--- IMAGE
 
 -- | Read image from disk, normalize before crop, keep result in MVar
 getCachedImage :: ImageCrop -> Text -> PositiveT Handler (Image.Monochrome, IO ())
@@ -254,7 +256,7 @@ getCachedImage crop path = do
     Nothing -> do
       logDebug "From disk"
       image <-
-        handleNothing $
+        handleLeft $
           Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
       pure
         ( image,
