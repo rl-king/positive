@@ -349,6 +349,9 @@ update key msg model =
                         SyntaxError _ ->
                             False
 
+                        TypeError _ ->
+                            False
+
                 toArray =
                     Array.fromList << List.map Tuple.second << Reorderable.toList
 
@@ -1023,7 +1026,10 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
                             ]
 
                         SyntaxError err ->
-                            [ text err ]
+                            [ text "Syntax error\n", text err ]
+
+                        TypeError err ->
+                            [ text "Type error\n", text err ]
         ]
 
 

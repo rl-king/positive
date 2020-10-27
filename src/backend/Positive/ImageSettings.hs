@@ -278,6 +278,7 @@ instance Elm.HasElmEncoder Aeson.Value Expression where
 
 data ExpressionResult
   = SyntaxError Text
+  | TypeError Text
   | SampleEval [Double]
   deriving
     ( Generic,

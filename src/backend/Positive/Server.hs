@@ -138,9 +138,12 @@ handleSaveSettings dir newSettings = do
 -- CHECK EXPRESSIONS
 
 handleCheckExpressions :: [Expression] -> PositiveT Handler [ExpressionResult]
-handleCheckExpressions =
-  let eval v expr = SampleEval [Language.eval p v expr | p <- [0.0, 0.1 .. 1.0]]
-   in pure . fmap (\e -> either SyntaxError (eval e.eValue) (Language.parse e.eExpr))
+handleCheckExpressions exprs =
+  let eval v expr =
+        SampleEval [Language.eval p v expr | p <- [0.0, 0.1 .. 1.0]]
+      parseAndCheck e =
+        first TypeError . Language.check =<< first SyntaxError (Language.parse e.eExpr)
+   in pure [either id (eval e.eValue) (parseAndCheck e) | e <- exprs]
 
 -- GENERATE PREVIEWS
 
