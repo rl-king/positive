@@ -319,7 +319,8 @@ update key msg model =
                         (Array.slice 0 i arr)
                         (Array.slice (i + 1) (Array.length arr) arr)
             in
-            ( updateSettings (\settings -> { settings | iExpressions = Index.withIndex remove index settings.iExpressions })
+            ( updateSettings
+                (\s -> { s | iExpressions = Index.withIndex remove index s.iExpressions })
                 { model
                     | draftExpressions = Index.withIndex Reorderable.drop index model.draftExpressions
                 }
@@ -353,12 +354,15 @@ update key msg model =
 
                 draftExpressions =
                     Tuple.second <|
-                        List.foldl (\x ( i, acc ) -> ( i + 1, Reorderable.update i (Tuple.mapFirst (always (Just x))) acc ))
+                        List.foldl
+                            (\x ( i, acc ) ->
+                                ( i + 1, Reorderable.update i (Tuple.mapFirst (always (Just x))) acc )
+                            )
                             ( 0, model.draftExpressions )
                             result
             in
             if List.all isOk result then
-                ( updateSettings (\settings -> { settings | iExpressions = toArray model.draftExpressions })
+                ( updateSettings (\s -> { s | iExpressions = toArray model.draftExpressions })
                     { model | draftExpressions = draftExpressions }
                 , Cmd.none
                 )
@@ -891,11 +895,11 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
     div [ class "image-settings-left" ]
         [ viewSettingsGroup
             [ viewImageCropMode settings imageCropMode
-            , button [ onClick Rotate, title "rotate" ] [ Icon.rotate ]
-            , button [ onClick AddExpression ] [ Icon.lambda ]
+            , button [ onClick Rotate, title "rotate ccw" ] [ Icon.rotate ]
+            , button [ onClick AddExpression, title "add expression" ] [ Icon.lambda ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (CopySettings settings), title "copy" ] [ Icon.copy ]
+            [ button [ onClick (CopySettings settings), title "copy settings" ] [ Icon.copy ]
             , viewMaybe clipboard_ <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
@@ -1047,7 +1051,7 @@ viewImageCropMode current imageCropMode =
     in
     case imageCropMode of
         Nothing ->
-            button [ onClick (UpdateImageCropMode (Just current.iCrop)) ] [ Icon.crop ]
+            button [ onClick (UpdateImageCropMode (Just current.iCrop)), title "crop" ] [ Icon.crop ]
 
         Just imageCrop ->
             div []

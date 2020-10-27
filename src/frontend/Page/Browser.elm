@@ -159,7 +159,7 @@ viewFilmRollBrowser minimumRating filmRollHover filmRolls =
     in
     section [ class "browser" ] <|
         [ header []
-            [ h1 [] [ text "Route.Browser" ]
+            [ h1 [] [ text "Browser" ]
             , Input.viewRange (SetMinRating << floor) 1 ( 0, 5, 0 ) "Minimum rating" (toFloat (Maybe.withDefault 0 minimumRating))
             ]
         , case minimumRating of
