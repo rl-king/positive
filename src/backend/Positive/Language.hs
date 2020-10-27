@@ -34,6 +34,7 @@ check :: Expr -> Either Text Expr
 check e =
   case e of
     Fun f as -> e <$ (checkFun f =<< traverse check as)
+    BinOp a _ b -> e <$ traverse check [a, b]
     _ -> Right e
 
 checkFun :: Text -> [Expr] -> Either Text ()
@@ -78,7 +79,7 @@ evalFun f as =
     ("sqrt", [x]) -> sqrt x
     ("min", [x, y]) -> min x y
     ("max", [x, y]) -> max x y
-    _ -> error ": ("
+    (name, args) -> error $ Text.unpack name <> " " <> show args
 
 -- RUN
 
