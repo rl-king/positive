@@ -207,6 +207,7 @@ type Msg
     | GotHistogram (HttpResult (List Int))
     | RotatePreview String Float
     | OnImageSettingsChange ImageSettings
+    | OnExpressionValueChange EditorIndex Expression
     | OnExpressionChange EditorIndex Expression
     | AddExpression
     | RemoveExpression EditorIndex
@@ -290,6 +291,19 @@ update key msg model =
 
         OnImageSettingsChange settings ->
             ( updateSettings (\_ -> settings) model, Cmd.none )
+
+        OnExpressionValueChange index val ->
+            ( { model
+                | checkExpressionsKey = nextKey model.checkExpressionsKey
+                , draftExpressions =
+                    Index.withIndex Reorderable.update
+                        index
+                        (Tuple.mapSecond (always val))
+                        model.draftExpressions
+              }
+            , Task.perform (\_ -> CheckExpressions (nextKey model.checkExpressionsKey)) <|
+                Process.sleep 1000
+            )
 
         OnExpressionChange index val ->
             ( { model
@@ -983,14 +997,7 @@ viewExpressionEditor :
 viewExpressionEditor settings draftExpressions index ( expressionResult, expression ) =
     let
         onRangeInput v =
-            OnImageSettingsChange
-                { settings
-                    | iExpressions =
-                        Index.withIndex Array.set
-                            index
-                            { expression | eValue = v }
-                            settings.iExpressions
-                }
+            OnExpressionValueChange index { expression | eValue = v }
 
         onTextInput v =
             OnExpressionChange index { expression | eExpr = v }
@@ -1013,8 +1020,8 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
             , rows (List.length (String.lines expression.eExpr))
             ]
             []
-        , viewMaybe (Index.withIndex Array.get index settings.iExpressions) <|
-            (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue)
+        , viewMaybe (Index.withIndex Reorderable.get index draftExpressions) <|
+            (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue << Tuple.second)
         , viewMaybe expressionResult <|
             \result ->
                 pre [] <|
