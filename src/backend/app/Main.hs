@@ -16,7 +16,7 @@ import qualified System.Log.FastLogger as FastLogger
 
 main :: IO ()
 main = do
-  timeCache <- FastLogger.newTimeCache FastLogger.simpleTimeFormat
+  timeCache <- FastLogger.newTimeCache "%T"
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
       flags <- Flags.parseArgs
