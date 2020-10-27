@@ -28,7 +28,7 @@ import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
 import Network.Wai.Handler.Warp hiding (run)
 import Positive.Api
-import Positive.Flags (Flags (..))
+import qualified Positive.CLI as CLI
 import qualified Positive.Image as Image
 import Positive.ImageSettings
   ( CoordinateInfo (..),
@@ -58,14 +58,14 @@ data Env = Env
   { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.Monochrome))),
     previewMVar :: !(MVar [(FilePath, ImageSettings)]),
     eventChan :: !(Chan ServerEvent),
-    isDev :: !Bool,
+    isDev :: !CLI.IsDev,
     logger :: !Log.TimedFastLogger
   }
 
 -- SERVER
 
-run :: Log.TimedFastLogger -> Flags -> IO ()
-run logger_ flags =
+run :: Log.TimedFastLogger -> CLI.IsDev -> IO ()
+run logger_ isDev_ =
   let settings =
         setPort 8080 $
           setBeforeMainLoop
@@ -75,13 +75,13 @@ run logger_ flags =
         imageMVar_ <- MVar.newMVar OrdPSQ.empty
         previewMVar_ <- MVar.newEmptyMVar
         eventChan_ <- Chan.newChan
-        let env = Env imageMVar_ previewMVar_ eventChan_ flags.isDev logger_
+        let env = Env imageMVar_ previewMVar_ eventChan_ isDev_ logger_
         Preview.loop previewMVar_ imageMVar_ eventChan_ (Log.log logger_)
-        runSettings settings (genericServeT (`runReaderT` env) (handlers flags.isDev eventChan_))
+        runSettings settings (genericServeT (`runReaderT` env) (handlers isDev_ eventChan_))
 
 -- HANDLERS
 
-handlers :: Bool -> Chan ServerEvent -> Api (AsServerT (PositiveT Handler))
+handlers :: CLI.IsDev -> Chan ServerEvent -> Api (AsServerT (PositiveT Handler))
 handlers isDev_ chan =
   Api
     { aImageApi =

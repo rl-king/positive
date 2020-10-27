@@ -1,9 +1,7 @@
-{-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
-
 module Main where
 
+import qualified Positive.CLI as CLI
 import qualified Positive.CodeGen as CodeGen
-import qualified Positive.Flags as Flags
 import qualified Positive.Init as Init
 import qualified Positive.Log as Log
 import Positive.Prelude
@@ -19,10 +17,10 @@ main = do
   timeCache <- FastLogger.newTimeCache "%T"
   FastLogger.withTimedFastLogger timeCache (FastLogger.LogStdout FastLogger.defaultBufSize) $
     \logger -> do
-      flags <- Flags.parseArgs
+      mode <- CLI.parseArgs
       let log = Log.log logger
-      case flags.mode of
-        Flags.Init replace -> Init.run replace >> Preview.run log replace
-        Flags.Previews replace -> Preview.run log replace
-        Flags.SingleImage filepath -> SingleImage.run log filepath
-        Flags.Server -> when flags.isDev (CodeGen.run log) >> Server.run logger flags
+      case mode of
+        CLI.Init replace -> Init.run replace >> Preview.run log replace
+        CLI.Previews replace -> Preview.run log replace
+        CLI.SingleImage filepath -> SingleImage.run log filepath
+        CLI.Server isDev -> when isDev (CodeGen.run log) >> Server.run logger isDev

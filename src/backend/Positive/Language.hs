@@ -42,8 +42,15 @@ checkFun f as =
   let countArgs name xs n
         | length xs == n = Right ()
         | otherwise =
-          Left $ "Unexpected amount of arguments: " <> tshow (length xs) <> " for: " <> name
+          Left $
+            "The function "
+              <> tshow name
+              <> " expects "
+              <> tshow n
+              <> " argument(s), but was given "
+              <> tshow (length xs)
    in case f of
+        "id" -> countArgs f as 1
         "sin" -> countArgs f as 1
         "cos" -> countArgs f as 1
         "neg" -> countArgs f as 1
@@ -74,6 +81,7 @@ evalOp = \case
 evalFun :: Text -> [Double] -> Double
 evalFun f as =
   case (f, as) of
+    ("id", [x]) -> x
     ("sin", [x]) -> sin x
     ("cos", [x]) -> cos x
     ("neg", [x]) -> negate x
