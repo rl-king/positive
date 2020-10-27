@@ -47,6 +47,7 @@ checkFun f as =
         "sin" -> countArgs f as 1
         "cos" -> countArgs f as 1
         "neg" -> countArgs f as 1
+        "abs" -> countArgs f as 1
         "sqrt" -> countArgs f as 1
         "min" -> countArgs f as 2
         "max" -> countArgs f as 2
@@ -77,6 +78,7 @@ evalFun f as =
     ("cos", [x]) -> cos x
     ("neg", [x]) -> negate x
     ("sqrt", [x]) -> sqrt x
+    ("abs", [x]) -> abs x
     ("min", [x, y]) -> min x y
     ("max", [x, y]) -> max x y
     (name, args) -> error $ Text.unpack name <> " " <> show args
