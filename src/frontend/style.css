@@ -405,6 +405,7 @@ li.-small span {
 
 .expression-editor-sample-bar {
     width: 100%;
+    margin-bottom: 6rem;
     display: block;
     position: relative;
     background-color: #444;
