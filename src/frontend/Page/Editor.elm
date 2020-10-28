@@ -1024,20 +1024,43 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
             (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue << Tuple.second)
         , viewMaybe expressionResult <|
             \result ->
-                pre [] <|
-                    case result of
-                        SampleEval xs ->
-                            [ text <|
-                                String.join ", " <|
-                                    List.map (String.fromFloat << threeDecimalFloat) xs
-                            ]
+                case result of
+                    SampleEval xs ->
+                        viewSampleEval xs
 
-                        SyntaxError err ->
+                    SyntaxError err ->
+                        pre []
                             [ text "Syntax error\n", text err ]
 
-                        TypeError err ->
+                    TypeError err ->
+                        pre []
                             [ text "Type error\n", text err ]
         ]
+
+
+viewSampleEval : List Float -> Html Msg
+viewSampleEval offset =
+    div [ class "expression-editor-sample" ] <|
+        List.map
+            (\v ->
+                span [ class "expression-editor-sample-part" ]
+                    [ span
+                        [ style "height" <|
+                            interpolate "{0}rem"
+                                [ String.fromFloat (abs (v * 2)) ]
+                        , class "expression-editor-sample-bar"
+                        ]
+                        [ span
+                            [ class "expression-editor-sample-value"
+                            , style "transform" <|
+                                interpolate "translateY(calc({0}rem + .25rem)) rotate(90deg)"
+                                    [ String.fromFloat (abs (v * 2)) ]
+                            ]
+                            [ text (String.fromFloat (threeDecimalFloat v)) ]
+                        ]
+                    ]
+            )
+            offset
 
 
 viewSettingsGroup : List (Html Msg) -> Html Msg

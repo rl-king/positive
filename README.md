@@ -14,7 +14,7 @@ as it's completely written to handle my workflow.
 
 ## Compile things
 
-```
+```shell
 # Reload hs/elm/css on save
 ./build-dev.sh
 

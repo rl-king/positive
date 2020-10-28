@@ -237,6 +237,7 @@ nav {
 }
 
 .files ul {
+    width: 100%;
     padding: 0;
     display: flex;
     flex-wrap: wrap;
@@ -389,6 +390,33 @@ li.-small span {
 }
 
 .expression-editor {
+}
+
+.expression-editor-sample {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+}
+
+.expression-editor-sample-part {
+    width: calc(9% - .25rem);
+    display: block;
+}
+
+.expression-editor-sample-bar {
+    width: 100%;
+    display: block;
+    position: relative;
+    background-color: #444;
+    transition: height .5s;
+}
+
+.expression-editor-sample-value {
+    display: block;
+    left: 0;
+    font-family: var(--mono);
+    color: #999;
+    transform: rotate(90deg);
 }
 
 .expression-editor-hint {

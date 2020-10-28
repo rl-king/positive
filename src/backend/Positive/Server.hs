@@ -144,7 +144,10 @@ handleSaveSettings dir newSettings = do
 handleCheckExpressions :: [Expression] -> PositiveT Handler [ExpressionResult]
 handleCheckExpressions exprs =
   let eval v expr =
-        SampleEval $ filter (not . isInfinite) [Language.eval p v expr | p <- [0.0, 0.1 .. 1.0]]
+        SampleEval $
+          filter
+            (not . isInfinite)
+            [Language.eval p v expr - p | p <- [0.1, 0.2 .. 1.0]]
       parseAndCheck e =
         first TypeError . Language.check =<< first SyntaxError (Language.parse e.eExpr)
    in pure [either id (eval e.eValue) (parseAndCheck e) | e <- exprs]

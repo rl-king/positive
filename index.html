@@ -18,8 +18,6 @@
      const app = Elm.Main.init(null);
      const evtSource = new EventSource("/events");
 
-     console.log(evtSource);
-
      evtSource.addEventListener("log", e => {
          app.ports.serverMessage.send(e.data);
      });
