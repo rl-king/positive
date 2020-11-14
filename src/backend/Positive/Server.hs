@@ -64,12 +64,12 @@ data Env = Env
 
 -- SERVER
 
-run :: Log.TimedFastLogger -> CLI.IsDev -> IO ()
-run logger_ isDev_ =
+run :: Log.TimedFastLogger -> CLI.IsDev -> CLI.Port -> IO ()
+run logger_ isDev_ port =
   let settings =
-        setPort 8080 $
+        setPort port $
           setBeforeMainLoop
-            (Log.log logger_ ("listening on port " <> tshow @Int 8080))
+            (Log.log logger_ ("listening on port " <> tshow port))
             defaultSettings
    in do
         imageMVar_ <- MVar.newMVar OrdPSQ.empty

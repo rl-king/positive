@@ -9,12 +9,14 @@ data Mode
   = Init Replace
   | Previews Replace
   | SingleImage FilePath
-  | Server IsDev
+  | Server IsDev Port
   deriving (Show, Eq)
 
 type Replace = Bool
 
 type IsDev = Bool
+
+type Port = Int
 
 parseArgs :: IO Mode
 parseArgs =
@@ -32,7 +34,7 @@ parser =
             <> metavar "FILENAME"
             <> help "process fullsize image to ./highres"
         )
-    <|> Server <$> isDev
+    <|> Server <$> isDev <*> port
 
 replace :: Parser Replace
 replace =
@@ -41,3 +43,9 @@ replace =
 isDev :: Parser IsDev
 isDev =
   flag False True (long "dev" <> help "generate elm, verbose logging")
+
+port :: Parser Int
+port =
+  option auto $
+    long "listen" <> short 'l' <> showDefault <> value 8080 <> metavar "INT"
+      <> help "Port at which the server is run"
