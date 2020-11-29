@@ -287,8 +287,11 @@ checkScrollPosition previousPage ( model, cmd ) =
             else
                 ( model, cmd )
 
-        _ ->
+        ( Browser _, Editor _ ) ->
             ( model, Cmd.batch [ cmd, Cmd.map ScrollToMsg ScrollTo.scrollToTop ] )
+
+        _ ->
+            ( model, cmd )
 
 
 
