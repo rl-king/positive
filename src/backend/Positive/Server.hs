@@ -47,6 +47,7 @@ import qualified Positive.SingleImage as SingleImage
 import qualified Positive.Static as Static
 import Servant
 import Servant.Server.Generic
+import qualified System.Directory as Directory
 import System.FilePath.Posix (isPathSeparator, (</>))
 
 -- POSITIVE
@@ -164,8 +165,9 @@ handleGenerateHighRes dir settings = do
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
-      output =
-        "/Users/king/Documents/wallpapers/positive"
+      output homeDir =
+        homeDir
+          </> "Documents/wallpapers/positive"
           </> filter (\c -> not (isPathSeparator c || c == '.')) (Text.unpack dir)
           <> " | "
           <> Text.unpack settings.iFilename
@@ -173,7 +175,8 @@ handleGenerateWallpaper dir settings = do
   image <-
     handleLeft $
       Image.fromDiskPreProcess (Just 2560) settings.iCrop input
-  HIP.writeImage output $ Image.applySettings settings image
+  homeDir <- liftIO Directory.getHomeDirectory
+  HIP.writeImage (output homeDir) $ Image.applySettings settings image
   NoContent <$ log ("Wrote wallpaper version of: " <> Text.pack input)
 
 -- OPEN EXTERNALEDITOR
