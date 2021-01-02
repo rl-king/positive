@@ -1,3 +1,5 @@
+[![Actions Status](https://github.com/rl-king/positive/workflows/build/badge.svg)](https://github.com/rl-king/positive/actions)
+
 # Positive
 
 Lightroom for linear scanned monochrome film.
