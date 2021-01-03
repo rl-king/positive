@@ -58,7 +58,7 @@ port previewReady : (String -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
-subscriptions { imageCropMode, filmRoll } =
+subscriptions { clipboard, imageCropMode, filmRoll } =
     let
         current =
             Zipper.current filmRoll
@@ -72,7 +72,7 @@ subscriptions { imageCropMode, filmRoll } =
                 Decode.oneOf
                     [ matchKey "s" SaveSettings
                     , matchKey "u" Undo
-                    , matchKey "c" (CopySettings current)
+                    , matchKey "c" (CopySettings (Just current))
                     , matchKey "r" Rotate
                     , matchKey "h" PreviousImage
                     , matchKey "l" NextImage
@@ -90,6 +90,11 @@ subscriptions { imageCropMode, filmRoll } =
                 matchKey "Escape" (UpdateImageCropMode Nothing)
             )
             imageCropMode
+        , ifJust
+            (always <|
+                matchKey "Escape" (CopySettings Nothing)
+            )
+            clipboard
         , previewReady OnPreviewReady
         , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
@@ -217,7 +222,7 @@ type Msg
     | SaveSettings
     | GenerateHighres
     | GenerateWallpaper
-    | CopySettings ImageSettings
+    | CopySettings (Maybe ImageSettings)
     | ApplyCopyToAll FilmRoll
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
@@ -393,11 +398,12 @@ update key msg model =
             pushNotification Warning RemoveNotification "Unknown expression error" model
 
         CopySettings settings ->
-            if Just settings == model.clipboard then
-                ( { model | clipboard = Nothing }, Cmd.none )
-
-            else
-                ( { model | clipboard = Just settings, imageCropMode = Nothing }, Cmd.none )
+            ( { model
+                | clipboard = settings
+                , imageCropMode = Nothing
+              }
+            , Cmd.none
+            )
 
         ApplyCopyToAll filmRoll ->
             let
@@ -820,7 +826,7 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
             ]
         , span [ class "files-file-footer" ]
             [ text settings.iFilename
-            , button [ onClick (CopySettings settings) ] [ Icon.copy ]
+            , button [ onClick (CopySettings (Just settings)) ] [ Icon.copy ]
             , viewRating settings.iFilename ratings
             ]
         ]
@@ -916,7 +922,7 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
             , button [ onClick AddExpression, title "add expression" ] [ Icon.lambda ]
             ]
         , viewSettingsGroup
-            [ button [ onClick (CopySettings settings), title "copy settings" ] [ Icon.copy ]
+            [ button [ onClick (CopySettings (Just settings)), title "copy settings" ] [ Icon.copy ]
             , viewMaybe clipboard_ <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
