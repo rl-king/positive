@@ -305,6 +305,7 @@ view model =
             { title = "Loading"
             , body =
                 [ viewNotifications model.notifications
+                , div [ class "loading-spinner" ] []
                 ]
             }
 
