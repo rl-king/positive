@@ -296,6 +296,6 @@ toPreviewUrl dir filename =
 
 focusWithOffset : Float -> Dict String ImageSettings -> Maybe String
 focusWithOffset offset xs =
-    List.drop (floor (toFloat (Dict.size xs) * offset)) (Dict.values xs)
+    List.drop (round (toFloat (Dict.size xs) * offset) - 1) (Dict.values xs)
         |> List.head
         |> Maybe.map .iFilename
