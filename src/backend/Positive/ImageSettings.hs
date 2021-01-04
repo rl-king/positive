@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -21,6 +22,7 @@ import qualified Generics.SOP as SOP
 import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
+import qualified Language.Haskell.To.Elm.Via as Elm
 import Positive.Prelude
 import Servant
 import qualified System.FilePath.Glob as Glob
@@ -33,7 +35,13 @@ data FilmRollSettings = FilmRollSettings
     frsRatings :: !(HashMap Text Int),
     frsSettings :: !(HashMap Text ImageSettings)
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData, Show, Eq)
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
+  deriving
+    ( Elm.HasElmType,
+      Elm.HasElmDecoder Aeson.Value,
+      Elm.HasElmEncoder Aeson.Value
+    )
+    via Elm.ElmType "Generated.Data.ImageSettings.FilmRollSettings" FilmRollSettings
 
 instance Aeson.FromJSON FilmRollSettings where
   parseJSON =
@@ -95,18 +103,6 @@ plainImageSettings :: Text -> ImageSettings
 plainImageSettings x =
   ImageSettings x 0 noCrop 2.2 initZones 0 1 mempty
 
-instance Elm.HasElmType FilmRollSettings where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @FilmRollSettings Elm.defaultOptions "Generated.Data.ImageSettings.FilmRollSettings"
-
-instance Elm.HasElmDecoder Aeson.Value FilmRollSettings where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @FilmRollSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeFilmRollSettings"
-
-instance Elm.HasElmEncoder Aeson.Value FilmRollSettings where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @FilmRollSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeFilmRollSettings"
-
 instance
   (ElmComparable k, Elm.HasElmType k, Elm.HasElmType a) =>
   Elm.HasElmType (HashMap k a)
@@ -144,15 +140,14 @@ data ImageSettings = ImageSettings
     iWhitepoint :: !Double,
     iExpressions :: !(Vector Expression)
   }
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
-    ( Generic,
-      SOP.Generic,
-      SOP.HasDatatypeInfo,
-      NFData,
-      Show,
-      Eq,
-      Aeson.ToJSON
+    ( Aeson.ToJSON,
+      Elm.HasElmType,
+      Elm.HasElmDecoder Aeson.Value,
+      Elm.HasElmEncoder Aeson.Value
     )
+    via Elm.ElmType "Generated.Data.ImageSettings.ImageSettings" ImageSettings
 
 instance Aeson.FromJSON ImageSettings where
   parseJSON =
@@ -186,18 +181,6 @@ instance FromHttpApiData ImageSettings where
       Aeson.eitherDecodeStrict =<< Base64.decode (encodeUtf8 piece)
   parseQueryParam = parseUrlPiece
 
-instance Elm.HasElmType ImageSettings where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @ImageSettings Elm.defaultOptions "Generated.Data.ImageSettings.ImageSettings"
-
-instance Elm.HasElmDecoder Aeson.Value ImageSettings where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @ImageSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeImageSettings"
-
-instance Elm.HasElmEncoder Aeson.Value ImageSettings where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @ImageSettings Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeImageSettings"
-
 -- Zones
 
 data Zones = Zones
@@ -211,32 +194,19 @@ data Zones = Zones
     z8 :: !Double,
     z9 :: !Double
   }
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
-    ( Generic,
-      SOP.Generic,
-      SOP.HasDatatypeInfo,
-      NFData,
-      Show,
-      Eq,
+    ( Aeson.ToJSON,
       Aeson.FromJSON,
-      Aeson.ToJSON
+      Elm.HasElmType,
+      Elm.HasElmDecoder Aeson.Value,
+      Elm.HasElmEncoder Aeson.Value
     )
+    via Elm.ElmType "Generated.Data.ImageSettings.Zones" Zones
 
 initZones :: Zones
 initZones =
   Zones 0 0 0 0 0 0 0 0 0
-
-instance Elm.HasElmType Zones where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @Zones Elm.defaultOptions "Generated.Data.ImageSettings.Zones"
-
-instance Elm.HasElmDecoder Aeson.Value Zones where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @Zones Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeZones"
-
-instance Elm.HasElmEncoder Aeson.Value Zones where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @Zones Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeZones"
 
 -- EXPR
 
@@ -247,32 +217,19 @@ data Expression = Expression
     eLabel :: !Text,
     eExpr :: !Text
   }
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
-    ( Generic,
-      SOP.Generic,
-      SOP.HasDatatypeInfo,
-      NFData,
-      Show,
-      Eq,
+    ( Aeson.ToJSON,
       Aeson.FromJSON,
-      Aeson.ToJSON
+      Elm.HasElmType,
+      Elm.HasElmDecoder Aeson.Value,
+      Elm.HasElmEncoder Aeson.Value
     )
+    via Elm.ElmType "Generated.Data.ImageSettings.Expression" Expression
 
 emptyExpression :: Expression
 emptyExpression =
   Expression 0 (-1) 1 "" ""
-
-instance Elm.HasElmType Expression where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @Expression Elm.defaultOptions "Generated.Data.ImageSettings.Expression"
-
-instance Elm.HasElmDecoder Aeson.Value Expression where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @Expression Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeExpression"
-
-instance Elm.HasElmEncoder Aeson.Value Expression where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @Expression Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeExpression"
 
 -- EXPR RESULT
 
@@ -280,28 +237,15 @@ data ExpressionResult
   = SyntaxError Text
   | TypeError Text
   | SampleEval [Double]
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
-    ( Generic,
-      SOP.Generic,
-      SOP.HasDatatypeInfo,
-      NFData,
-      Show,
-      Eq,
+    ( Aeson.ToJSON,
       Aeson.FromJSON,
-      Aeson.ToJSON
+      Elm.HasElmType,
+      Elm.HasElmDecoder Aeson.Value,
+      Elm.HasElmEncoder Aeson.Value
     )
-
-instance Elm.HasElmType ExpressionResult where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @ExpressionResult Elm.defaultOptions "Generated.Data.ImageSettings.ExpressionResult"
-
-instance Elm.HasElmDecoder Aeson.Value ExpressionResult where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @ExpressionResult Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeExpressionResult"
-
-instance Elm.HasElmEncoder Aeson.Value ExpressionResult where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @ExpressionResult Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeExpressionResult"
+    via Elm.ElmType "Generated.Data.ImageSettings.ExpressionResult" ExpressionResult
 
 -- CROP
 
@@ -310,32 +254,19 @@ data ImageCrop = ImageCrop
     icLeft :: !Double,
     icWidth :: !Double
   }
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
-    ( Generic,
-      SOP.Generic,
-      SOP.HasDatatypeInfo,
-      NFData,
-      Show,
-      Eq,
+    ( Aeson.ToJSON,
       Aeson.FromJSON,
-      Aeson.ToJSON
+      Elm.HasElmType,
+      Elm.HasElmDecoder Aeson.Value,
+      Elm.HasElmEncoder Aeson.Value
     )
+    via Elm.ElmType "Generated.Data.ImageSettings.ImageCrop" ImageCrop
 
 noCrop :: ImageCrop
 noCrop =
   ImageCrop 0 0 100
-
-instance Elm.HasElmType ImageCrop where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @ImageCrop Elm.defaultOptions "Generated.Data.ImageSettings.ImageCrop"
-
-instance Elm.HasElmDecoder Aeson.Value ImageCrop where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @ImageCrop Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeImageCrop"
-
-instance Elm.HasElmEncoder Aeson.Value ImageCrop where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @ImageCrop Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeImageCrop"
 
 -- COORDINATE
 
@@ -344,19 +275,15 @@ data CoordinateInfo = CoordinateInfo
     ciY :: !Double,
     ciValue :: !Double
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo, Show, Eq, Aeson.FromJSON, Aeson.ToJSON)
-
-instance Elm.HasElmType CoordinateInfo where
-  elmDefinition =
-    Just $ Elm.deriveElmTypeDefinition @CoordinateInfo Elm.defaultOptions "Generated.Data.ImageSettings.CoordinateInfo"
-
-instance Elm.HasElmDecoder Aeson.Value CoordinateInfo where
-  elmDecoderDefinition =
-    Just $ Elm.deriveElmJSONDecoder @CoordinateInfo Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.decodeCoordinateInfo"
-
-instance Elm.HasElmEncoder Aeson.Value CoordinateInfo where
-  elmEncoderDefinition =
-    Just $ Elm.deriveElmJSONEncoder @CoordinateInfo Elm.defaultOptions Aeson.defaultOptions "Generated.Data.ImageSettings.encodeCoordinateInfo"
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo)
+  deriving
+    ( Aeson.ToJSON,
+      Aeson.FromJSON,
+      Elm.HasElmType,
+      Elm.HasElmDecoder Aeson.Value,
+      Elm.HasElmEncoder Aeson.Value
+    )
+    via Elm.ElmType "Generated.Data.ImageSettings.CoordinateInfo" CoordinateInfo
 
 -- FS
 
@@ -366,7 +293,7 @@ findImageSettings = do
   filmRollSettings <-
     liftIO $
       traverse
-        (\path -> pure ((,) (Text.pack (makeRelative "./" (takeDirectory path)))) <*> Aeson.decodeFileStrict path)
+        (\path -> (,) (Text.pack (makeRelative "./" (takeDirectory path))) <$> Aeson.decodeFileStrict path)
         settingFiles
   pure $
     foldr
