@@ -31,7 +31,7 @@ generate log message filepath is = do
   image <- Image.fromDiskPreProcess Nothing is.iCrop filepath
   liftIO $ createDirectoryIfMissing False (dropFileName filepath </> "highres")
   outputWithCount <-
-    ImageSettings.pickFilename $
+    ImageSettings.ensureUniqueFilename $
       dropFileName filepath </> "highres" </> takeFileName filepath
   log $ message <> Text.pack outputWithCount
   either (log . tshow) (HIP.writeImage outputWithCount . Image.applySettings is) image

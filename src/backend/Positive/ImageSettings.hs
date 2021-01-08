@@ -323,16 +323,15 @@ insertPreviewSettings ps settings = do
     (Aeson.encodeFile ps . insert settings)
     previewSettings
 
-pickFilename :: MonadIO m => FilePath -> m FilePath
-pickFilename filepath = do
+ensureUniqueFilename :: MonadIO m => FilePath -> m FilePath
+ensureUniqueFilename filepath = do
   current <- liftIO $ Glob.glob (dropExtension filepath <> "*")
   pure $
     if null current
       then filepath
       else
         let toNumbers = read @Int . reverse . takeWhile isDigit . reverse . dropExtension
-         in case sortOn Down $ toNumbers <$> filter (/= filepath) current of
-              n : _ ->
-                mconcat [dropExtension filepath, "-", show (n + 1), takeExtension filepath]
-              _ ->
-                mconcat [dropExtension filepath, "-1", takeExtension filepath]
+            preExt = case sortOn Down $ toNumbers <$> filter (/= filepath) current of
+              n : _ -> "-" <> show (n + 1)
+              _ -> "-1"
+         in mconcat [dropExtension filepath, preExt, takeExtension filepath]

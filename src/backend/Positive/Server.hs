@@ -165,18 +165,18 @@ handleGenerateHighRes dir settings = do
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
-      output homeDir =
+      outputBase homeDir =
         homeDir
           </> "Documents/wallpapers/positive"
           </> filter (\c -> not (isPathSeparator c || c == '.')) (Text.unpack dir)
           <> " | "
           <> Text.unpack settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
+  output <- ImageSettings.ensureUniqueFilename . outputBase =<< liftIO Directory.getHomeDirectory
   image <-
     handleLeft $
       Image.fromDiskPreProcess (Just 2560) settings.iCrop input
-  homeDir <- liftIO Directory.getHomeDirectory
-  HIP.writeImage (output homeDir) $ Image.applySettings settings image
+  HIP.writeImage output $ Image.applySettings settings image
   NoContent <$ log ("Wrote wallpaper version of: " <> Text.pack input)
 
 -- OPEN EXTERNALEDITOR
