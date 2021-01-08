@@ -4,7 +4,7 @@
 
 module Positive.Image where
 
-import Control.Exception.Safe (IOException, tryIO)
+import Control.Exception.Safe (try)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Massiv.Array.IO as Massiv
 import Graphics.Image (Ix2 ((:.)))
@@ -29,9 +29,9 @@ type MonochromePixelDouble =
 
 -- LOAD
 
-fromDisk :: MonadIO m => FilePath -> m (Either IOException Monochrome)
+fromDisk :: MonadIO m => FilePath -> m (Either SomeException Monochrome)
 fromDisk =
-  liftIO . tryIO . fromDisk_
+  liftIO . try . fromDisk_
 
 fromDisk_ :: MonadIO m => FilePath -> m Monochrome
 fromDisk_ =
@@ -42,7 +42,7 @@ fromDiskPreProcess ::
   Maybe Int ->
   ImageCrop ->
   String ->
-  m (Either IOException Monochrome)
+  m (Either SomeException Monochrome)
 fromDiskPreProcess targetSize imageCrop path =
   fmap (fromDoubleI . maybe id resize targetSize . normalize . toDoubleI . crop imageCrop)
     <$> fromDisk path
