@@ -90,7 +90,10 @@ update key msg model =
             ( { model | filmRollHover = Just ( id, offset ) }, Cmd.none )
 
         OnFilmRollHoverMove offset ->
-            ( { model | filmRollHover = Maybe.map (Tuple.mapSecond (always offset)) model.filmRollHover }
+            ( { model
+                | filmRollHover =
+                    Maybe.map (Tuple.mapSecond (always offset)) model.filmRollHover
+              }
             , Cmd.none
             )
 
@@ -98,7 +101,9 @@ update key msg model =
             ( { model | filmRollHover = Nothing }, Cmd.none )
 
         GotSaveImageSettings dir (Ok settings) ->
-            ( { model | filmRolls = Dict.insert dir settings model.filmRolls }, Cmd.none )
+            ( { model | filmRolls = Dict.insert dir settings model.filmRolls }
+            , Cmd.none
+            )
 
         GotSaveImageSettings _ (Err _) ->
             ( model, Cmd.none )
@@ -171,6 +176,12 @@ view model =
                         List.map (viewFilmRollBrowserRated n) <|
                             List.sortWith down <|
                                 Dict.toList model.filmRolls
+            , footer []
+                [ text "Total photos: "
+                , text <|
+                    String.fromInt <|
+                        Dict.foldl (\_ v acc -> Dict.size v.frsSettings + acc) 0 model.filmRolls
+                ]
             ]
         ]
 

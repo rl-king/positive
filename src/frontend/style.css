@@ -145,6 +145,12 @@ nav {
     justify-content: space-between;
 }
 
+.browser footer {
+    padding: 2rem 0;
+    text-align: center;
+    color: #888;
+}
+
 .browser .range-slider {
     width: 18rem;
     margin-left: 1rem;
