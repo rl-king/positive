@@ -52,6 +52,7 @@ type alias Model =
     { filmRolls : FilmRolls
     , filmRollHover : Maybe ( String, Float )
     , minimumRating : Maybe Int
+    , columns : Int
     }
 
 
@@ -64,6 +65,7 @@ init { minimumRating } filmRolls =
     { filmRolls = filmRolls
     , filmRollHover = Nothing
     , minimumRating = minimumRating
+    , columns = 4
     }
 
 
@@ -78,6 +80,7 @@ type Msg
     | SetPoster String (Maybe String)
     | GotSaveImageSettings String (HttpResult FilmRollSettings)
     | SetMinRating Int
+    | SetColumnCount Int
 
 
 update : Browser.Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -124,6 +127,9 @@ update key msg model =
                 Route.toUrl (Route.Browser { minimumRating = Just val })
             )
 
+        SetColumnCount scale ->
+            ( { model | columns = scale }, Cmd.none )
+
 
 
 -- VIEW
@@ -131,20 +137,6 @@ update key msg model =
 
 view : Model -> Html Msg
 view model =
-    main_ []
-        [ viewFilmRollBrowser
-            model.minimumRating
-            model.filmRollHover
-            model.filmRolls
-        ]
-
-
-
--- FILE BROWSER
-
-
-viewFilmRollBrowser : Maybe Int -> Maybe ( String, Float ) -> FilmRolls -> Html Msg
-viewFilmRollBrowser minimumRating filmRollHover filmRolls =
     let
         down ( a, _ ) ( b, _ ) =
             case compare a b of
@@ -157,23 +149,29 @@ viewFilmRollBrowser minimumRating filmRollHover filmRolls =
                 LT ->
                     GT
     in
-    section [ class "browser" ] <|
-        [ header []
-            [ h1 [] [ text "Browser" ]
-            , Input.viewRange (SetMinRating << floor) 1 ( 0, 5, 0 ) "Minimum rating" (toFloat (Maybe.withDefault 0 minimumRating))
-            ]
-        , case minimumRating of
-            Nothing ->
-                div [ class "browser-filmrolls" ] <|
-                    List.map (viewFilmRollBrowserRoll filmRollHover) <|
-                        List.sortWith down <|
-                            Dict.toList filmRolls
+    main_ []
+        [ section [ class "browser" ] <|
+            [ header []
+                [ h1 [] [ text "Browser" ]
+                , div [ class "browser-controls" ]
+                    [ Input.viewRangeInt SetColumnCount 1 ( 2, 13, 5 ) "Columns" model.columns
+                    , Input.viewRangeInt SetMinRating 1 ( 0, 5, 0 ) "Minimum rating" <|
+                        Maybe.withDefault 0 model.minimumRating
+                    ]
+                ]
+            , case model.minimumRating of
+                Nothing ->
+                    div [ class "browser-filmrolls" ] <|
+                        List.map (viewFilmRollBrowserRoll model.columns model.filmRollHover) <|
+                            List.sortWith down <|
+                                Dict.toList model.filmRolls
 
-            Just n ->
-                div [ class "browser-rated" ] <|
-                    List.map (viewFilmRollBrowserRated n) <|
-                        List.sortWith down <|
-                            Dict.toList filmRolls
+                Just n ->
+                    div [ class "browser-rated" ] <|
+                        List.map (viewFilmRollBrowserRated n) <|
+                            List.sortWith down <|
+                                Dict.toList model.filmRolls
+            ]
         ]
 
 
@@ -217,8 +215,8 @@ viewRatedImage dir ( filename, rating ) =
 -- ROLLS
 
 
-viewFilmRollBrowserRoll : Maybe ( String, Float ) -> ( String, FilmRollSettings ) -> Html Msg
-viewFilmRollBrowserRoll filmRollHover ( dir, filmRoll ) =
+viewFilmRollBrowserRoll : Int -> Maybe ( String, Float ) -> ( String, FilmRollSettings ) -> Html Msg
+viewFilmRollBrowserRoll columns filmRollHover ( dir, filmRoll ) =
     let
         name =
             Maybe.withDefault dir <|
@@ -245,8 +243,16 @@ viewFilmRollBrowserRoll filmRollHover ( dir, filmRoll ) =
                             [ Maybe.andThen (\filename -> Dict.get filename filmRoll.frsSettings) filmRoll.frsPoster
                             , List.head (Dict.values filmRoll.frsSettings)
                             ]
+
+        width =
+            style "width" <|
+                interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
     in
-    div [ class "browser-filmroll", title dir ]
+    div
+        [ classList [ ( "browser-filmroll", True ), ( "browser-filmroll-small", columns > 4 ) ]
+        , title dir
+        , width
+        ]
         [ viewMaybe poster <|
             viewFilmRollBrowserImage dir
         , h2 [] [ text shortTitle ]

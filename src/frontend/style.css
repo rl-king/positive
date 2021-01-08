@@ -134,6 +134,10 @@ nav {
     padding: 2rem 0 4rem 0;
 }
 
+.browser h1 {
+    margin-bottom: 1.5rem;
+}
+
 .browser header {
     margin-bottom: 1rem;
     display: flex;
@@ -143,6 +147,11 @@ nav {
 
 .browser .range-slider {
     width: 18rem;
+    margin-left: 1rem;
+}
+
+.browser-controls {
+    display: flex;
 }
 
 .browser-filmrolls {
@@ -151,26 +160,8 @@ nav {
     justify-content: space-between;
 }
 
-.browser-filmroll {
-    width: calc(50% - .5rem);
-}
-
-@media (min-width: 1024px) {
-    .browser-filmroll {
-        width: calc(33% - .5rem);
-    }
-}
-
-@media (min-width: 1440px) {
-    .browser-filmroll {
-        width: calc(25% - 1rem);
-    }
-}
-
-@media (min-width: 1920px) {
-    .browser-filmroll {
-        width: calc(20% - 1rem);
-    }
+.browser-filmroll-small h2 {
+    font-size: .875rem;
 }
 
 .browser-filmroll a {
