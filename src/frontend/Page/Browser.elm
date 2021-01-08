@@ -143,7 +143,18 @@ update key msg model =
 view : Model -> Html Msg
 view model =
     let
-        down ( a, _ ) ( b, _ ) =
+        firstNumber =
+            List.head << List.filterMap String.toInt << String.words
+
+        sorter ( a, _ ) ( b, _ ) =
+            case Maybe.map2 Tuple.pair (firstNumber a) (firstNumber b) of
+                Just ( x, y ) ->
+                    down x y
+
+                Nothing ->
+                    down a b
+
+        down a b =
             case compare a b of
                 GT ->
                     LT
@@ -168,13 +179,13 @@ view model =
                 Nothing ->
                     div [ class "browser-filmrolls" ] <|
                         List.map (viewFilmRollBrowserRoll model.columns model.filmRollHover) <|
-                            List.sortWith down <|
+                            List.sortWith sorter <|
                                 Dict.toList model.filmRolls
 
                 Just n ->
                     div [ class "browser-rated" ] <|
                         List.map (viewFilmRollBrowserRated n) <|
-                            List.sortWith down <|
+                            List.sortWith sorter <|
                                 Dict.toList model.filmRolls
             , footer []
                 [ text "Total photos: "
