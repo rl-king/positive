@@ -1192,7 +1192,7 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
                         ]
                         []
             ]
-        , section [ class "zones" ]
+        , section [ class "zoom" ]
             [ Input.viewRange UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" scale_ ]
         ]
 
