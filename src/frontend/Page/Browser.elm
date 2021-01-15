@@ -144,7 +144,13 @@ view : Model -> Html Msg
 view model =
     let
         firstNumber =
-            List.head << List.filterMap String.toInt << String.words
+            List.head
+                << List.filterMap String.toInt
+                << String.words
+                << String.concat
+                << List.take 1
+                << List.reverse
+                << String.split "/"
 
         sorter ( a, _ ) ( b, _ ) =
             case Maybe.map2 Tuple.pair (firstNumber a) (firstNumber b) of
