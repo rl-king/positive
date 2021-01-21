@@ -96,10 +96,14 @@ fromDoubleI =
 {-# INLINE fromDoubleI #-}
 
 resize :: Int -> MonochromeDouble -> MonochromeDouble
-resize !targetWidth !image
-  | HIP.cols image `div` targetWidth > 5 = HIP.shrink2x2 (HIP.shrink3x3 image)
-  | HIP.cols image `div` targetWidth > 3 = HIP.shrink3x3 image
-  | otherwise = HIP.shrink2x2 image
+resize !targetWidth !image =
+  case HIP.cols image `div` targetWidth of
+    0 -> image
+    1 -> image
+    2 -> HIP.shrink2x2 image
+    3 -> HIP.shrink3x3 image
+    4 -> HIP.shrink2x2 (HIP.shrink2x2 image)
+    _ -> HIP.shrink2x2 (HIP.shrink3x3 image)
 {-# INLINE resize #-}
 
 crop :: ImageCrop -> Monochrome -> Monochrome
