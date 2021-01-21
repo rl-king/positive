@@ -6,12 +6,12 @@ import Html.Events exposing (..)
 import Json.Decode as Decode
 
 
-viewRangeInt : (Int -> msg) -> Int -> ( Int, Int, Int ) -> String -> Int -> Html msg
+viewRangeInt : Int -> ( Int, Int, Int ) -> String -> Int -> (Int -> msg) -> Html msg
 viewRangeInt =
     viewRangeInternal String.fromInt Decode.int
 
 
-viewRange : (Float -> msg) -> Float -> ( Float, Float, Float ) -> String -> Float -> Html msg
+viewRange : Float -> ( Float, Float, Float ) -> String -> Float -> (Float -> msg) -> Html msg
 viewRange =
     viewRangeInternal String.fromFloat Decode.float
 
@@ -19,13 +19,13 @@ viewRange =
 viewRangeInternal :
     (number -> String)
     -> Decode.Decoder number
-    -> (number -> msg)
     -> number
     -> ( number, number, number )
     -> String
     -> number
+    -> (number -> msg)
     -> Html msg
-viewRangeInternal toString decoder toMsg stepSize ( min, max, startingValue ) title val =
+viewRangeInternal toString decoder stepSize ( min, max, startingValue ) title val toMsg =
     let
         deDupe v =
             if v == val then

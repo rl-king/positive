@@ -176,9 +176,12 @@ view model =
             [ header []
                 [ h1 [] [ text "Browser" ]
                 , div [ class "browser-controls" ]
-                    [ Input.viewRangeInt SetColumnCount 1 ( 2, 13, 5 ) "Columns" model.columns
-                    , Input.viewRangeInt SetMinRating 1 ( 0, 5, 0 ) "Minimum rating" <|
-                        Maybe.withDefault 0 model.minimumRating
+                    [ Input.viewRangeInt 1 ( 2, 13, 5 ) "Columns" model.columns SetColumnCount
+                    , Input.viewRangeInt 1
+                        ( 0, 5, 0 )
+                        "Minimum rating"
+                        (Maybe.withDefault 0 model.minimumRating)
+                        SetMinRating
                     ]
                 ]
             , case model.minimumRating of

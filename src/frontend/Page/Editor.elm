@@ -702,7 +702,10 @@ updateSettings f model =
 
         Processing state ->
             { model
-                | processingState = ProcessingState.toQueued (Zipper.mapCurrent f model.filmRoll) state
+                | processingState =
+                    ProcessingState.toQueued
+                        (Zipper.mapCurrent f model.filmRoll)
+                        state
                 , undoState = model.filmRoll :: model.undoState
             }
 
@@ -782,20 +785,31 @@ viewNav route =
 viewFiles : Route.EditorRoute -> Int -> Int -> PreviewVersions -> Ratings -> FilmRoll -> Html Msg
 viewFiles route columns minimumRating previewVersions ratings filmRoll =
     section [ class "files" ]
-        [ Input.viewRangeInt SetColumnCount 1 ( 2, 13, 5 ) "Columns" columns
-        , Input.viewRangeInt SetMinRating 1 ( 0, 5, 0 ) "Rating" minimumRating
+        [ Input.viewRangeInt 1 ( 2, 13, 5 ) "Columns" columns SetColumnCount
+        , Input.viewRangeInt 1 ( 0, 5, 0 ) "Rating" minimumRating SetMinRating
         , Html.Keyed.ul [] <|
             List.map (\( _, filename, x ) -> ( filename, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
                     List.concat
-                        [ List.map (viewFilesLink False route.dir columns previewVersions ratings) (Zipper.before filmRoll)
-                        , [ viewFilesLink True route.dir columns previewVersions ratings (Zipper.current filmRoll) ]
-                        , List.map (viewFilesLink False route.dir columns previewVersions ratings) (Zipper.after filmRoll)
+                        [ List.map (viewFilesLink False route.dir columns previewVersions ratings) <|
+                            Zipper.before filmRoll
+                        , [ viewFilesLink True route.dir columns previewVersions ratings <|
+                                Zipper.current filmRoll
+                          ]
+                        , List.map (viewFilesLink False route.dir columns previewVersions ratings) <|
+                            Zipper.after filmRoll
                         ]
         ]
 
 
-viewFilesLink : Bool -> String -> Int -> PreviewVersions -> Ratings -> ImageSettings -> ( Int, String, Html Msg )
+viewFilesLink :
+    Bool
+    -> String
+    -> Int
+    -> PreviewVersions
+    -> Ratings
+    -> ImageSettings
+    -> ( Int, String, Html Msg )
 viewFilesLink isCurrent dir columns previewVersions ratings settings =
     let
         width =
@@ -820,9 +834,18 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
                 []
             ]
         , span [ class "files-file-rotate" ]
-            [ button [ onClick (RotatePreview settings.iFilename (rotate 270)) ] [ text "⊤" ]
-            , button [ onClick (RotatePreview settings.iFilename (rotate 180)) ] [ text "⊤" ]
-            , button [ onClick (RotatePreview settings.iFilename (rotate 90)) ] [ text "⊤" ]
+            [ button
+                [ onClick (RotatePreview settings.iFilename (rotate 270))
+                ]
+                [ text "⊤" ]
+            , button
+                [ onClick (RotatePreview settings.iFilename (rotate 180))
+                ]
+                [ text "⊤" ]
+            , button
+                [ onClick (RotatePreview settings.iFilename (rotate 90))
+                ]
+                [ text "⊤" ]
             ]
         , span [ class "files-file-footer" ]
             [ text settings.iFilename
@@ -872,16 +895,20 @@ viewSettingsRight filmRoll draftExpressions histogram processingState =
             settings.iZones
 
         zoneInput f value name =
-            Input.viewRange (\v -> { settings | iZones = f v }) 0.001 ( -0.25, 0.25, 0 ) name value
+            Input.viewRange 0.001 ( -0.25, 0.25, 0 ) name value <|
+                \v -> { settings | iZones = f v }
     in
     section [ class "image-settings-right" ]
         [ viewSettingsGroup
             [ Html.Lazy.lazy viewHistogram histogram ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
-                [ Input.viewRange (\v -> { settings | iGamma = v }) 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma
-                , Input.viewRange (\v -> { settings | iBlackpoint = v }) 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint
-                , Input.viewRange (\v -> { settings | iWhitepoint = v }) 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint
+                [ Input.viewRange 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma <|
+                    \v -> { settings | iGamma = v }
+                , Input.viewRange 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint <|
+                    \v -> { settings | iBlackpoint = v }
+                , Input.viewRange 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint <|
+                    \v -> { settings | iWhitepoint = v }
                 ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange) <|
@@ -897,8 +924,10 @@ viewSettingsRight filmRoll draftExpressions histogram processingState =
                 ]
         , viewSettingsGroup
             [ Html.Keyed.node "div" [] <|
-                Index.indexedMap List.indexedMap (Tuple.mapSecond << viewExpressionEditor settings draftExpressions) <|
-                    Reorderable.toKeyedList draftExpressions
+                Index.indexedMap
+                    List.indexedMap
+                    (Tuple.mapSecond << viewExpressionEditor settings draftExpressions)
+                    (Reorderable.toKeyedList draftExpressions)
             ]
         ]
 
@@ -951,7 +980,11 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
                                 ApplyCopyToAll <|
                                     Zipper.map
                                         (\i ->
-                                            { clipboard | iFilename = i.iFilename, iRotate = i.iRotate, iCrop = i.iCrop }
+                                            { clipboard
+                                                | iFilename = i.iFilename
+                                                , iRotate = i.iRotate
+                                                , iCrop = i.iCrop
+                                            }
                                         )
                                         filmRoll
                             , title (interpolate "apply tone to all from {0}" [ clipboard.iFilename ])
@@ -984,13 +1017,15 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
             , button [ onClick GenerateHighres, title "generate highres" ] [ Icon.highres ]
             , button [ onClick GenerateWallpaper, title "generate wallpaper" ] [ Icon.wallpaper ]
             , button [ onClick OpenExternalEditor, title "open external" ] [ Icon.externalEditor ]
-            , viewIf (processingState == ProcessingState.preview) <|
-                \_ -> button [ onClick LoadOriginal, title "load original" ] [ Icon.original ]
             ]
         , viewSettingsGroup
             [ button [ onClick NextImage ] [ Icon.right ]
             , button [ onClick PreviousImage ] [ Icon.left ]
             ]
+        , viewIf (processingState == ProcessingState.preview) <|
+            \_ ->
+                viewSettingsGroup
+                    [ button [ onClick LoadOriginal, title "load original" ] [ Icon.original ] ]
         ]
 
 
@@ -1027,7 +1062,7 @@ viewExpressionEditor settings draftExpressions index ( expressionResult, express
             ]
             []
         , viewMaybe (Index.withIndex Reorderable.get index draftExpressions) <|
-            (Input.viewRange onRangeInput 0.01 ( -1, 1, 0 ) "n" << .eValue << Tuple.second)
+            \( _, { eValue } ) -> Input.viewRange 0.01 ( -1, 1, 0 ) "n" eValue onRangeInput
         , viewMaybe expressionResult <|
             \result ->
                 case result of
@@ -1099,9 +1134,12 @@ viewImageCropMode current imageCropMode =
             div []
                 [ button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.crop ]
                 , div [ class "crop-settings" ]
-                    [ Input.viewRange (onTopChange imageCrop) 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop
-                    , Input.viewRange (onLeftChange imageCrop) 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft
-                    , Input.viewRange (onWidthChange imageCrop) 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth
+                    [ Input.viewRange 0.01 ( 0, 5, 0 ) "Top" imageCrop.icTop <|
+                        onTopChange imageCrop
+                    , Input.viewRange 0.01 ( 0, 5, 0 ) "Left" imageCrop.icLeft <|
+                        onLeftChange imageCrop
+                    , Input.viewRange 0.1 ( 85, 100, 100 ) "Width" imageCrop.icWidth <|
+                        onWidthChange imageCrop
                     , button [ onClick (UpdateImageCropMode Nothing) ] [ Icon.cancel ]
                     , button [ onClick (ApplyCrop imageCrop) ] [ Icon.ok ]
                     ]
@@ -1193,7 +1231,8 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
                         []
             ]
         , section [ class "zoom" ]
-            [ Input.viewRange UpdateScale 0.01 ( 0.05, 1.05, 1 ) "Zoom" scale_ ]
+            [ Input.viewRange 0.01 ( 0.05, 1.05, 1 ) "Zoom" scale_ UpdateScale
+            ]
         ]
 
 
