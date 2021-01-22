@@ -888,11 +888,8 @@ viewSettingsRight :
     -> Html Msg
 viewSettingsRight filmRoll draftExpressions histogram processingState =
     let
-        settings =
+        ({ iZones } as settings) =
             settingsFromState processingState filmRoll
-
-        zones =
-            settings.iZones
 
         zoneInput f value name =
             Input.viewRange 0.001 ( -0.25, 0.25, 0 ) name value <|
@@ -909,18 +906,20 @@ viewSettingsRight filmRoll draftExpressions histogram processingState =
                     \v -> { settings | iBlackpoint = v }
                 , Input.viewRange 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint <|
                     \v -> { settings | iWhitepoint = v }
+                , Input.viewRange 0.01 ( -0.25, 0.25, 0 ) "Pop" iZones.z7 <|
+                    \v -> { settings | iZones = { iZones | z2 = -v, z7 = v } }
                 ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange) <|
-                [ zoneInput (\v -> { zones | z1 = v }) zones.z1 "I"
-                , zoneInput (\v -> { zones | z2 = v }) zones.z2 "II"
-                , zoneInput (\v -> { zones | z3 = v }) zones.z3 "III"
-                , zoneInput (\v -> { zones | z4 = v }) zones.z4 "IV"
-                , zoneInput (\v -> { zones | z5 = v }) zones.z5 "V"
-                , zoneInput (\v -> { zones | z6 = v }) zones.z6 "VI"
-                , zoneInput (\v -> { zones | z7 = v }) zones.z7 "VII"
-                , zoneInput (\v -> { zones | z8 = v }) zones.z8 "VIII"
-                , zoneInput (\v -> { zones | z9 = v }) zones.z9 "IX"
+                [ zoneInput (\v -> { iZones | z1 = v }) iZones.z1 "I"
+                , zoneInput (\v -> { iZones | z2 = v }) iZones.z2 "II"
+                , zoneInput (\v -> { iZones | z3 = v }) iZones.z3 "III"
+                , zoneInput (\v -> { iZones | z4 = v }) iZones.z4 "IV"
+                , zoneInput (\v -> { iZones | z5 = v }) iZones.z5 "V"
+                , zoneInput (\v -> { iZones | z6 = v }) iZones.z6 "VI"
+                , zoneInput (\v -> { iZones | z7 = v }) iZones.z7 "VII"
+                , zoneInput (\v -> { iZones | z8 = v }) iZones.z8 "VIII"
+                , zoneInput (\v -> { iZones | z9 = v }) iZones.z9 "IX"
                 ]
         , viewSettingsGroup
             [ Html.Keyed.node "div" [] <|
