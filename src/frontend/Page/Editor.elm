@@ -1008,8 +1008,12 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
         , viewSettingsGroup
             [ button [ onClick (OnImageSettingsChange (resetAll settings)), title "reset" ] [ Icon.reset ]
             , button [ onClick (OnImageSettingsChange (resetTone settings)), title "reset tone" ] [ Icon.resetTone ]
-            , viewIf (not (List.isEmpty undoState)) <|
-                \_ -> button [ onClick Undo, title "undo" ] [ Icon.undo ]
+            , button
+                [ disabled (List.isEmpty undoState)
+                , onClick Undo
+                , title "undo"
+                ]
+                [ Icon.undo ]
             ]
         , viewSettingsGroup
             [ button [ onClick SaveSettings, title "save" ] [ Icon.save ]
