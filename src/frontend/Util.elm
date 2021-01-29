@@ -21,7 +21,7 @@ import Task
 
 type Status a
     = Success a
-    | Error Http.Error
+    | Failure
     | Requested
     | Unknown
 

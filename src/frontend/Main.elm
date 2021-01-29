@@ -8,7 +8,6 @@ import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Http
 import Json.Decode as Decode
 import List.Zipper as Zipper
 import Page.Browser
@@ -147,7 +146,10 @@ update msg model =
                 { model | filmRolls = Success (Dict.fromList filmRolls) }
 
         GotFilmRolls _ (Err _) ->
-            pushNotification Warning RemoveNotification "Error gettings filmroll settings" model
+            pushNotification Warning
+                RemoveNotification
+                "Error gettings filmroll settings"
+                { model | filmRolls = Failure }
 
         RemoveNotification ->
             ( { model
@@ -203,7 +205,7 @@ onNavigation route model =
             Requested ->
                 ( model, Cmd.none )
 
-            Error _ ->
+            Failure ->
                 pushNotification Warning RemoveNotification "Error loading filmrolls" model
 
             Unknown ->

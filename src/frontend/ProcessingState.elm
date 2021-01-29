@@ -1,7 +1,6 @@
 module ProcessingState exposing
     ( ProcessingState(..)
     , State
-    , debug
     , map
     , preview
     , toData
@@ -46,18 +45,13 @@ preview =
     Preview (State ())
 
 
-debug : ProcessingState
-debug =
-    Processing (State ())
-
-
 toReady : State b { a | toReady : Allowed } -> ProcessingState
-toReady (State _) =
+toReady _ =
     Ready (State ())
 
 
 toProcessing : State b { a | toProcessing : Allowed } -> ProcessingState
-toProcessing (State _) =
+toProcessing _ =
     Processing (State ())
 
 

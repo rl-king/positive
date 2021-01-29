@@ -207,7 +207,7 @@ focus route filmRoll =
 
 
 type Msg
-    = GotSaveImageSettings String (HttpResult FilmRollSettings)
+    = GotSaveImageSettings (HttpResult FilmRollSettings)
     | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (List Int))
     | RotatePreview String Float
@@ -240,7 +240,7 @@ type Msg
     | OnImageClick ( Float, Float )
     | RemoveCoordinate CoordinateInfo
     | RequestCoordinateInfo ( Float, Float ) Element
-    | GotCoordinateInfo Element (HttpResult (List CoordinateInfo))
+    | GotCoordinateInfo (HttpResult (List CoordinateInfo))
     | OnBrowserResize
     | GotElementPosition Element
     | OpenExternalEditor
@@ -254,10 +254,10 @@ update key msg model =
         GotHistogram result ->
             ( { model | histogram = Result.withDefault [] result }, Cmd.none )
 
-        GotSaveImageSettings _ (Ok _) ->
+        GotSaveImageSettings (Ok _) ->
             pushNotification Normal RemoveNotification "Saved settings" model
 
-        GotSaveImageSettings _ (Err _) ->
+        GotSaveImageSettings (Err _) ->
             pushNotification Warning RemoveNotification "Error saving settings" model
 
         GotGenerate type_ (Ok _) ->
@@ -429,7 +429,7 @@ update key msg model =
                         Cmd.none
 
                     else
-                        Cmd.map (GotCoordinateInfo model.imageElement) <|
+                        Cmd.map GotCoordinateInfo <|
                             Request.postImageSettingsCoordinate model.route.dir
                                 ( Dict.keys model.coordinateInfo
                                 , Zipper.current model.filmRoll
@@ -606,12 +606,12 @@ update key msg model =
                 , processingState = fromPreview model.processingState
                 , coordinateInfo = Dict.insert ( cX, cY ) (CoordinateInfo cX cY 0) model.coordinateInfo
               }
-            , Cmd.map (GotCoordinateInfo imageElement) <|
+            , Cmd.map GotCoordinateInfo <|
                 Request.postImageSettingsCoordinate model.route.dir
                     ( [ ( cX, cY ) ], Zipper.current model.filmRoll )
             )
 
-        GotCoordinateInfo _ (Ok coordinateInfo) ->
+        GotCoordinateInfo (Ok coordinateInfo) ->
             ( { model
                 | coordinateInfo =
                     List.foldl (\c -> Dict.insert ( c.ciX, c.ciY ) c) model.coordinateInfo coordinateInfo
@@ -619,7 +619,7 @@ update key msg model =
             , Cmd.none
             )
 
-        GotCoordinateInfo _ (Err _) ->
+        GotCoordinateInfo (Err _) ->
             ( model, Cmd.none )
 
         GotElementPosition element ->
@@ -658,7 +658,7 @@ nextKey (Key k) =
 
 saveSettings : Model -> Cmd Msg
 saveSettings model =
-    Cmd.map (GotSaveImageSettings model.route.dir) <|
+    Cmd.map GotSaveImageSettings <|
         Request.postImageSettings model.route.dir <|
             fromZipper model.poster model.ratings model.filmRoll
 
@@ -906,8 +906,12 @@ viewSettingsRight filmRoll draftExpressions histogram processingState =
                     \v -> { settings | iBlackpoint = v }
                 , Input.viewRange 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint <|
                     \v -> { settings | iWhitepoint = v }
-                , Input.viewRange 0.01 ( -0.25, 0.25, 0 ) "Pop" iZones.z7 <|
-                    \v -> { settings | iZones = { iZones | z2 = -v, z7 = v } }
+                , Input.viewRange 0.001 ( -0.25, 0.25, 0 ) "Pop" iZones.z7 <|
+                    \v ->
+                        { settings
+                            | iZones =
+                                { iZones | z2 = threeDecimalFloat (-v * 1.25), z7 = v }
+                        }
                 ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange) <|
@@ -925,7 +929,7 @@ viewSettingsRight filmRoll draftExpressions histogram processingState =
             [ Html.Keyed.node "div" [] <|
                 Index.indexedMap
                     List.indexedMap
-                    (Tuple.mapSecond << viewExpressionEditor settings draftExpressions)
+                    (Tuple.mapSecond << viewExpressionEditor draftExpressions)
                     (Reorderable.toKeyedList draftExpressions)
             ]
         ]
@@ -1033,12 +1037,11 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
 
 
 viewExpressionEditor :
-    ImageSettings
-    -> DraftExpressions
+    DraftExpressions
     -> EditorIndex
     -> ( Maybe ExpressionResult, Expression )
     -> Html Msg
-viewExpressionEditor settings draftExpressions index ( expressionResult, expression ) =
+viewExpressionEditor draftExpressions index ( expressionResult, expression ) =
     let
         onRangeInput v =
             OnExpressionValueChange index { expression | eValue = v }
