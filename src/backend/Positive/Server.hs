@@ -26,19 +26,19 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
-import Network.Wai.Handler.Warp hiding (run)
+import qualified Network.Wai.Handler.Warp as Warp
 import Positive.Api
 import qualified Positive.CLI as CLI
+import Positive.FilmRoll (FilmRoll)
 import qualified Positive.Image as Image
-import Positive.ImageSettings
+import Positive.Image.Settings
   ( CoordinateInfo (..),
     Expression (..),
     ExpressionResult (..),
-    FilmRollSettings,
     ImageCrop (..),
-    ImageSettings (..),
+    Settings (..),
   )
-import qualified Positive.ImageSettings as ImageSettings
+import qualified Positive.Image.Util as Util
 import qualified Positive.Language as Language
 import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
@@ -57,7 +57,7 @@ type PositiveT m =
 
 data Env = Env
   { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.Monochrome))),
-    previewMVar :: !(MVar [(FilePath, ImageSettings)]),
+    previewMVar :: !(MVar [(FilePath, Settings)]),
     eventChan :: !(Chan ServerEvent),
     isDev :: !CLI.IsDev,
     logger :: !Log.TimedFastLogger
@@ -68,17 +68,18 @@ data Env = Env
 run :: Log.TimedFastLogger -> CLI.IsDev -> CLI.Port -> IO ()
 run logger_ isDev_ port =
   let settings =
-        setPort port $
-          setBeforeMainLoop
+        Warp.setPort port $
+          Warp.setBeforeMainLoop
             (Log.log logger_ ("listening on port " <> tshow port))
-            defaultSettings
+            Warp.defaultSettings
    in do
         imageMVar_ <- MVar.newMVar OrdPSQ.empty
         previewMVar_ <- MVar.newEmptyMVar
         eventChan_ <- Chan.newChan
         let env = Env imageMVar_ previewMVar_ eventChan_ isDev_ logger_
         Preview.loop previewMVar_ imageMVar_ eventChan_ (Log.log logger_)
-        runSettings settings (genericServeT (`runReaderT` env) (handlers isDev_ eventChan_))
+        Warp.runSettings settings $
+          genericServeT (`runReaderT` env) (handlers isDev_ eventChan_)
 
 -- HANDLERS
 
@@ -108,7 +109,7 @@ handlers isDev_ chan =
 
 -- IMAGE
 
-handleImage :: Text -> ImageSettings -> PositiveT Handler ByteString
+handleImage :: Text -> Settings -> PositiveT Handler ByteString
 handleImage dir settings = do
   logSSE $ "Requested image " <> settings.iFilename
   env <- ask
@@ -130,7 +131,7 @@ handleImage dir settings = do
 
 -- SAVE
 
-handleSaveSettings :: Text -> FilmRollSettings -> PositiveT Handler FilmRollSettings
+handleSaveSettings :: Text -> FilmRoll -> PositiveT Handler FilmRoll
 handleSaveSettings dir newSettings = do
   liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
   logDebug "Wrote settings"
@@ -155,14 +156,14 @@ handleCheckExpressions exprs =
 
 -- GENERATE
 
-handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
+handleGenerateHighRes :: Text -> Settings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
   env <- ask
   SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
   pure NoContent
 
-handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
+handleGenerateWallpaper :: Text -> Settings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
       outputBase homeDir =
@@ -172,7 +173,7 @@ handleGenerateWallpaper dir settings = do
           <> " | "
           <> Text.unpack settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
-  output <- ImageSettings.ensureUniqueFilename . outputBase =<< liftIO Directory.getHomeDirectory
+  output <- Util.ensureUniqueFilename . outputBase =<< liftIO Directory.getHomeDirectory
   image <-
     handleLeft $
       Image.fromDiskPreProcess (Just 2560) settings.iCrop input
@@ -181,7 +182,7 @@ handleGenerateWallpaper dir settings = do
 
 -- OPEN EXTERNALEDITOR
 
-handleOpenExternalEditor :: Text -> ImageSettings -> PositiveT Handler NoContent
+handleOpenExternalEditor :: Text -> Settings -> PositiveT Handler NoContent
 handleOpenExternalEditor dir settings = do
   let input = Text.unpack dir </> Text.unpack settings.iFilename
   log $ "Opening in external editor: " <> Text.pack input
@@ -193,7 +194,7 @@ handleOpenExternalEditor dir settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Text -> ImageSettings -> PositiveT Handler [Int]
+handleGetSettingsHistogram :: Text -> Settings -> PositiveT Handler [Int]
 handleGetSettingsHistogram dir settings =
   let toHistogram arr =
         Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
@@ -214,7 +215,7 @@ handleGetSettingsHistogram dir settings =
 
 handleGetCoordinateInfo ::
   Text ->
-  ([(Double, Double)], ImageSettings) ->
+  ([(Double, Double)], Settings) ->
   PositiveT Handler [CoordinateInfo]
 handleGetCoordinateInfo dir (coordinates, settings) =
   let toInfo image (x, y) =
@@ -234,9 +235,9 @@ handleGetCoordinateInfo dir (coordinates, settings) =
 
 -- LIST DIRECTORIES
 
-handleGetSettings :: PositiveT Handler [(Text, FilmRollSettings)]
+handleGetSettings :: PositiveT Handler [(Text, FilmRoll)]
 handleGetSettings =
-  HashMap.toList <$> ImageSettings.findImageSettings
+  HashMap.toList <$> Util.findImageSettings
 
 -- HANDLER HELPERS
 

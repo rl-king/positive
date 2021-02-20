@@ -3,7 +3,7 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
-import Generated.Data.ImageSettings exposing (FilmRollSettings)
+import Generated.Data exposing (FilmRoll)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -85,7 +85,7 @@ type Page
 
 
 type alias FilmRolls =
-    Dict String FilmRollSettings
+    Dict String FilmRoll
 
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -108,7 +108,7 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | CancelScroll
-    | GotFilmRolls Route (HttpResult (List ( String, FilmRollSettings )))
+    | GotFilmRolls Route (HttpResult (List ( String, FilmRoll )))
     | RemoveNotification
     | OnServerMessage String
     | EditorMsg Page.Editor.Msg
@@ -269,7 +269,7 @@ extractUpdates model =
                 | filmRolls =
                     mapStatus
                         (Dict.insert m.route.dir
-                            (FilmRollSettings m.poster m.ratings (fromZipper m.filmRoll))
+                            (FilmRoll m.poster m.ratings (fromZipper m.filmRoll))
                         )
                         model.filmRolls
             }

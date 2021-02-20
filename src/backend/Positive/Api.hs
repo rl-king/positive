@@ -7,7 +7,8 @@ module Positive.Api where
 
 import Data.ByteString.Lazy (ByteString)
 import Network.HTTP.Media ((//))
-import Positive.ImageSettings
+import Positive.FilmRoll
+import Positive.Image.Settings
 import Positive.Prelude hiding (ByteString)
 import Servant
 import Servant.API.Generic
@@ -24,7 +25,7 @@ data ImageApi route = ImageApi
   { iaImage ::
       route :- "image"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
+        :> QueryParam' '[Required, Strict] "image-settings" Settings
         :> Get '[Image] ByteString,
     iaEvents :: route :- "events" :> Raw,
     iaRaw :: route :- Raw
@@ -35,39 +36,39 @@ data SettingsApi route = SettingsApi
   { saSaveSettings ::
       route :- "image" :> "settings"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] FilmRollSettings
-        :> Post '[JSON] FilmRollSettings,
+        :> ReqBody '[JSON] FilmRoll
+        :> Post '[JSON] FilmRoll,
     saCheckExpressions ::
       route :- "image" :> "settings" :> "expressions"
         :> ReqBody '[JSON] [Expression]
         :> Post '[JSON] [ExpressionResult],
     saGetSettings ::
       route :- "image" :> "settings"
-        :> Get '[JSON] [(Text, FilmRollSettings)],
+        :> Get '[JSON] [(Text, FilmRoll)],
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] ImageSettings
+        :> ReqBody '[JSON] Settings
         :> Post '[JSON] [Int],
     saGenerateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] ImageSettings
+        :> ReqBody '[JSON] Settings
         :> PostNoContent '[JSON] NoContent,
     saOpenExternalEditor ::
       route :- "image" :> "settings" :> "externaleditor"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] ImageSettings
+        :> ReqBody '[JSON] Settings
         :> PostNoContent '[JSON] NoContent,
     saGetCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)
+        :> ReqBody '[JSON] ([(Double, Double)], Settings)
         :> Post '[JSON] [CoordinateInfo],
     saGenerateWallpaper ::
       route :- "image" :> "settings" :> "wallpaper"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] ImageSettings
+        :> ReqBody '[JSON] Settings
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)

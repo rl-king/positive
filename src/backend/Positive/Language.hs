@@ -8,7 +8,6 @@ import Positive.Prelude
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
-import Text.Megaparsec.Debug
 
 -- DEFINTIONS
 

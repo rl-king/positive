@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NumericUnderscores #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Positive.Preview where
@@ -12,8 +11,11 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
+import Positive.FilmRoll (FilmRoll)
+import qualified Positive.FilmRoll as FilmRoll
 import qualified Positive.Image as Image
-import Positive.ImageSettings as ImageSettings
+import Positive.Image.Settings as Settings
+import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
 import System.FilePath.Posix
 
@@ -29,19 +31,23 @@ run log replace = do
 -- LOOP
 
 loop ::
-  MVar [(FilePath, ImageSettings)] ->
-  MVar (OrdPSQ Text UTCTime (ImageSettings.ImageCrop, Image.Monochrome)) ->
+  MVar [(FilePath, Settings)] ->
+  MVar (OrdPSQ Text UTCTime (Settings.ImageCrop, Image.Monochrome)) ->
   Chan ServerEvent ->
   (Text -> IO ()) ->
   IO ()
 loop queueMVar cacheMVar eventChan log =
   void . forkIO . forever $
-    {- block while some other process uses cacheMVar -}
+    -- block while some other process uses cacheMVar
     takeMVar queueMVar <* readMVar cacheMVar >>= \case
       [] -> log "Finished generating previews"
       x@(_, is) : xs -> do
         generatePreview (addCount log xs) x
-        writeChan eventChan (ServerEvent (Just "preview") Nothing [Builder.byteString $ encodeUtf8 is.iFilename])
+        writeChan eventChan $
+          ServerEvent
+            (Just "preview")
+            Nothing
+            [Builder.byteString $ encodeUtf8 is.iFilename]
         void (tryPutMVar queueMVar xs)
 
 addCount :: (Text -> IO ()) -> [a] -> Text -> IO ()
@@ -50,25 +56,27 @@ addCount log xs t =
 
 -- FIND
 
-findMissingPreviews :: MonadIO m => Bool -> m [(FilePath, ImageSettings)]
+findMissingPreviews :: MonadIO m => Bool -> m [(FilePath, Settings)]
 findMissingPreviews replace =
   let toSettings dir =
         if replace
           then
             maybe (fail "Something went wrong reading the settings file") pure
               =<< Aeson.decodeFileStrict (dir </> "image-settings.json")
-          else diffedPreviewSettings dir (dir </> "previews")
+          else Util.diffedPreviewSettings dir (dir </> "previews")
    in liftIO $
-        fmap (sortOn fst . concat) . mapM (\dir -> prependDir dir <$> toSettings dir)
-          =<< fmap dropFileName <$> findImageSettingFiles
+        fmap (sortOn fst . concat)
+          . mapM (\dir -> prependDir dir <$> toSettings dir)
+          . fmap dropFileName
+          =<< Util.findImageSettingFiles
 
-prependDir :: FilePath -> FilmRollSettings -> [(FilePath, ImageSettings)]
+prependDir :: FilePath -> FilmRoll -> [(FilePath, Settings)]
 prependDir dir settings =
-  (\x -> (dir </> Text.unpack x.iFilename, x)) <$> toList settings
+  (\x -> (dir </> Text.unpack x.iFilename, x)) <$> FilmRoll.toList settings
 
 -- WRITE
 
-generatePreview :: (Text -> IO ()) -> (FilePath, ImageSettings) -> IO ()
+generatePreview :: (Text -> IO ()) -> (FilePath, Settings) -> IO ()
 generatePreview log (input, is) = do
   let dir = dropFileName input
       output = dir </> "previews" </> replaceExtension (Text.unpack is.iFilename) ".jpg"
@@ -79,7 +87,7 @@ generatePreview log (input, is) = do
       log $ Text.unwords ["Error generating preview", Text.pack output]
     Right image -> do
       HIP.writeImage output $ Image.applySettings is image
-      insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
+      Util.insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
       done <- liftIO Time.getCurrentTime
       log $
         Text.unwords

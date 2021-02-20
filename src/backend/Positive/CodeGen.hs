@@ -11,7 +11,8 @@ import qualified Language.Elm.Pretty as Pretty
 import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Api
-import Positive.ImageSettings
+import Positive.FilmRoll
+import Positive.Image.Settings
 import Positive.Prelude
 import Servant.API.Generic (ToServantApi)
 import qualified Servant.To.Elm
@@ -29,9 +30,9 @@ run log = do
         fmap (Servant.To.Elm.elmEndpointDefinition (Expression.String "") ["Generated", "Request"]) $
           Servant.To.Elm.elmEndpoints @(ToServantApi SettingsApi)
       jsonDefinitions =
-        Elm.jsonDefinitions @ImageSettings
+        Elm.jsonDefinitions @Settings
           <> Elm.jsonDefinitions @ImageCrop
-          <> Elm.jsonDefinitions @FilmRollSettings
+          <> Elm.jsonDefinitions @FilmRoll
           <> Elm.jsonDefinitions @Zones
           <> Elm.jsonDefinitions @CoordinateInfo
           <> Elm.jsonDefinitions @Expression
@@ -41,10 +42,9 @@ run log = do
         Pretty.modules $
           Simplification.simplifyDefinition
             <$> jsonDefinitions <> endpointDefinitions
-  log "Removing src/frontend/Generated before generating code"
-  whenM
-    (Directory.doesFileExist "src/frontend/Generated")
-    (Directory.removeDirectoryRecursive "src/frontend/Generated")
+  whenM (Directory.doesDirectoryExist "src/frontend/Generated") $ do
+    log "Removing src/frontend/Generated before generating code"
+    Directory.removeDirectoryRecursive "src/frontend/Generated"
   for_ (HashMap.toList modules) $ \(modulePath, contents) -> do
     (filename, location) <-
       case List.reverse modulePath of

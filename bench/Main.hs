@@ -5,7 +5,7 @@ module Main where
 import Criterion.Main
 import qualified Graphics.Image as HIP
 import qualified Positive.Image as Image
-import qualified Positive.ImageSettings as ImageSettings
+import qualified Positive.Image.Settings as Settings
 import Positive.Prelude
 
 main :: IO ()
@@ -19,18 +19,18 @@ processing img =
   bgroup
     "Process"
     [ -- bench "Process image" $
-      --nf (Image.applySettings (ImageSettings.plainImageSettings "")) img,
+      --nf (Image.applySettings (Settings.plainImageSettings "")) img,
       bench "Process image blur" $ --4.5s
-        nf (Image.applySettings (ImageSettings.plainImageSettings "") . Image.normalize) img
+        nf (Image.applySettings (Settings.plainImageSettings "") . Image.normalize) img
     ]
 
 processingWithResize img =
   bgroup
     "Resize and process"
     [ bench "Full size" $
-        nf (Image.applySettings (ImageSettings.plainImageSettings "")) img,
+        nf (Image.applySettings (Settings.plainImageSettings "")) img,
       bench "1/4 size" $
-        nf (Image.applySettings (ImageSettings.plainImageSettings "")) img
+        nf (Image.applySettings (Settings.plainImageSettings "")) img
     ]
 
 resizing img =

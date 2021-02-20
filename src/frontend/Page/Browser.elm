@@ -10,11 +10,7 @@ module Page.Browser exposing
 import Browser.Events
 import Browser.Navigation
 import Dict exposing (Dict)
-import Generated.Data.ImageSettings
-    exposing
-        ( FilmRollSettings
-        , ImageSettings
-        )
+import Generated.Data exposing (FilmRoll, Settings)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -57,7 +53,7 @@ type alias Model =
 
 
 type alias FilmRolls =
-    Dict String FilmRollSettings
+    Dict String FilmRoll
 
 
 init : { minimumRating : Maybe Int } -> FilmRolls -> Model
@@ -78,7 +74,7 @@ type Msg
     | OnFilmRollHoverMove Float
     | OnFilmRollHoverEnd
     | SetPoster String (Maybe String)
-    | GotSaveImageSettings String (HttpResult FilmRollSettings)
+    | GotSaveImageSettings String (HttpResult FilmRoll)
     | SetMinRating Int
     | SetColumnCount Int
 
@@ -210,7 +206,7 @@ view model =
 -- RATED
 
 
-viewFilmRollBrowserRated : Int -> ( String, FilmRollSettings ) -> Html Msg
+viewFilmRollBrowserRated : Int -> ( String, FilmRoll ) -> Html Msg
 viewFilmRollBrowserRated minimumRating ( dir, filmRoll ) =
     case List.filter ((<=) minimumRating << Tuple.second) (Dict.toList filmRoll.frsRatings) of
         [] ->
@@ -246,7 +242,7 @@ viewRatedImage dir ( filename, rating ) =
 -- ROLLS
 
 
-viewFilmRollBrowserRoll : Int -> Maybe ( String, Float ) -> ( String, FilmRollSettings ) -> Html Msg
+viewFilmRollBrowserRoll : Int -> Maybe ( String, Float ) -> ( String, FilmRoll ) -> Html Msg
 viewFilmRollBrowserRoll columns filmRollHover ( dir, filmRoll ) =
     let
         name =
@@ -331,7 +327,7 @@ toPreviewUrl dir filename =
 -- HELPERS
 
 
-focusWithOffset : Float -> Dict String ImageSettings -> Maybe String
+focusWithOffset : Float -> Dict String Settings -> Maybe String
 focusWithOffset offset xs =
     List.drop (round (toFloat (Dict.size xs) * offset) - 1) (Dict.values xs)
         |> List.head

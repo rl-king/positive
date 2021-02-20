@@ -2,7 +2,7 @@ module Positive.Init where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Text as Text
-import Positive.ImageSettings as ImageSettings
+import qualified Positive.FilmRoll as FilmRoll
 import Positive.Prelude hiding (ByteString)
 import System.Directory
 import System.FilePath.Posix
@@ -18,7 +18,8 @@ run replace =
             . filter (\x -> isExtensionOf ".tif" x || isExtensionOf ".png" x)
             <$> listDirectory "."
         unless (null filenames) $ do
-          let settings = fromFilenames filenames
+          let settings = FilmRoll.fromFilenames filenames
           unlessM (check imageSettings) $ Aeson.encodeFile imageSettings settings
           createDirectoryIfMissing False (dropFileName imagePreviewSettings)
-          unlessM (check imagePreviewSettings) $ Aeson.encodeFile imagePreviewSettings empty
+          unlessM (check imagePreviewSettings) $
+            Aeson.encodeFile imagePreviewSettings FilmRoll.empty

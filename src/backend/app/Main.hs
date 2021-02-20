@@ -23,4 +23,5 @@ main = do
         CLI.Init replace -> Init.run replace >> Preview.run log replace
         CLI.Previews replace -> Preview.run log replace
         CLI.SingleImage filepath -> SingleImage.run log filepath
-        CLI.Server isDev port -> when isDev (CodeGen.run log) >> Server.run logger isDev port
+        CLI.Server isDev port ->
+          when isDev (CodeGen.run log) >> Server.run logger isDev port
