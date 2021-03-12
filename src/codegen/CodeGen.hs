@@ -5,6 +5,7 @@
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Language.Elm.Expression as Expression
@@ -40,6 +41,7 @@ main = do
           <> Elm.jsonDefinitions @CoordinateInfo
           <> Elm.jsonDefinitions @Expression
           <> Elm.jsonDefinitions @ExpressionResult
+          <> Maybe.maybeToList (Elm.elmEncoderDefinition @Text @Filename)
       modules =
         -- FIXME: spaceleak in both elm-syntax functions
         Pretty.modules $
@@ -62,10 +64,10 @@ main = do
           pure (Text.unpack $ moduleName <> ".elm", p)
     writeFile (location </> filename) (show contents)
     Text.putStrLn $ "Wrote elm file: " <> Text.pack (location </> filename)
-  runElmFormat Text.putStrLn
+  runElmFormat
 
-runElmFormat :: (Text -> IO ()) -> IO ()
-runElmFormat putStrLn =
+runElmFormat :: IO ()
+runElmFormat =
   let args = ["--elm-version=0.19", "--yes", "src/frontend/Generated"]
    in Process.withCreateProcess (Process.proc "elm-format" args) $
         \_ _ _ handler ->

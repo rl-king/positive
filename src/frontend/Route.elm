@@ -5,6 +5,7 @@ module Route exposing
     , toUrl
     )
 
+import Generated.Data exposing (Filename(..))
 import String.Interpolate exposing (interpolate)
 import Url exposing (Url)
 import Url.Builder
@@ -24,7 +25,7 @@ type Route
 
 type alias EditorRoute =
     { dir : String
-    , filename : String
+    , filename : Filename
     }
 
 
@@ -33,7 +34,7 @@ fromUrl url =
     let
         toEditorRoute a b =
             Maybe.withDefault (DecodeError (interpolate "Failed to decode {0} {1}" [ a, b ])) <|
-                Maybe.map2 (\x y -> Editor { dir = x, filename = y })
+                Maybe.map2 (\x y -> Editor { dir = x, filename = Filename y })
                     (Url.percentDecode a)
                     (Url.percentDecode b)
 
@@ -64,7 +65,11 @@ toUrl route =
                     Maybe.map (List.singleton << Url.Builder.int "rating") minimumRating
 
         Editor { dir, filename } ->
-            Url.Builder.absolute [ "editor", Url.percentEncode dir, Url.percentEncode filename ] []
+            let
+                (Filename name) =
+                    filename
+            in
+            Url.Builder.absolute [ "editor", Url.percentEncode dir, Url.percentEncode name ] []
 
         DecodeError _ ->
             Url.Builder.absolute [] []

@@ -3,7 +3,8 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
-import Generated.Data exposing (FilmRoll)
+import Dict.Fun
+import Generated.Data as Image exposing (Filename(..), FilmRoll)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -14,6 +15,7 @@ import Page.Browser
 import Page.Editor
 import Route exposing (Route)
 import ScrollTo
+import String.Interpolate exposing (interpolate)
 import Url exposing (Url)
 import Util exposing (..)
 
@@ -192,12 +194,15 @@ mapPage model toPage toMsg ( page, cmds ) =
 onNavigation : Route -> Model -> ( Model, Cmd Msg )
 onNavigation route model =
     let
+        sortFun =
+            Image.filenameToString << .iFilename
+
         toSortedZipper filmRoll =
-            Zipper.fromList (List.sortBy .iFilename (Dict.values filmRoll.frsSettings))
+            Zipper.fromList (List.sortBy sortFun (Dict.Fun.values filmRoll.frsSettings))
                 |> Maybe.map (\x -> ( x, filmRoll.frsRatings, filmRoll.frsPoster ))
 
-        toFilmRoll data filmRolls =
-            Dict.get data.dir filmRolls
+        toFilmRoll editorRoute filmRolls =
+            Dict.get editorRoute.dir filmRolls
                 |> Maybe.andThen toSortedZipper
     in
     checkScrollPosition model.page <|
@@ -220,20 +225,26 @@ onNavigation route model =
                         , Cmd.none
                         )
 
-                    Route.Editor data ->
-                        case toFilmRoll data filmRolls of
+                    Route.Editor editorRoute ->
+                        case toFilmRoll editorRoute filmRolls of
                             Nothing ->
                                 pushNotification Warning RemoveNotification "Error loading filmroll" model
 
                             Just ( filmRoll, ratings, poster ) ->
                                 case model.page of
                                     Editor m ->
-                                        ( { model | page = Editor (Page.Editor.continue data filmRoll ratings poster m) }
+                                        ( { model
+                                            | page =
+                                                Editor (Page.Editor.continue editorRoute filmRoll ratings poster m)
+                                          }
                                         , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                                         )
 
                                     _ ->
-                                        ( { model | page = Editor (Page.Editor.init data filmRoll ratings poster) }
+                                        ( { model
+                                            | page =
+                                                Editor (Page.Editor.init editorRoute filmRoll ratings poster)
+                                          }
                                         , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                                         )
 
@@ -253,7 +264,7 @@ extractUpdates model =
                     x
 
         fromZipper xs =
-            Dict.fromList <|
+            Dict.Fun.fromList Image.filenameToString Filename <|
                 List.map (\x -> ( x.iFilename, x )) <|
                     Zipper.toList xs
     in
@@ -322,7 +333,9 @@ view model =
             }
 
         Editor m ->
-            { title = m.route.filename ++ " | " ++ m.route.dir ++ " | Editor"
+            { title =
+                interpolate "{0} | {1} | Editor"
+                    [ Image.filenameToString m.route.filename, m.route.dir ]
             , body =
                 [ Html.map EditorMsg <|
                     Page.Editor.view m model.notifications

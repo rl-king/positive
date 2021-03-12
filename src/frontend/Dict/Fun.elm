@@ -8,7 +8,10 @@ module Dict.Fun exposing
     , get
     , insert
     , remove
+    , size
     , toList
+    , update
+    , values
     )
 
 import Dict
@@ -30,9 +33,25 @@ insert k v (Dict f g dict) =
     Dict f g (Dict.insert (f k) v dict)
 
 
+values : Dict k comparable v -> List v
+values (Dict _ _ dict) =
+    Dict.values dict
+
+
+size : Dict k comparable v -> Int
+size (Dict _ _ dict) =
+    Dict.size dict
+
+
 get : k -> Dict k comparable v -> Maybe v
 get k (Dict f _ dict) =
     Dict.get (f k) dict
+
+
+update : k -> (Maybe v -> Maybe v) -> Dict k comparable v -> Dict k comparable v
+update k h (Dict f g dict) =
+    Dict f g <|
+        Dict.update (f k) h dict
 
 
 remove : k -> Dict k comparable v -> Dict k comparable v

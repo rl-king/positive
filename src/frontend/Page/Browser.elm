@@ -10,7 +10,13 @@ module Page.Browser exposing
 import Browser.Events
 import Browser.Navigation
 import Dict exposing (Dict)
-import Generated.Data exposing (FilmRoll, Settings)
+import Dict.Fun
+import Generated.Data as Image
+    exposing
+        ( Filename(..)
+        , FilmRoll
+        , Settings
+        )
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -73,7 +79,7 @@ type Msg
     = OnFilmRollHoverStart String Float
     | OnFilmRollHoverMove Float
     | OnFilmRollHoverEnd
-    | SetPoster String (Maybe String)
+    | SetPoster String (Maybe Filename)
     | GotSaveImageSettings String (HttpResult FilmRoll)
     | SetMinRating Int
     | SetColumnCount Int
@@ -196,7 +202,10 @@ view model =
                 [ text "Total photos: "
                 , text <|
                     String.fromInt <|
-                        Dict.foldl (\_ v acc -> Dict.size v.frsSettings + acc) 0 model.filmRolls
+                        Dict.foldl
+                            (\_ v acc -> Dict.Fun.size v.frsSettings + acc)
+                            0
+                            model.filmRolls
                 ]
             ]
         ]
@@ -208,7 +217,7 @@ view model =
 
 viewFilmRollBrowserRated : Int -> ( String, FilmRoll ) -> Html Msg
 viewFilmRollBrowserRated minimumRating ( dir, filmRoll ) =
-    case List.filter ((<=) minimumRating << Tuple.second) (Dict.toList filmRoll.frsRatings) of
+    case List.filter ((<=) minimumRating << Tuple.second) (Dict.Fun.toList filmRoll.frsRatings) of
         [] ->
             div [] []
 
@@ -220,7 +229,7 @@ viewFilmRollBrowserRated minimumRating ( dir, filmRoll ) =
                 ]
 
 
-viewRatedImage : String -> ( String, Int ) -> Html msg
+viewRatedImage : String -> ( Filename, Int ) -> Html msg
 viewRatedImage dir ( filename, rating ) =
     let
         gliph n =
@@ -232,7 +241,8 @@ viewRatedImage dir ( filename, rating ) =
     in
     a [ href (Route.toUrl (Route.Editor { dir = dir, filename = filename })) ]
         [ img [ src (toPreviewUrl dir filename) ] []
-        , text filename
+        , text <|
+            Image.filenameToString filename
         , div [ class "browser-rated-rating" ] <|
             List.map (\n -> span [] [ gliph n ]) (List.range 1 5)
         ]
@@ -267,8 +277,10 @@ viewFilmRollBrowserRoll columns filmRollHover ( dir, filmRoll ) =
                 _ ->
                     Maybe.map .iFilename <|
                         choice
-                            [ Maybe.andThen (\filename -> Dict.get filename filmRoll.frsSettings) filmRoll.frsPoster
-                            , List.head (Dict.values filmRoll.frsSettings)
+                            [ Maybe.andThen
+                                (\filename -> Dict.Fun.get filename filmRoll.frsSettings)
+                                filmRoll.frsPoster
+                            , List.head (Dict.Fun.values filmRoll.frsSettings)
                             ]
 
         width =
@@ -286,7 +298,7 @@ viewFilmRollBrowserRoll columns filmRollHover ( dir, filmRoll ) =
         ]
 
 
-viewFilmRollBrowserImage : String -> String -> Html Msg
+viewFilmRollBrowserImage : String -> Filename -> Html Msg
 viewFilmRollBrowserImage dir filename =
     let
         decodeOffset f =
@@ -312,10 +324,10 @@ viewFilmRollBrowserImage dir filename =
         ]
 
 
-toPreviewUrl : String -> String -> String
+toPreviewUrl : String -> Filename -> String
 toPreviewUrl dir filename =
     let
-        previewExtension x =
+        previewExtension (Filename x) =
             String.dropRight 3 x ++ "jpg"
     in
     Url.Builder.absolute
@@ -327,8 +339,8 @@ toPreviewUrl dir filename =
 -- HELPERS
 
 
-focusWithOffset : Float -> Dict String Settings -> Maybe String
+focusWithOffset : Float -> Dict.Fun.Dict Filename String Settings -> Maybe Filename
 focusWithOffset offset xs =
-    List.drop (round (toFloat (Dict.size xs) * offset) - 1) (Dict.values xs)
+    List.drop (round (toFloat (Dict.Fun.size xs) * offset) - 1) (Dict.Fun.values xs)
         |> List.head
         |> Maybe.map .iFilename

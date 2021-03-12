@@ -14,11 +14,13 @@ import Browser.Dom exposing (Element)
 import Browser.Events
 import Browser.Navigation as Navigation
 import Dict exposing (Dict)
+import Dict.Fun
 import Generated.Data as Image
     exposing
         ( CoordinateInfo
         , Expression
         , ExpressionResult(..)
+        , Filename(..)
         , ImageCrop
         , Zones
         )
@@ -93,7 +95,7 @@ subscriptions { clipboard, imageCropMode, filmRoll } =
                 matchKey "Escape" (CopySettings Nothing)
             )
             clipboard
-        , previewReady OnPreviewReady
+        , previewReady (OnPreviewReady << Filename)
         , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
 
@@ -103,25 +105,25 @@ subscriptions { clipboard, imageCropMode, filmRoll } =
 
 
 type alias Model =
-    { processingState : ProcessingState
-    , ratings : Ratings
-    , previewVersions : PreviewVersions
-    , draftExpressions : DraftExpressions
-    , poster : Maybe String
-    , filmRoll : Images
-    , checkExpressionsKey : Key { checkExpressionsKey : () }
-    , imageCropMode : Maybe ImageCrop
+    { checkExpressionsKey : Key { checkExpressionsKey : () }
     , clipboard : Maybe Image.Settings
-    , histogram : List Int
-    , undoState : UndoHistory
-    , scale : Float
-    , minimumRating : Int
-    , previewColumns : Int
-    , route : Route.EditorRoute
-    , notifications : List ( Level, String )
-    , imageElement : Element
     , coordinateInfo : Dict ( Float, Float ) CoordinateInfo
+    , draftExpressions : DraftExpressions
+    , filmRoll : Images
     , fullscreen : Bool
+    , histogram : List Int
+    , imageCropMode : Maybe ImageCrop
+    , imageElement : Element
+    , minimumRating : Int
+    , notifications : List ( Level, String )
+    , poster : Maybe Filename
+    , previewColumns : Int
+    , previewVersions : PreviewVersions
+    , ratings : Ratings
+    , route : Route.EditorRoute
+    , scale : Float
+    , undoState : UndoHistory
+    , processingState : ProcessingState
     }
 
 
@@ -134,11 +136,11 @@ type alias Images =
 
 
 type alias Ratings =
-    Dict String Int
+    Dict.Fun.Dict Filename String Int
 
 
 type alias PreviewVersions =
-    Dict String Int
+    Dict.Fun.Dict Filename String Int
 
 
 type alias DraftExpressions =
@@ -149,7 +151,7 @@ type alias EditorIndex =
     Index { editor : () }
 
 
-init : Route.EditorRoute -> Images -> Ratings -> Maybe String -> Model
+init : Route.EditorRoute -> Images -> Ratings -> Maybe Filename -> Model
 init route filmRoll ratings poster =
     let
         focussed =
@@ -170,7 +172,7 @@ init route filmRoll ratings poster =
     , previewColumns = 4
     , route = route
     , notifications = []
-    , previewVersions = Dict.empty
+    , previewVersions = Dict.Fun.empty (\(Filename n) -> n) Filename
     , imageElement =
         { scene = { width = 0, height = 0 }
         , viewport = { x = 0, y = 0, width = 0, height = 0 }
@@ -181,7 +183,7 @@ init route filmRoll ratings poster =
     }
 
 
-continue : Route.EditorRoute -> Images -> Ratings -> Maybe String -> Model -> Model
+continue : Route.EditorRoute -> Images -> Ratings -> Maybe Filename -> Model -> Model
 continue route filmRoll ratings poster model =
     let
         focussed =
@@ -212,7 +214,7 @@ type Msg
     = GotSaveImageSettings (HttpResult Image.FilmRoll)
     | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (List Int))
-    | RotatePreview String Float
+    | RotatePreview Filename Float
     | OnImageSettingsChange Image.Settings
     | OnExpressionValueChange EditorIndex Expression
     | OnExpressionChange EditorIndex Expression
@@ -233,11 +235,11 @@ type Msg
     | Undo
     | UpdateScale Float
     | SetColumnCount Int
-    | Rate String Int
+    | Rate Filename Int
     | SetMinRating Int
     | Rotate
     | RemoveNotification
-    | OnPreviewReady String
+    | OnPreviewReady Filename
     | LoadOriginal
     | OnImageClick ( Float, Float )
     | RemoveCoordinate CoordinateInfo
@@ -469,8 +471,8 @@ update key msg model =
             in
             pushNotification Normal
                 RemoveNotification
-                ("Preview ready: " ++ filename)
-                { model | previewVersions = Dict.update filename f model.previewVersions }
+                ("Preview ready: " ++ Image.filenameToString filename)
+                { model | previewVersions = Dict.Fun.update filename f model.previewVersions }
 
         SaveSettings ->
             ( model
@@ -576,7 +578,7 @@ update key msg model =
                                 Just rating
 
                 newModel =
-                    { model | ratings = Dict.update filename check model.ratings }
+                    { model | ratings = Dict.Fun.update filename check model.ratings }
             in
             ( newModel
             , saveSettings newModel
@@ -734,10 +736,10 @@ updateSettings f model =
             }
 
 
-fromZipper : Maybe String -> Ratings -> Images -> Image.FilmRoll
+fromZipper : Maybe Filename -> Ratings -> Images -> Image.FilmRoll
 fromZipper poster ratings =
     Image.FilmRoll poster ratings
-        << Dict.fromList
+        << Dict.Fun.fromList Image.filenameToString Filename
         << List.map (\x -> ( x.iFilename, x ))
         << Zipper.toList
 
@@ -793,7 +795,8 @@ viewNav route =
         , text "/"
         , text route.dir
         , text "/"
-        , text route.filename
+        , text <|
+            Image.filenameToString route.filename
         ]
 
 
@@ -807,7 +810,7 @@ viewFiles route columns minimumRating previewVersions ratings filmRoll =
         [ Input.viewRangeInt 1 ( 2, 13, 5 ) "Columns" columns SetColumnCount
         , Input.viewRangeInt 1 ( 0, 5, 0 ) "Rating" minimumRating SetMinRating
         , Html.Keyed.ul [] <|
-            List.map (\( _, filename, x ) -> ( filename, x )) <|
+            List.map (\( _, Filename filename, x ) -> ( filename, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
                     List.concat
                         [ List.map (viewFilesLink False route.dir columns previewVersions ratings) <|
@@ -828,7 +831,7 @@ viewFilesLink :
     -> PreviewVersions
     -> Ratings
     -> Image.Settings
-    -> ( Int, String, Html Msg )
+    -> ( Int, Filename, Html Msg )
 viewFilesLink isCurrent dir columns previewVersions ratings settings =
     let
         width =
@@ -838,7 +841,7 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
         rotate deg =
             fractionalModBy (degrees -360) (settings.iRotate - degrees deg)
     in
-    ( Maybe.withDefault 0 (Dict.get settings.iFilename ratings)
+    ( Maybe.withDefault 0 (Dict.Fun.get settings.iFilename ratings)
     , settings.iFilename
     , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 4 ) ], width ]
         [ a [ href (Route.toUrl (Route.Editor { filename = settings.iFilename, dir = dir })) ]
@@ -847,7 +850,7 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
                     Url.Builder.absolute
                         [ dir, "previews", previewExtension settings.iFilename ]
                         [ Url.Builder.int "v" <|
-                            Maybe.withDefault 0 (Dict.get settings.iFilename previewVersions)
+                            Maybe.withDefault 0 (Dict.Fun.get settings.iFilename previewVersions)
                         ]
                 ]
                 []
@@ -867,7 +870,8 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
                 [ text "⊤" ]
             ]
         , span [ class "files-file-footer" ]
-            [ text settings.iFilename
+            [ text <|
+                Image.filenameToString settings.iFilename
             , button [ onClick (CopySettings (Just settings)) ] [ Icon.copy ]
             , viewRating settings.iFilename ratings
             ]
@@ -875,12 +879,12 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
     )
 
 
-viewRating : String -> Ratings -> Html Msg
+viewRating : Filename -> Ratings -> Html Msg
 viewRating filename ratings =
     let
         rating =
             Maybe.withDefault 0 <|
-                Dict.get filename ratings
+                Dict.Fun.get filename ratings
 
         gliph n =
             if n <= rating then
@@ -965,6 +969,9 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
     let
         settings =
             settingsFromState processingState filmRoll
+
+        clipboardTitle x clipboard =
+            interpolate "{0} from {1}" [ x, Image.filenameToString clipboard.iFilename ]
     in
     div [ class "image-settings-left" ]
         [ viewSettingsGroup
@@ -982,24 +989,24 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
             , viewMaybe clipboard_ <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
-                        [ viewClipboardButton (interpolate "both from {0}" [ clipboard.iFilename ])
+                        [ viewClipboardButton (clipboardTitle "bot" clipboard)
                             Icon.applyBoth
                             { clipboard | iFilename = settings.iFilename }
-                        , viewClipboardButton (interpolate "tone from {0}" [ clipboard.iFilename ])
+                        , viewClipboardButton (clipboardTitle "tone" clipboard)
                             Icon.applyTone
                             { clipboard
                                 | iFilename = settings.iFilename
                                 , iRotate = settings.iRotate
                                 , iCrop = settings.iCrop
                             }
-                        , viewClipboardButton (interpolate "crop from {0}" [ clipboard.iFilename ])
+                        , viewClipboardButton (clipboardTitle "crop" clipboard)
                             Icon.applyCrop
                             { settings | iCrop = clipboard.iCrop }
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
                                     Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
-                            , title (interpolate "apply to all from {0}" [ clipboard.iFilename ])
+                            , title (clipboardTitle "apply to all" clipboard)
                             ]
                             [ Icon.applyAll ]
                         , button
@@ -1014,26 +1021,21 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
                                             }
                                         )
                                         filmRoll
-                            , title <|
-                                interpolate "apply tone to all from {0}" [ clipboard.iFilename ]
+                            , title (clipboardTitle "apply tone to all" clipboard)
                             ]
                             [ Icon.applyAllTone ]
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
                                     Zipper.map (\i -> { i | iCrop = clipboard.iCrop }) filmRoll
-                            , title <|
-                                interpolate "apply crop to all from {0}"
-                                    [ clipboard.iFilename ]
+                            , title (clipboardTitle "apply crop to all" clipboard)
                             ]
                             [ Icon.applyAllCrop ]
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
                                     Zipper.map (\i -> { i | iRotate = clipboard.iRotate }) filmRoll
-                            , title <|
-                                interpolate "apply rotate to all from {0}"
-                                    [ clipboard.iFilename ]
+                            , title (clipboardTitle "apply rotate to all" clipboard)
                             ]
                             [ Icon.applyAllRotate ]
                         ]
@@ -1204,7 +1206,7 @@ viewImage :
     -> Maybe ImageCrop
     -> Float
     -> ProcessingState
-    -> Dict String Int
+    -> PreviewVersions
     -> Dict ( Float, Float ) CoordinateInfo
     -> Element
     -> Html Msg
@@ -1240,7 +1242,8 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
                             Url.Builder.absolute
                                 [ route.dir, "previews", previewExtension current.iFilename ]
                                 [ Url.Builder.int "v" <|
-                                    Maybe.withDefault 0 (Dict.get current.iFilename previewVersions)
+                                    Maybe.withDefault 0 <|
+                                        Dict.Fun.get current.iFilename previewVersions
                                 ]
                         ]
                         []
@@ -1435,8 +1438,8 @@ threeDecimalFloat x =
     toFloat (round (x * 1000)) / 1000
 
 
-previewExtension : String -> String
-previewExtension x =
+previewExtension : Filename -> String
+previewExtension (Filename x) =
     String.dropRight 3 x ++ "jpg"
 
 
