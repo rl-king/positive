@@ -7,7 +7,7 @@ assets
 src/frontend/Generated
 positive.cabal
 *~
-pos*
+pos.*
 bench/*.tif
 bench/*.png
 src/backend/Scratch.hs
