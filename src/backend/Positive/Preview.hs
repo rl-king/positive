@@ -11,6 +11,7 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
+import qualified Positive.Filename as Filename
 import Positive.FilmRoll (FilmRoll)
 import qualified Positive.FilmRoll as FilmRoll
 import qualified Positive.Image as Image
@@ -47,7 +48,7 @@ loop queueMVar cacheMVar eventChan log =
           ServerEvent
             (Just "preview")
             Nothing
-            [Builder.byteString $ encodeUtf8 is.iFilename]
+            [Builder.byteString $ Filename.toByteString is.iFilename]
         void (tryPutMVar queueMVar xs)
 
 addCount :: (Text -> IO ()) -> [a] -> Text -> IO ()
@@ -72,14 +73,14 @@ findMissingPreviews replace =
 
 prependDir :: FilePath -> FilmRoll -> [(FilePath, Settings)]
 prependDir dir settings =
-  (\x -> (dir </> Text.unpack x.iFilename, x)) <$> FilmRoll.toList settings
+  (\x -> (dir </> Filename.toFilePath x.iFilename, x)) <$> FilmRoll.toList settings
 
 -- WRITE
 
 generatePreview :: (Text -> IO ()) -> (FilePath, Settings) -> IO ()
 generatePreview log (input, is) = do
   let dir = dropFileName input
-      output = dir </> "previews" </> replaceExtension (Text.unpack is.iFilename) ".jpg"
+      output = dir </> "previews" </> replaceExtension (Filename.toFilePath is.iFilename) ".jpg"
   start <- Time.getCurrentTime
   maybeImage <- Image.fromDiskPreProcess (Just 750) is.iCrop input
   case maybeImage of

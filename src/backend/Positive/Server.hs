@@ -29,6 +29,7 @@ import Network.Wai.EventSource
 import qualified Network.Wai.Handler.Warp as Warp
 import Positive.Api
 import qualified Positive.CLI as CLI
+import qualified Positive.Filename as Filename
 import Positive.FilmRoll (FilmRoll)
 import qualified Positive.Image as Image
 import Positive.Image.Settings
@@ -111,11 +112,11 @@ handlers isDev_ chan =
 
 handleImage :: Text -> Settings -> PositiveT Handler ByteString
 handleImage dir settings = do
-  logSSE $ "Requested image " <> settings.iFilename
+  logSSE $ "Requested image " <> Filename.toText settings.iFilename
   env <- ask
   (image, putMVarBack) <-
     getCachedImage settings.iCrop $
-      Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
+      Text.pack (Text.unpack dir </> Filename.toFilePath settings.iFilename)
   if env.isDev
     then do
       processed <- timed "Apply" $ Image.applySettings settings image
@@ -123,10 +124,10 @@ handleImage dir settings = do
       liftIO putMVarBack
       pure encoded
     else do
-      log $ "Apply settings and encode: " <> settings.iFilename
+      log $ "Apply settings and encode: " <> Filename.toText settings.iFilename
       !encoded <- Image.encode "_.png" $ Image.applySettings settings image
       liftIO putMVarBack
-      logSSE $ "Processed image " <> settings.iFilename
+      logSSE $ "Processed image " <> Filename.toText settings.iFilename
       pure encoded
 
 -- SAVE
@@ -158,20 +159,20 @@ handleCheckExpressions exprs =
 
 handleGenerateHighRes :: Text -> Settings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
-  let input = Text.unpack dir </> Text.unpack settings.iFilename
+  let input = Text.unpack dir </> Filename.toFilePath settings.iFilename
   env <- ask
   SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
   pure NoContent
 
 handleGenerateWallpaper :: Text -> Settings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
-  let input = Text.unpack dir </> Text.unpack settings.iFilename
+  let input = Text.unpack dir </> Filename.toFilePath settings.iFilename
       outputBase homeDir =
         homeDir
           </> "Documents/wallpapers/positive"
           </> filter (\c -> not (isPathSeparator c || c == '.')) (Text.unpack dir)
           <> " | "
-          <> Text.unpack settings.iFilename
+          <> Filename.toFilePath settings.iFilename
   log $ "Generating wallpaper version of: " <> Text.pack input
   output <- Util.ensureUniqueFilename . outputBase =<< liftIO Directory.getHomeDirectory
   image <-
@@ -184,7 +185,7 @@ handleGenerateWallpaper dir settings = do
 
 handleOpenExternalEditor :: Text -> Settings -> PositiveT Handler NoContent
 handleOpenExternalEditor dir settings = do
-  let input = Text.unpack dir </> Text.unpack settings.iFilename
+  let input = Text.unpack dir </> Filename.toFilePath settings.iFilename
   log $ "Opening in external editor: " <> Text.pack input
   image <-
     handleLeft $
@@ -205,9 +206,9 @@ handleGetSettingsHistogram dir settings =
    in do
         (image, putMVarBack) <-
           getCachedImage settings.iCrop $
-            Text.pack (Text.unpack dir </> Text.unpack settings.iFilename)
+            Text.pack (Text.unpack dir </> Filename.toFilePath settings.iFilename)
         liftIO putMVarBack
-        logDebug $ "Creating histogram for: " <> settings.iFilename
+        logDebug $ "Creating histogram for: " <> Filename.toText settings.iFilename
         pure . Massiv.toList . toHistogram . HIP.unImage $
           Image.applySettings settings image
 
@@ -229,7 +230,7 @@ handleGetCoordinateInfo dir (coordinates, settings) =
         (image, putMVarBack) <-
           first (Image.applySettings settings)
             <$> getCachedImage settings.iCrop
-              (Text.pack (Text.unpack dir </> Text.unpack settings.iFilename))
+              (Text.pack (Text.unpack dir </> Filename.toFilePath settings.iFilename))
         liftIO putMVarBack
         pure $ fmap (toInfo image) coordinates
 

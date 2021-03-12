@@ -1,7 +1,7 @@
 module Positive.Init where
 
 import qualified Data.Aeson as Aeson
-import qualified Data.Text as Text
+import qualified Positive.Filename as Filename
 import qualified Positive.FilmRoll as FilmRoll
 import Positive.Prelude hiding (ByteString)
 import System.Directory
@@ -14,7 +14,7 @@ run replace =
       check path = if replace then pure False else doesFileExist path
    in do
         filenames <-
-          fmap Text.pack
+          fmap Filename.fromFilePath
             . filter (\x -> isExtensionOf ".tif" x || isExtensionOf ".png" x)
             <$> listDirectory "."
         unless (null filenames) $ do
