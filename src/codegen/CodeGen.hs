@@ -29,10 +29,10 @@ import qualified System.Process as Process
 
 main :: IO ()
 main = do
-  let endpointDefinitions =
+  let httpDefs =
         fmap (Servant.To.Elm.elmEndpointDefinition (Expression.String "") ["Generated", "Request"]) $
           Servant.To.Elm.elmEndpoints @(ToServantApi SettingsApi)
-      jsonDefinitions =
+      typeDefs =
         Elm.jsonDefinitions @Settings
           <> Elm.jsonDefinitions @ImageCrop
           <> Elm.jsonDefinitions @FilmRoll
@@ -45,8 +45,7 @@ main = do
       modules =
         -- FIXME: spaceleak in both elm-syntax functions
         Pretty.modules $
-          Simplification.simplifyDefinition
-            <$> jsonDefinitions <> endpointDefinitions
+          Simplification.simplifyDefinition <$> typeDefs <> httpDefs
   whenM (Directory.doesDirectoryExist "src/frontend/Generated") $ do
     Text.putStrLn "Removing src/frontend/Generated before generating code"
     Directory.removeDirectoryRecursive "src/frontend/Generated"
@@ -72,5 +71,9 @@ runElmFormat =
    in Process.withCreateProcess (Process.proc "elm-format" args) $
         \_ _ _ handler ->
           Process.waitForProcess handler >>= \case
-            System.Exit.ExitSuccess -> Text.putStrLn "Formatted generated code with elm-format"
-            result -> Text.putStrLn $ "Something went wrong trying to format the generated Elm code: " <> tshow result
+            System.Exit.ExitSuccess ->
+              Text.putStrLn "Formatted generated code with elm-format"
+            result ->
+              Text.putStrLn $
+                "Something went wrong trying to format the generated Elm code: "
+                  <> tshow result

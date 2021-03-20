@@ -11,14 +11,12 @@
 
 module Positive.FilmRoll where
 
-import qualified Bound
 import Data.Aeson ((.!=), (.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import Data.Maybe
 import qualified Generics.SOP as SOP
 import qualified Language.Elm.Expression as Expression
-import qualified Language.Elm.Pattern as Pattern
 import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm

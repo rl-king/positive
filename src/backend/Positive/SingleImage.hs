@@ -20,7 +20,9 @@ import System.FilePath.Posix
 
 run :: (Text -> IO ()) -> FilePath -> IO ()
 run log filepath = do
-  maybeSettings <- join . rightToMaybe <$> tryAny (Aeson.decodeFileStrict "image-settings.json")
+  maybeSettings <-
+    join . rightToMaybe
+      <$> tryAny (Aeson.decodeFileStrict "image-settings.json")
   let filename = Filename.fromFilePath $ takeFileName filepath
   case HashMap.lookup filename . FilmRoll.frsSettings =<< maybeSettings of
     Nothing ->
