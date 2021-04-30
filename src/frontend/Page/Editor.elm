@@ -847,8 +847,8 @@ viewFilesLink isCurrent dir columns previewVersions ratings settings =
         [ a [ href (Route.toUrl (Route.Editor { filename = settings.iFilename, dir = dir })) ]
             [ img
                 [ src <|
-                    Url.Builder.absolute
-                        [ dir, "previews", previewExtension settings.iFilename ]
+                    Url.Builder.crossOrigin dir
+                        [ "previews", previewExtension settings.iFilename ]
                         [ Url.Builder.int "v" <|
                             Maybe.withDefault 0 (Dict.Fun.get settings.iFilename previewVersions)
                         ]
@@ -1239,8 +1239,9 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
                         , id "image"
                         , scale
                         , src <|
-                            Url.Builder.absolute
-                                [ route.dir, "previews", previewExtension current.iFilename ]
+                            Url.Builder.crossOrigin
+                                route.dir
+                                [ "previews", previewExtension current.iFilename ]
                                 [ Url.Builder.int "v" <|
                                     Maybe.withDefault 0 <|
                                         Dict.Fun.get current.iFilename previewVersions

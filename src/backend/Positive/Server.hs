@@ -14,7 +14,6 @@ import qualified Control.Concurrent.Chan as Chan
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.DeepSeq as DeepSeq
 import Control.Exception (evaluate)
-import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
@@ -25,10 +24,12 @@ import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
+import qualified Hasql.Pool
 import Network.Wai.EventSource
 import qualified Network.Wai.Handler.Warp as Warp
 import Positive.Api
 import qualified Positive.CLI as CLI
+import qualified Positive.Database.Session as Session
 import qualified Positive.Filename as Filename
 import Positive.FilmRoll (FilmRoll)
 import qualified Positive.Image as Image
@@ -61,6 +62,7 @@ data Env = Env
     previewMVar :: !(MVar [(FilePath, Settings)]),
     eventChan :: !(Chan ServerEvent),
     isDev :: !CLI.IsDev,
+    sqlPool :: !Hasql.Pool.Pool,
     logger :: !Log.TimedFastLogger
   }
 
@@ -71,13 +73,17 @@ run logger_ isDev_ port =
   let settings =
         Warp.setPort port $
           Warp.setBeforeMainLoop
-            (Log.log logger_ ("listening on port " <> tshow port))
+            ( Log.log logger_ $
+                Text.concat
+                  ["listening on port: ", tshow port, ", is dev: ", tshow isDev_]
+            )
             Warp.defaultSettings
    in do
         imageMVar_ <- MVar.newMVar OrdPSQ.empty
         previewMVar_ <- MVar.newEmptyMVar
         eventChan_ <- Chan.newChan
-        let env = Env imageMVar_ previewMVar_ eventChan_ isDev_ logger_
+        pool <- Hasql.Pool.acquire (3, 10, "host=localhost port=5432 dbname=positive")
+        let env = Env imageMVar_ previewMVar_ eventChan_ isDev_ pool logger_
         Preview.loop previewMVar_ imageMVar_ eventChan_ (Log.log logger_)
         Warp.runSettings settings $
           genericServeT (`runReaderT` env) (handlers isDev_ eventChan_)
@@ -237,8 +243,12 @@ handleGetCoordinateInfo dir (coordinates, settings) =
 -- LIST DIRECTORIES
 
 handleGetSettings :: PositiveT Handler [(Text, FilmRoll)]
-handleGetSettings =
-  HashMap.toList <$> Util.findImageSettings
+handleGetSettings = do
+  pool <- asks sqlPool
+  result <- liftIO $ Hasql.Pool.use pool Session.selectFilmRolls
+  case result of
+    Left _ -> throwError err500
+    Right filmRolls -> pure $ HashMap.toList filmRolls
 
 -- HANDLER HELPERS
 

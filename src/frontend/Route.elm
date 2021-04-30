@@ -44,9 +44,6 @@ fromUrl url =
                     Url.Parser.s "editor"
                         </> Url.Parser.string
                         </> Url.Parser.string
-                , Url.Parser.map (toEditorRoute ".") <|
-                    Url.Parser.s "editor"
-                        </> Url.Parser.string
                 , Url.Parser.map (\x -> Browser { minimumRating = x }) <|
                     Url.Parser.top
                         <?> Url.Parser.Query.int "rating"

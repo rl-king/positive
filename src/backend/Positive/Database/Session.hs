@@ -6,6 +6,8 @@ import qualified Data.Aeson.Types as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Data.Vector as Vector
+import Hasql.Session (Session)
+import qualified Hasql.Session as Session
 import Hasql.Statement (refineResult)
 import Hasql.Transaction (Transaction)
 import qualified Hasql.Transaction as Transaction
@@ -48,7 +50,7 @@ updatePoster imageId filmRollId =
 
 -- SELECT
 
-selectFilmRolls :: Transaction (HashMap Text FilmRoll)
+selectFilmRolls :: Session (HashMap Text FilmRoll)
 selectFilmRolls =
   let toPair
         ( _filmRollId,
@@ -91,5 +93,5 @@ selectFilmRolls =
             )
       toHashMap =
         bimap Text.pack (HashMap.fromListWith (<>)) . traverse toPair
-   in Transaction.statement () $
+   in Session.statement () $
         refineResult (toHashMap . Vector.toList) Statement.selectFilmRolls
