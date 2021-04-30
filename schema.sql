@@ -30,11 +30,6 @@ create table if not exists positive.film_roll
 alter table positive.image
 add film_roll_id integer references positive.film_roll(id);
 
--- create table positive.poster
---   ( film_roll_id serial references positive.film_roll id
---   , image_id serial references positive.image id
---   )
-
 -- create table positive.collection
 --   ( id serial primary key
 --   , name text not null

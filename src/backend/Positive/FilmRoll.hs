@@ -39,6 +39,14 @@ data FilmRoll = FilmRoll
     )
     via Elm.ElmType FilmRoll
 
+instance Semigroup FilmRoll where
+  (<>) a b =
+    FilmRoll
+      { frsPoster = b.frsPoster,
+        frsRatings = a.frsRatings <> b.frsRatings,
+        frsSettings = a.frsSettings <> b.frsSettings
+      }
+
 instance Aeson.FromJSON FilmRoll where
   parseJSON =
     Aeson.withObject "FilmRoll" $ \o ->

@@ -25,7 +25,10 @@ run :: (Text -> IO ()) -> IO ()
 run log = do
   filmRolls <- makePathsAbsolute =<< Util.findImageSettings
   Right conn <- Hasql.Connection.acquire "host=localhost port=5432 dbname=positive"
-  result <- Hasql.Session.run (Transaction.transaction Serializable Write (session filmRolls)) conn
+  result <-
+    Hasql.Session.run
+      (Transaction.transaction Serializable Write (session filmRolls))
+      conn
   Hasql.Connection.release conn
   log $ tshow result
 
