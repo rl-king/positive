@@ -35,6 +35,10 @@ dependencies:
   - hashable
   - haskeline
   - haskell-to-elm
+  - hasql
+  - hasql-pool
+  - hasql-th
+  - hasql-transaction
   - hip
   - http-media
   - http-types
@@ -44,6 +48,7 @@ dependencies:
   - mtl
   - optparse-applicative
   - process
+  - profunctors
   - psqueues
   - record-hasfield
   - safe-exceptions

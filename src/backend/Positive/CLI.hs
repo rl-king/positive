@@ -9,6 +9,7 @@ data Mode
   = Init Replace
   | Previews Replace
   | SingleImage FilePath
+  | Import
   | Server IsDev Port
   deriving (Show, Eq)
 
@@ -34,6 +35,7 @@ parser =
             <> metavar "FILENAME"
             <> help "process fullsize image to ./highres"
         )
+    <|> flag' Import (long "import" <> help "json to psql")
     <|> Server <$> isDev <*> port
 
 replace :: Parser Replace
