@@ -1,6 +1,6 @@
+drop schema if exists positive cascade;
 create schema if not exists positive;
 
-drop table if exists positive.image cascade;
 create table if not exists positive.image
   ( id serial primary key
   , filename text not null
@@ -19,17 +19,19 @@ create table if not exists positive.image
   , unique (id, filename)
   );
 
-drop table if exists positive.filmroll cascade;
-create table if not exists positive.filmroll
+create table if not exists positive.film_roll
   ( id serial primary key
-  , poster serial references positive.image(id)
+  , poster integer null references positive.image(id)
   , directory_path text not null
 
-  , unique (id, directory_path)
+  , unique (directory_path)
   );
 
+alter table positive.image
+add film_roll_id integer references positive.film_roll(id);
+
 -- create table positive.poster
---   ( filmroll_id serial references positive.filmroll id
+--   ( film_roll_id serial references positive.film_roll id
 --   , image_id serial references positive.image id
 --   )
 

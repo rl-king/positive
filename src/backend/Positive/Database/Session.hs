@@ -4,17 +4,16 @@ module Positive.Database.Session where
 
 import Data.Aeson
 import qualified Data.HashMap.Strict as HashMap
-import Hasql.Session (Session)
-import qualified Hasql.Session as Session
+import Hasql.Transaction (Transaction)
+import qualified Hasql.Transaction as Transaction
 import qualified Positive.Database.Statement as Statement
 import Positive.Filename
-import Positive.FilmRoll
 import Positive.Image.Settings
 import Positive.Prelude
 
-insertImageSettings :: Int32 -> Settings -> HashMap Filename Int -> Session Int32
+insertImageSettings :: Int32 -> Settings -> HashMap Filename Int -> Transaction (Int32, Text)
 insertImageSettings filmRollId settings ratings =
-  Session.statement (filmRollId, settings, ratings) $
+  Transaction.statement (filmRollId, settings, ratings) $
     lmap
       ( \(frid, s, r) ->
           ( toText s.iFilename,
@@ -31,8 +30,10 @@ insertImageSettings filmRollId settings ratings =
       )
       Statement.insertImageSettings
 
-insertFilmRoll :: Text -> FilmRoll -> Session Int32
-insertFilmRoll path filmRoll =
-  Session.statement
-    (path, fmap toText filmRoll.frsPoster)
-    Statement.insertFilmRoll
+insertFilmRoll :: Text -> Transaction Int32
+insertFilmRoll path =
+  Transaction.statement path Statement.insertFilmRoll
+
+updatePoster :: Maybe Int32 -> Int32 -> Transaction Int32
+updatePoster imageId filmRollId =
+  Transaction.statement (imageId, filmRollId) Statement.updatePoster
