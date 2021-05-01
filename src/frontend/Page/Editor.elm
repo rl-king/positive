@@ -22,6 +22,7 @@ import Generated.Data as Image
         , ExpressionResult(..)
         , Filename(..)
         , ImageCrop
+        , ImageSettings
         , Zones
         )
 import Generated.Request as Request
@@ -106,7 +107,7 @@ subscriptions { clipboard, imageCropMode, filmRoll } =
 
 type alias Model =
     { checkExpressionsKey : Key { checkExpressionsKey : () }
-    , clipboard : Maybe Image.Settings
+    , clipboard : Maybe ImageSettings
     , coordinateInfo : Dict ( Float, Float ) CoordinateInfo
     , draftExpressions : DraftExpressions
     , filmRoll : Images
@@ -132,7 +133,7 @@ type alias UndoHistory =
 
 
 type alias Images =
-    Zipper Image.Settings
+    Zipper ImageSettings
 
 
 type alias Ratings =
@@ -215,18 +216,18 @@ type Msg
     | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (List Int))
     | RotatePreview Filename Float
-    | OnImageSettingsChange Image.Settings
+    | OnImageSettingsChange ImageSettings
     | OnExpressionValueChange EditorIndex Expression
     | OnExpressionChange EditorIndex Expression
     | AddExpression
     | RemoveExpression EditorIndex
     | CheckExpressions (Key { checkExpressionsKey : () })
     | GotCheckExpressions (HttpResult (List ExpressionResult))
-    | OnImageLoad String Image.Settings
+    | OnImageLoad String ImageSettings
     | SaveSettings
     | GenerateHighres
     | GenerateWallpaper
-    | CopySettings (Maybe Image.Settings)
+    | CopySettings (Maybe ImageSettings)
     | ApplyCopyToAll Images
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
@@ -694,7 +695,7 @@ fromPreview state =
             other
 
 
-updateSettings : (Image.Settings -> Image.Settings) -> Model -> Model
+updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
     let
         unlessUnchanged old new =
@@ -830,7 +831,7 @@ viewFilesLink :
     -> Int
     -> PreviewVersions
     -> Ratings
-    -> Image.Settings
+    -> ImageSettings
     -> ( Int, Filename, Html Msg )
 viewFilesLink isCurrent dir columns previewVersions ratings settings =
     let
@@ -962,7 +963,7 @@ viewSettingsLeft :
     Images
     -> UndoHistory
     -> Maybe ImageCrop
-    -> Maybe Image.Settings
+    -> Maybe ImageSettings
     -> ProcessingState
     -> Html Msg
 viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
@@ -1159,12 +1160,12 @@ viewSettingsGroup =
     div [ class "image-settings-group" ]
 
 
-viewClipboardButton : String -> Html Msg -> Image.Settings -> Html Msg
+viewClipboardButton : String -> Html Msg -> ImageSettings -> Html Msg
 viewClipboardButton desc icon settings =
     button [ onClick (OnImageSettingsChange settings), title desc ] [ icon ]
 
 
-viewImageCropMode : Image.Settings -> Maybe ImageCrop -> Html Msg
+viewImageCropMode : ImageSettings -> Maybe ImageCrop -> Html Msg
 viewImageCropMode current imageCropMode =
     let
         onTopChange imageCrop v =
@@ -1288,7 +1289,7 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
         ]
 
 
-viewCoordinate : Element -> Image.Settings -> Float -> CoordinateInfo -> ( String, Html Msg )
+viewCoordinate : Element -> ImageSettings -> Float -> CoordinateInfo -> ( String, Html Msg )
 viewCoordinate { element } settings scale coordinate =
     let
         xOffset =
@@ -1390,7 +1391,7 @@ viewLoading state =
 -- HELPERS
 
 
-updateZoneByInt : Int -> (Float -> Float) -> Image.Settings -> Image.Settings
+updateZoneByInt : Int -> (Float -> Float) -> ImageSettings -> ImageSettings
 updateZoneByInt n f settings =
     let
         g =
@@ -1444,9 +1445,9 @@ previewExtension (Filename x) =
     String.dropRight 3 x ++ "jpg"
 
 
-resetAll : Image.Settings -> Image.Settings
+resetAll : ImageSettings -> ImageSettings
 resetAll current =
-    Image.Settings current.filename
+    ImageSettings current.filename
         0
         (ImageCrop 0 0 100)
         2.2
@@ -1456,9 +1457,9 @@ resetAll current =
         Array.empty
 
 
-resetTone : Image.Settings -> Image.Settings
+resetTone : ImageSettings -> ImageSettings
 resetTone current =
-    Image.Settings current.filename
+    ImageSettings current.filename
         current.rotate
         current.crop
         2.2
@@ -1473,12 +1474,12 @@ emptyExpression =
     Expression 0 -1 1 "" ""
 
 
-toImageUrlParams : Image.Settings -> Url.Builder.QueryParameter
+toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
 toImageUrlParams =
     Url.Builder.string "image-settings"
         << Base64.encode
         << Encode.encode 0
-        << Image.encodeSettings
+        << Image.encodeImageSettings
 
 
 fractionalModBy : Float -> Float -> Float
@@ -1486,7 +1487,7 @@ fractionalModBy m v =
     v - m * Basics.toFloat (Basics.floor (v / m))
 
 
-settingsFromState : ProcessingState -> Images -> Image.Settings
+settingsFromState : ProcessingState -> Images -> ImageSettings
 settingsFromState processingState filmRoll =
     case processingState of
         Queued queuedFilmRoll ->

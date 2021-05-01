@@ -13,8 +13,8 @@ import qualified Language.Elm.Pretty as Pretty
 import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Api
-import Positive.Data.FilmRoll
 import Positive.Data.Filename
+import Positive.Data.FilmRoll
 import Positive.Data.ImageSettings
 import Positive.Prelude
 import Servant.API.Generic (ToServantApi)
@@ -33,7 +33,7 @@ main = do
         fmap (Servant.To.Elm.elmEndpointDefinition (Expression.String "") ["Generated", "Request"]) $
           Servant.To.Elm.elmEndpoints @(ToServantApi SettingsApi)
       typeDefs =
-        Elm.jsonDefinitions @Settings
+        Elm.jsonDefinitions @ImageSettings
           <> Elm.jsonDefinitions @ImageCrop
           <> Elm.jsonDefinitions @FilmRoll
           <> Elm.jsonDefinitions @Filename

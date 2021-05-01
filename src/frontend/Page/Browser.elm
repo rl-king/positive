@@ -15,7 +15,7 @@ import Generated.Data as Image
     exposing
         ( Filename(..)
         , FilmRoll
-        , Settings
+        , ImageSettings
         )
 import Generated.Request as Request
 import Html exposing (..)
@@ -340,7 +340,7 @@ toPreviewUrl dir filename =
 -- HELPERS
 
 
-focusWithOffset : Float -> Dict.Fun.Dict Filename String Settings -> Maybe Filename
+focusWithOffset : Float -> Dict.Fun.Dict Filename String ImageSettings -> Maybe Filename
 focusWithOffset offset xs =
     List.drop (round (toFloat (Dict.Fun.size xs) * offset) - 1) (Dict.Fun.values xs)
         |> List.head
