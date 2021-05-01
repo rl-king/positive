@@ -7,8 +7,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import Data.Maybe
 import qualified Data.Text as Text
-import Positive.FilmRoll
-import Positive.Image.Settings
+import Positive.Data.FilmRoll
+import Positive.Data.ImageSettings
 import Positive.Prelude
 import qualified System.FilePath.Glob as Glob
 import System.FilePath.Posix as Path
@@ -51,7 +51,7 @@ diffedPreviewSettings a b = do
   maybe (fail "Something went wrong decoding the settings files") pure $
     difference <$> xs <*> ys
 
-insertPreviewSettings :: FilePath -> Settings -> IO ()
+insertPreviewSettings :: FilePath -> ImageSettings -> IO ()
 insertPreviewSettings ps settings = do
   previewSettings <- Aeson.decodeFileStrict ps
   maybe

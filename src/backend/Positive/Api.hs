@@ -7,8 +7,8 @@ module Positive.Api where
 
 import Data.ByteString.Lazy (ByteString)
 import Network.HTTP.Media ((//))
-import Positive.FilmRoll
-import Positive.Image.Settings
+import Positive.Data.FilmRoll
+import Positive.Data.ImageSettings
 import Positive.Prelude hiding (ByteString)
 import Servant
 import Servant.API.Generic
@@ -25,7 +25,7 @@ data ImageApi route = ImageApi
   { iaImage ::
       route :- "image"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> QueryParam' '[Required, Strict] "image-settings" Settings
+        :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
         :> Get '[Image] ByteString,
     iaEvents :: route :- "events" :> Raw,
     iaRaw :: route :- Raw
@@ -48,27 +48,27 @@ data SettingsApi route = SettingsApi
     saGetSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] Settings
+        :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
     saGenerateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] Settings
+        :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     saOpenExternalEditor ::
       route :- "image" :> "settings" :> "externaleditor"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] Settings
+        :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     saGetCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] ([(Double, Double)], Settings)
+        :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)
         :> Post '[JSON] [CoordinateInfo],
     saGenerateWallpaper ::
       route :- "image" :> "settings" :> "wallpaper"
         :> QueryParam' '[Required, Strict] "dir" Text
-        :> ReqBody '[JSON] Settings
+        :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)

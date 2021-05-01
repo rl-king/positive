@@ -9,7 +9,7 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.Massiv.Array.IO as Massiv
 import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
-import Positive.Image.Settings
+import Positive.Data.ImageSettings
 import qualified Positive.Language as Language
 import Positive.Prelude hiding (ByteString)
 
@@ -49,7 +49,7 @@ fromDiskPreProcess targetSize imageCrop path =
 
 -- EDIT
 
-applySettings :: Settings -> Monochrome -> Monochrome
+applySettings :: ImageSettings -> Monochrome -> Monochrome
 applySettings !is !image =
   let applyZones =
         foldr (\(z, v) acc -> acc . zone z v) id $

@@ -12,9 +12,9 @@ import qualified Hasql.Session
 import Hasql.Transaction (Transaction)
 import Hasql.Transaction.Sessions (IsolationLevel (..), Mode (..))
 import qualified Hasql.Transaction.Sessions as Transaction
+import Positive.Data.FilmRoll (FilmRoll)
 import Positive.Database.Session
 import Positive.Filename
-import Positive.FilmRoll (FilmRoll)
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
 import System.Directory

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -8,7 +9,7 @@
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Positive.Image.Settings where
+module Positive.Data.ImageSettings where
 
 import Data.Aeson ((.!=), (.:), (.:?))
 import qualified Data.Aeson as Aeson
@@ -23,7 +24,7 @@ import Servant
 
 -- SETTINGS
 
-data Settings = Settings
+data ImageSettings = ImageSettings
   { iFilename :: !Filename,
     iRotate :: !Double,
     iCrop :: !ImageCrop,
@@ -40,11 +41,11 @@ data Settings = Settings
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
-    via Elm.ElmType Settings
+    via Elm.ElmType ImageSettings
 
-instance Aeson.FromJSON Settings where
+instance Aeson.FromJSON ImageSettings where
   parseJSON =
-    Aeson.withObject "Settings" $ \o -> do
+    Aeson.withObject "ImageSettings" $ \o -> do
       filename <- o .: "iFilename"
       rotate <- o .: "iRotate"
       crop <- o .: "iCrop"
@@ -57,7 +58,7 @@ instance Aeson.FromJSON Settings where
       whitepoint <- o .: "iWhitepoint"
       expressions <- o .:? "iExpressions" .!= mempty
       pure $
-        Settings
+        ImageSettings
           { iFilename = filename,
             iRotate = rotate,
             iCrop = crop,
@@ -68,7 +69,7 @@ instance Aeson.FromJSON Settings where
             iExpressions = expressions
           }
 
-instance FromHttpApiData Settings where
+instance FromHttpApiData ImageSettings where
   parseUrlPiece piece =
     first Text.pack $
       Aeson.eitherDecodeStrict =<< Base64.decode (encodeUtf8 piece)

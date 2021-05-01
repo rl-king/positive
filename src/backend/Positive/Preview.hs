@@ -11,11 +11,11 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
+import Positive.Data.FilmRoll (FilmRoll)
+import qualified Positive.Data.FilmRoll as FilmRoll
+import Positive.Data.ImageSettings as ImageSettings
 import qualified Positive.Filename as Filename
-import Positive.FilmRoll (FilmRoll)
-import qualified Positive.FilmRoll as FilmRoll
 import qualified Positive.Image as Image
-import Positive.Image.Settings as Settings
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
 import System.FilePath.Posix
@@ -32,8 +32,8 @@ run log replace = do
 -- LOOP
 
 loop ::
-  MVar [(FilePath, Settings)] ->
-  MVar (OrdPSQ Text UTCTime (Settings.ImageCrop, Image.Monochrome)) ->
+  MVar [(FilePath, ImageSettings)] ->
+  MVar (OrdPSQ Text UTCTime (ImageSettings.ImageCrop, Image.Monochrome)) ->
   Chan ServerEvent ->
   (Text -> IO ()) ->
   IO ()
@@ -57,7 +57,7 @@ addCount log xs t =
 
 -- FIND
 
-findMissingPreviews :: MonadIO m => Bool -> m [(FilePath, Settings)]
+findMissingPreviews :: MonadIO m => Bool -> m [(FilePath, ImageSettings)]
 findMissingPreviews replace =
   let toSettings dir =
         if replace
@@ -71,13 +71,13 @@ findMissingPreviews replace =
           . fmap dropFileName
           =<< Util.findImageSettingFiles
 
-prependDir :: FilePath -> FilmRoll -> [(FilePath, Settings)]
+prependDir :: FilePath -> FilmRoll -> [(FilePath, ImageSettings)]
 prependDir dir settings =
   (\x -> (dir </> Filename.toFilePath x.iFilename, x)) <$> FilmRoll.toList settings
 
 -- WRITE
 
-generatePreview :: (Text -> IO ()) -> (FilePath, Settings) -> IO ()
+generatePreview :: (Text -> IO ()) -> (FilePath, ImageSettings) -> IO ()
 generatePreview log (input, is) = do
   let dir = dropFileName input
       output = dir </> "previews" </> replaceExtension (Filename.toFilePath is.iFilename) ".jpg"

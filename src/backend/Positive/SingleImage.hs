@@ -7,10 +7,10 @@ import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
+import qualified Positive.Data.FilmRoll as FilmRoll
+import Positive.Data.ImageSettings as ImageSettings
 import qualified Positive.Filename as Filename
-import qualified Positive.FilmRoll as FilmRoll
 import qualified Positive.Image as Image
-import Positive.Image.Settings as Settings
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
 import System.Directory
@@ -29,9 +29,9 @@ run log filepath = do
       generate log "No settings file found, generating plain image: " filepath $
         FilmRoll.plainImageSettings filename
     Just settings ->
-      generate log "Settings file found, generating image: " filepath settings
+      generate log "ImageSettings file found, generating image: " filepath settings
 
-generate :: MonadIO m => (Text -> m ()) -> Text -> FilePath -> Settings -> m ()
+generate :: MonadIO m => (Text -> m ()) -> Text -> FilePath -> ImageSettings -> m ()
 generate log message filepath is = do
   image <- Image.fromDiskPreProcess Nothing is.iCrop filepath
   liftIO $ createDirectoryIfMissing False (dropFileName filepath </> "highres")

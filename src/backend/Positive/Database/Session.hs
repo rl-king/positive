@@ -11,17 +11,21 @@ import qualified Hasql.Session as Session
 import Hasql.Statement (refineResult)
 import Hasql.Transaction (Transaction)
 import qualified Hasql.Transaction as Transaction
+import Positive.Data.FilmRoll
+import Positive.Data.ImageSettings
 import qualified Positive.Database.Statement as Statement
 import Positive.Filename
-import Positive.FilmRoll
-import Positive.Image.Settings
 import Positive.Prelude
 
 -- INSERT
 
-insertImageSettings :: Int32 -> Settings -> HashMap Filename Int -> Transaction (Int32, Text)
-insertImageSettings filmRollId settings ratings =
-  Transaction.statement (filmRollId, settings, ratings) $
+insertImageSettings ::
+  Int32 ->
+  ImageSettings ->
+  HashMap Filename Int ->
+  Transaction (Int32, Text)
+insertImageSettings filmRollId imageSettings ratings =
+  Transaction.statement (filmRollId, imageSettings, ratings) $
     lmap
       ( \(frid, s, r) ->
           ( toText s.iFilename,
@@ -48,9 +52,9 @@ updateFilmRoll :: FilmRoll -> Transaction ()
 updateFilmRoll filmRoll =
   traverse_ (updateImageSettings 1) $ HashMap.elems filmRoll.frsSettings
 
-updateImageSettings :: Int32 -> Settings -> Transaction Int32
-updateImageSettings imageId settings =
-  Transaction.statement (imageId, settings) $
+updateImageSettings :: Int32 -> ImageSettings -> Transaction Int32
+updateImageSettings imageId imageSettings =
+  Transaction.statement (imageId, imageSettings) $
     lmap
       ( \(iId, s) ->
           ( iId,
@@ -100,7 +104,7 @@ selectFilmRolls =
                   frsSettings =
                     HashMap.singleton
                       (Filename filename)
-                      Settings
+                      ImageSettings
                         { iFilename = Filename filename,
                           iRotate = orientation,
                           iCrop = crop,

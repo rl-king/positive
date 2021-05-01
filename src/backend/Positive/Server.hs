@@ -14,7 +14,6 @@ import qualified Control.Concurrent.Chan as Chan
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.DeepSeq as DeepSeq
 import Control.Exception (evaluate)
-import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Builder as Builder
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.HashMap.Strict as HashMap
@@ -31,17 +30,17 @@ import Network.Wai.EventSource
 import qualified Network.Wai.Handler.Warp as Warp
 import Positive.Api
 import qualified Positive.CLI as CLI
-import qualified Positive.Database.Session as Session
-import qualified Positive.Filename as Filename
-import Positive.FilmRoll (FilmRoll)
-import qualified Positive.Image as Image
-import Positive.Image.Settings
+import Positive.Data.FilmRoll (FilmRoll)
+import Positive.Data.ImageSettings
   ( CoordinateInfo (..),
     Expression (..),
     ExpressionResult (..),
     ImageCrop (..),
-    Settings (..),
+    ImageSettings (..),
   )
+import qualified Positive.Database.Session as Session
+import qualified Positive.Filename as Filename
+import qualified Positive.Image as Image
 import qualified Positive.Image.Util as Util
 import qualified Positive.Language as Language
 import qualified Positive.Log as Log
@@ -61,7 +60,7 @@ type PositiveT m =
 
 data Env = Env
   { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.Monochrome))),
-    previewMVar :: !(MVar [(FilePath, Settings)]),
+    previewMVar :: !(MVar [(FilePath, ImageSettings)]),
     eventChan :: !(Chan ServerEvent),
     isDev :: !CLI.IsDev,
     sqlPool :: !Hasql.Pool.Pool,
@@ -118,7 +117,7 @@ handlers isDev_ chan =
 
 -- IMAGE
 
-handleImage :: Text -> Settings -> PositiveT Handler ByteString
+handleImage :: Text -> ImageSettings -> PositiveT Handler ByteString
 handleImage dir settings = do
   logSSE $ "Requested image " <> Filename.toText settings.iFilename
   env <- ask
@@ -167,14 +166,14 @@ handleCheckExpressions exprs =
 
 -- GENERATE
 
-handleGenerateHighRes :: Text -> Settings -> PositiveT Handler NoContent
+handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
   let input = Text.unpack dir </> Filename.toFilePath settings.iFilename
   env <- ask
   SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
   pure NoContent
 
-handleGenerateWallpaper :: Text -> Settings -> PositiveT Handler NoContent
+handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateWallpaper dir settings = do
   let input = Text.unpack dir </> Filename.toFilePath settings.iFilename
       outputBase homeDir =
@@ -193,7 +192,7 @@ handleGenerateWallpaper dir settings = do
 
 -- OPEN EXTERNALEDITOR
 
-handleOpenExternalEditor :: Text -> Settings -> PositiveT Handler NoContent
+handleOpenExternalEditor :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleOpenExternalEditor dir settings = do
   let input = Text.unpack dir </> Filename.toFilePath settings.iFilename
   log $ "Opening in external editor: " <> Text.pack input
@@ -205,7 +204,7 @@ handleOpenExternalEditor dir settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Text -> Settings -> PositiveT Handler [Int]
+handleGetSettingsHistogram :: Text -> ImageSettings -> PositiveT Handler [Int]
 handleGetSettingsHistogram dir settings =
   let toHistogram arr =
         Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
@@ -226,7 +225,7 @@ handleGetSettingsHistogram dir settings =
 
 handleGetCoordinateInfo ::
   Text ->
-  ([(Double, Double)], Settings) ->
+  ([(Double, Double)], ImageSettings) ->
   PositiveT Handler [CoordinateInfo]
 handleGetCoordinateInfo dir (coordinates, settings) =
   let toInfo image (x, y) =

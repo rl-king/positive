@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Positive.FilmRoll where
+module Positive.Data.FilmRoll where
 
 import Data.Aeson ((.!=), (.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
@@ -20,8 +20,8 @@ import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
+import Positive.Data.ImageSettings
 import Positive.Filename
-import Positive.Image.Settings
 import Positive.Prelude
 
 -- FILMROLLSETTINGS
@@ -29,7 +29,7 @@ import Positive.Prelude
 data FilmRoll = FilmRoll
   { frsPoster :: !(Maybe Filename),
     frsRatings :: !(HashMap Filename Int),
-    frsSettings :: !(HashMap Filename Settings)
+    frsSettings :: !(HashMap Filename ImageSettings)
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
@@ -71,13 +71,13 @@ isEmpty :: FilmRoll -> Bool
 isEmpty =
   (==) empty
 
-init :: Settings -> FilmRoll
+init :: ImageSettings -> FilmRoll
 init imageSettings =
   empty{frsSettings =
           HashMap.insert imageSettings.iFilename imageSettings mempty
        }
 
-insert :: Settings -> FilmRoll -> FilmRoll
+insert :: ImageSettings -> FilmRoll -> FilmRoll
 insert imageSettings filmRollSettings =
   filmRollSettings{frsSettings =
                      HashMap.insert
@@ -86,7 +86,7 @@ insert imageSettings filmRollSettings =
                        filmRollSettings.frsSettings
                   }
 
-fromList :: [Settings] -> FilmRoll
+fromList :: [ImageSettings] -> FilmRoll
 fromList settings =
   empty{frsSettings =
           HashMap.fromList $
@@ -100,7 +100,7 @@ fromFilenames xs =
             fmap (\x -> (x, plainImageSettings x)) xs
        }
 
-toList :: FilmRoll -> [Settings]
+toList :: FilmRoll -> [ImageSettings]
 toList =
   HashMap.elems . frsSettings
 
@@ -111,9 +111,9 @@ difference (FilmRoll pa sa a) (FilmRoll pb sb b) =
     (sa <> sb)
     (HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b)
 
-plainImageSettings :: Filename -> Settings
+plainImageSettings :: Filename -> ImageSettings
 plainImageSettings x =
-  Settings x 0 noCrop 2.2 initZones 0 1 mempty
+  ImageSettings x 0 noCrop 2.2 initZones 0 1 mempty
 
 instance Elm.HasElmType a => Elm.HasElmType (HashMap Filename a) where
   elmType =
