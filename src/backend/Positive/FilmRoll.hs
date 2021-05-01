@@ -42,7 +42,7 @@ data FilmRoll = FilmRoll
 instance Semigroup FilmRoll where
   (<>) a b =
     FilmRoll
-      { frsPoster = b.frsPoster,
+      { frsPoster = b.frsPoster <|> a.frsPoster,
         frsRatings = a.frsRatings <> b.frsRatings,
         frsSettings = a.frsSettings <> b.frsSettings
       }

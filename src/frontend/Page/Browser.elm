@@ -330,8 +330,9 @@ toPreviewUrl dir filename =
         previewExtension (Filename x) =
             String.dropRight 3 x ++ "jpg"
     in
-    Url.Builder.absolute
-        [ dir, "previews", previewExtension filename ]
+    Url.Builder.crossOrigin
+        dir
+        [ "previews", previewExtension filename ]
         []
 
 

@@ -44,6 +44,27 @@ insertFilmRoll path =
 
 -- UPDATE
 
+updateFilmRoll :: FilmRoll -> Transaction ()
+updateFilmRoll filmRoll =
+  traverse_ (updateImageSettings 1) $ HashMap.elems filmRoll.frsSettings
+
+updateImageSettings :: Int32 -> Settings -> Transaction Int32
+updateImageSettings imageId settings =
+  Transaction.statement (imageId, settings) $
+    lmap
+      ( \(iId, s) ->
+          ( iId,
+            s.iRotate,
+            Aeson.toJSON s.iCrop,
+            s.iGamma,
+            Aeson.toJSON s.iZones,
+            s.iBlackpoint,
+            s.iWhitepoint,
+            Aeson.toJSON s.iExpressions
+          )
+      )
+      Statement.updateImageSettings
+
 updatePoster :: Maybe Int32 -> Int32 -> Transaction Int32
 updatePoster imageId filmRollId =
   Transaction.statement (imageId, filmRollId) Statement.updatePoster

@@ -1,4 +1,3 @@
-drop schema if exists positive cascade;
 create schema if not exists positive;
 
 create table if not exists positive.image

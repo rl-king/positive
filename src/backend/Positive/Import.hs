@@ -23,7 +23,7 @@ import System.Directory
 
 run :: (Text -> IO ()) -> IO ()
 run log = do
-  filmRolls <- makePathsAbsolute =<< Util.findImageSettings
+  filmRolls <- makePathsAbsolute log =<< Util.findImageSettings
   Right conn <- Hasql.Connection.acquire "host=localhost port=5432 dbname=positive"
   result <-
     Hasql.Session.run
@@ -32,10 +32,11 @@ run log = do
   Hasql.Connection.release conn
   log $ tshow result
 
-makePathsAbsolute :: HashMap Text FilmRoll -> IO [(Text, FilmRoll)]
-makePathsAbsolute filmRolls =
+makePathsAbsolute :: (Text -> IO ()) -> HashMap Text FilmRoll -> IO [(Text, FilmRoll)]
+makePathsAbsolute log filmRolls =
   forM (HashMap.toList filmRolls) $ \(path, filmRoll) -> do
     absolutePath <- liftIO $ makeAbsolute (Text.unpack path)
+    log path
     pure (Text.pack absolutePath, filmRoll)
 
 session :: [(Text, FilmRoll)] -> Transaction ()

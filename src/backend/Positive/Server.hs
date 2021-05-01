@@ -25,6 +25,8 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import qualified Hasql.Pool
+import Hasql.Transaction.Sessions (IsolationLevel (..), Mode (..))
+import qualified Hasql.Transaction.Sessions as Transaction
 import Network.Wai.EventSource
 import qualified Network.Wai.Handler.Warp as Warp
 import Positive.Api
@@ -140,7 +142,9 @@ handleImage dir settings = do
 
 handleSaveSettings :: Text -> FilmRoll -> PositiveT Handler FilmRoll
 handleSaveSettings dir newSettings = do
-  liftIO $ Aeson.encodeFile (Text.unpack dir </> "image-settings.json") newSettings
+  pool <- asks sqlPool
+  liftIO . Hasql.Pool.use pool $
+    Transaction.transaction Serializable Write (Session.updateFilmRoll newSettings)
   logDebug "Wrote settings"
   env <- ask
   missing <- Preview.findMissingPreviews False
