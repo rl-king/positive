@@ -14,7 +14,7 @@ import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Api
 import Positive.Data.FilmRoll
-import Positive.Filename
+import Positive.Data.Filename
 import Positive.Data.ImageSettings
 import Positive.Prelude
 import Servant.API.Generic (ToServantApi)

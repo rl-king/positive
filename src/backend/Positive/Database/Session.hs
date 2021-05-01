@@ -11,10 +11,10 @@ import qualified Hasql.Session as Session
 import Hasql.Statement (refineResult)
 import Hasql.Transaction (Transaction)
 import qualified Hasql.Transaction as Transaction
+import Positive.Data.Filename
 import Positive.Data.FilmRoll
 import Positive.Data.ImageSettings
 import qualified Positive.Database.Statement as Statement
-import Positive.Filename
 import Positive.Prelude
 
 -- INSERT
@@ -28,15 +28,15 @@ insertImageSettings filmRollId imageSettings ratings =
   Transaction.statement (filmRollId, imageSettings, ratings) $
     lmap
       ( \(frid, s, r) ->
-          ( toText s.iFilename,
-            toEnum . fromMaybe 0 $ HashMap.lookup s.iFilename r,
-            s.iRotate,
-            Aeson.toJSON s.iCrop,
-            s.iGamma,
-            Aeson.toJSON s.iZones,
-            s.iBlackpoint,
-            s.iWhitepoint,
-            Aeson.toJSON s.iExpressions,
+          ( toText s.filename,
+            toEnum . fromMaybe 0 $ HashMap.lookup s.filename r,
+            s.rotate,
+            Aeson.toJSON s.crop,
+            s.gamma,
+            Aeson.toJSON s.zones,
+            s.blackpoint,
+            s.whitepoint,
+            Aeson.toJSON s.expressions,
             frid
           )
       )
@@ -58,13 +58,13 @@ updateImageSettings imageId imageSettings =
     lmap
       ( \(iId, s) ->
           ( iId,
-            s.iRotate,
-            Aeson.toJSON s.iCrop,
-            s.iGamma,
-            Aeson.toJSON s.iZones,
-            s.iBlackpoint,
-            s.iWhitepoint,
-            Aeson.toJSON s.iExpressions
+            s.rotate,
+            Aeson.toJSON s.crop,
+            s.gamma,
+            Aeson.toJSON s.zones,
+            s.blackpoint,
+            s.whitepoint,
+            Aeson.toJSON s.expressions
           )
       )
       Statement.updateImageSettings
@@ -105,14 +105,14 @@ selectFilmRolls =
                     HashMap.singleton
                       (Filename filename)
                       ImageSettings
-                        { iFilename = Filename filename,
-                          iRotate = orientation,
-                          iCrop = crop,
-                          iGamma = gamma,
-                          iZones = zones,
-                          iBlackpoint = blackpoint,
-                          iWhitepoint = whitepoint,
-                          iExpressions = expressions
+                        { filename = Filename filename,
+                          rotate = orientation,
+                          crop = crop,
+                          gamma = gamma,
+                          zones = zones,
+                          blackpoint = blackpoint,
+                          whitepoint = whitepoint,
+                          expressions = expressions
                         }
                 }
             )

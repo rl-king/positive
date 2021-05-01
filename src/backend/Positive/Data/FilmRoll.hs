@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -20,8 +21,8 @@ import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
+import Positive.Data.Filename
 import Positive.Data.ImageSettings
-import Positive.Filename
 import Positive.Prelude
 
 -- FILMROLLSETTINGS
@@ -74,14 +75,14 @@ isEmpty =
 init :: ImageSettings -> FilmRoll
 init imageSettings =
   empty{frsSettings =
-          HashMap.insert imageSettings.iFilename imageSettings mempty
+          HashMap.insert imageSettings.filename imageSettings mempty
        }
 
 insert :: ImageSettings -> FilmRoll -> FilmRoll
 insert imageSettings filmRollSettings =
   filmRollSettings{frsSettings =
                      HashMap.insert
-                       imageSettings.iFilename
+                       imageSettings.filename
                        imageSettings
                        filmRollSettings.frsSettings
                   }
@@ -90,7 +91,7 @@ fromList :: [ImageSettings] -> FilmRoll
 fromList settings =
   empty{frsSettings =
           HashMap.fromList $
-            fmap (\is -> (iFilename is, is)) settings
+            fmap (\is -> (is.filename, is)) settings
        }
 
 fromFilenames :: [Filename] -> FilmRoll

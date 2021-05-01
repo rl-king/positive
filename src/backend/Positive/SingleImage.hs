@@ -7,9 +7,9 @@ import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
+import qualified Positive.Data.Filename as Filename
 import qualified Positive.Data.FilmRoll as FilmRoll
 import Positive.Data.ImageSettings as ImageSettings
-import qualified Positive.Filename as Filename
 import qualified Positive.Image as Image
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
@@ -33,7 +33,7 @@ run log filepath = do
 
 generate :: MonadIO m => (Text -> m ()) -> Text -> FilePath -> ImageSettings -> m ()
 generate log message filepath is = do
-  image <- Image.fromDiskPreProcess Nothing is.iCrop filepath
+  image <- Image.fromDiskPreProcess Nothing is.crop filepath
   liftIO $ createDirectoryIfMissing False (dropFileName filepath </> "highres")
   outputWithCount <-
     Util.ensureUniqueFilename $

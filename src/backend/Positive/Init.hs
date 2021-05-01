@@ -1,7 +1,7 @@
 module Positive.Init where
 
 import qualified Data.Aeson as Aeson
-import qualified Positive.Filename as Filename
+import qualified Positive.Data.Filename as Filename
 import qualified Positive.Data.FilmRoll as FilmRoll
 import Positive.Prelude hiding (ByteString)
 import System.Directory

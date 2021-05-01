@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Positive.Filename where
+module Positive.Data.Filename where
 
 import qualified Bound
 import qualified Data.Aeson as Aeson

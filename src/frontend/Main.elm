@@ -195,7 +195,7 @@ onNavigation : Route -> Model -> ( Model, Cmd Msg )
 onNavigation route model =
     let
         sortFun =
-            Image.filenameToString << .iFilename
+            Image.filenameToString << .filename
 
         toSortedZipper filmRoll =
             Zipper.fromList (List.sortBy sortFun (Dict.Fun.values filmRoll.frsSettings))
@@ -265,7 +265,7 @@ extractUpdates model =
 
         fromZipper xs =
             Dict.Fun.fromList Image.filenameToString Filename <|
-                List.map (\x -> ( x.iFilename, x )) <|
+                List.map (\x -> ( x.filename, x )) <|
                     Zipper.toList xs
     in
     case model.page of

@@ -10,6 +10,9 @@ import qualified Data.Massiv.Array.IO as Massiv
 import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
 import Positive.Data.ImageSettings
+  ( ImageCrop,
+    ImageSettings,
+  )
 import qualified Positive.Language as Language
 import Positive.Prelude hiding (ByteString)
 
@@ -55,15 +58,15 @@ applySettings !is !image =
         foldr (\(z, v) acc -> acc . zone z v) id $
           filter
             ((/=) 0 . snd)
-            [ (0.1, is.iZones.z1),
-              (0.2, is.iZones.z2),
-              (0.3, is.iZones.z3),
-              (0.4, is.iZones.z4),
-              (0.5, is.iZones.z5),
-              (0.6, is.iZones.z6),
-              (0.7, is.iZones.z7),
-              (0.8, is.iZones.z8),
-              (0.9, is.iZones.z9)
+            [ (0.1, is.zones.z1),
+              (0.2, is.zones.z2),
+              (0.3, is.zones.z3),
+              (0.4, is.zones.z4),
+              (0.5, is.zones.z5),
+              (0.6, is.zones.z6),
+              (0.7, is.zones.z7),
+              (0.8, is.zones.z8),
+              (0.9, is.zones.z9)
             ]
       expressions =
         either (const id) (foldr (.) id) $
@@ -72,17 +75,17 @@ applySettings !is !image =
                 (\expr p -> Language.eval p e.eValue expr)
                   <$> Language.parse e.eExpr
             )
-            is.iExpressions
+            is.expressions
    in HIP.map
         ( fmap HIP.toWord16
             . applyZones
             . fmap expressions
-            . gamma is.iGamma
-            . compress is.iBlackpoint is.iWhitepoint
+            . gamma is.gamma
+            . compress is.blackpoint is.whitepoint
             . invert
             . fmap HIP.toDouble
         )
-        $ rotate is.iRotate image
+        $ rotate is.rotate image
 {-# INLINE applySettings #-}
 
 toDoubleI :: Monochrome -> MonochromeDouble

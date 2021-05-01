@@ -11,63 +11,63 @@
 
 module Positive.Data.ImageSettings where
 
-import Data.Aeson ((.!=), (.:), (.:?))
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
-import Positive.Filename
+import Positive.Data.Filename
 import Positive.Prelude
 import Servant
 
 -- SETTINGS
 
 data ImageSettings = ImageSettings
-  { iFilename :: !Filename,
-    iRotate :: !Double,
-    iCrop :: !ImageCrop,
-    iGamma :: !Double,
-    iZones :: !Zones,
-    iBlackpoint :: !Double,
-    iWhitepoint :: !Double,
-    iExpressions :: !(Vector Expression)
+  { filename :: !Filename,
+    rotate :: !Double,
+    crop :: !ImageCrop,
+    gamma :: !Double,
+    zones :: !Zones,
+    blackpoint :: !Double,
+    whitepoint :: !Double,
+    expressions :: !(Vector Expression)
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
     ( Aeson.ToJSON,
+      Aeson.FromJSON,
       Elm.HasElmType,
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
     via Elm.ElmType ImageSettings
 
-instance Aeson.FromJSON ImageSettings where
-  parseJSON =
-    Aeson.withObject "ImageSettings" $ \o -> do
-      filename <- o .: "iFilename"
-      rotate <- o .: "iRotate"
-      crop <- o .: "iCrop"
-      gamma <- o .: "iGamma"
-      zone1 <- o .:? "iZone1" .!= 0
-      zone5 <- o .:? "iZone5" .!= 0
-      zone9 <- o .:? "iZone9" .!= 0
-      zones <- o .:? "iZones" .!= Zones zone1 0 0 0 zone5 0 0 0 zone9
-      blackpoint <- o .: "iBlackpoint"
-      whitepoint <- o .: "iWhitepoint"
-      expressions <- o .:? "iExpressions" .!= mempty
-      pure $
-        ImageSettings
-          { iFilename = filename,
-            iRotate = rotate,
-            iCrop = crop,
-            iGamma = gamma,
-            iZones = zones,
-            iBlackpoint = blackpoint,
-            iWhitepoint = whitepoint,
-            iExpressions = expressions
-          }
+-- instance Aeson.FromJSON ImageSettings where
+--   parseJSON =
+--     Aeson.withObject "ImageSettings" $ \o -> do
+--       filename <- o .: "filename"
+--       rotate <- o .: "rotate"
+--       crop <- o .: "crop"
+--       gamma <- o .: "gamma"
+--       zone1 <- o .:? "iZone1" .!= 0
+--       zone5 <- o .:? "iZone5" .!= 0
+--       zone9 <- o .:? "iZone9" .!= 0
+--       zones <- o .:? "zones" .!= Zones zone1 0 0 0 zone5 0 0 0 zone9
+--       blackpoint <- o .: "blackpoint"
+--       whitepoint <- o .: "whitepoint"
+--       expressions <- o .:? "expressions" .!= mempty
+--       pure $
+--         ImageSettings
+--           { filename = filename,
+--             rotate = rotate,
+--             crop = crop,
+--             gamma = gamma,
+--             zones = zones,
+--             blackpoint = blackpoint,
+--             whitepoint = whitepoint,
+--             expressions = expressions
+--           }
 
 instance FromHttpApiData ImageSettings where
   parseUrlPiece piece =

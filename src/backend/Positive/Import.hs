@@ -14,7 +14,7 @@ import Hasql.Transaction.Sessions (IsolationLevel (..), Mode (..))
 import qualified Hasql.Transaction.Sessions as Transaction
 import Positive.Data.FilmRoll (FilmRoll)
 import Positive.Database.Session
-import Positive.Filename
+import Positive.Data.Filename
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
 import System.Directory

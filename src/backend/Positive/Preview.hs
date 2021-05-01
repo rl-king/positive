@@ -11,10 +11,10 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import Network.Wai.EventSource
+import qualified Positive.Data.Filename as Filename
 import Positive.Data.FilmRoll (FilmRoll)
 import qualified Positive.Data.FilmRoll as FilmRoll
 import Positive.Data.ImageSettings as ImageSettings
-import qualified Positive.Filename as Filename
 import qualified Positive.Image as Image
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
@@ -48,7 +48,7 @@ loop queueMVar cacheMVar eventChan log =
           ServerEvent
             (Just "preview")
             Nothing
-            [Builder.byteString $ Filename.toByteString is.iFilename]
+            [Builder.byteString $ Filename.toByteString is.filename]
         void (tryPutMVar queueMVar xs)
 
 addCount :: (Text -> IO ()) -> [a] -> Text -> IO ()
@@ -73,16 +73,16 @@ findMissingPreviews replace =
 
 prependDir :: FilePath -> FilmRoll -> [(FilePath, ImageSettings)]
 prependDir dir settings =
-  (\x -> (dir </> Filename.toFilePath x.iFilename, x)) <$> FilmRoll.toList settings
+  (\x -> (dir </> Filename.toFilePath x.filename, x)) <$> FilmRoll.toList settings
 
 -- WRITE
 
 generatePreview :: (Text -> IO ()) -> (FilePath, ImageSettings) -> IO ()
 generatePreview log (input, is) = do
   let dir = dropFileName input
-      output = dir </> "previews" </> replaceExtension (Filename.toFilePath is.iFilename) ".jpg"
+      output = dir </> "previews" </> replaceExtension (Filename.toFilePath is.filename) ".jpg"
   start <- Time.getCurrentTime
-  maybeImage <- Image.fromDiskPreProcess (Just 750) is.iCrop input
+  maybeImage <- Image.fromDiskPreProcess (Just 750) is.crop input
   case maybeImage of
     Left _ ->
       log $ Text.unwords ["Error generating preview", Text.pack output]

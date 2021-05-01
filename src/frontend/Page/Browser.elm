@@ -275,7 +275,7 @@ viewFilmRollBrowserRoll columns filmRollHover ( dir, filmRoll ) =
                     focusWithOffset offset filmRoll.frsSettings
 
                 _ ->
-                    Maybe.map .iFilename <|
+                    Maybe.map .filename <|
                         choice
                             [ Maybe.andThen
                                 (\filename -> Dict.Fun.get filename filmRoll.frsSettings)
@@ -344,4 +344,4 @@ focusWithOffset : Float -> Dict.Fun.Dict Filename String Settings -> Maybe Filen
 focusWithOffset offset xs =
     List.drop (round (toFloat (Dict.Fun.size xs) * offset) - 1) (Dict.Fun.values xs)
         |> List.head
-        |> Maybe.map .iFilename
+        |> Maybe.map .filename
