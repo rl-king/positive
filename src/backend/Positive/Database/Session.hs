@@ -20,27 +20,22 @@ import Positive.Prelude
 
 -- INSERT
 
-insertImageSettings ::
-  Int32 ->
-  ImageSettings ->
-  Transaction (Int32, Text)
-insertImageSettings filmRollId imageSettings =
-  Transaction.statement (filmRollId, imageSettings) $
-    lmap
-      ( \(frid, s) ->
-          ( toText s.filename,
-            s.rating,
-            s.rotate,
-            Aeson.toJSON s.crop,
-            s.gamma,
-            Aeson.toJSON s.zones,
-            s.blackpoint,
-            s.whitepoint,
-            Aeson.toJSON s.expressions,
-            frid
-          )
-      )
-      Statement.insertImageSettings
+insertImageSettings :: Int32 -> Filename -> Transaction (Int32, Text)
+insertImageSettings filmRollId filename =
+  let toInitalSettings (filmRollId, filename) =
+        ( toText filename,
+          0,
+          0,
+          Aeson.toJSON emptyCrop,
+          2.2,
+          Aeson.toJSON emptyZones,
+          0,
+          1,
+          Aeson.toJSON @[Expression] [],
+          filmRollId
+        )
+   in Transaction.statement (filmRollId, filename) $
+        lmap toInitalSettings Statement.insertImageSettings
 
 insertFilmRoll :: Text -> Transaction Int32
 insertFilmRoll path =

@@ -44,7 +44,7 @@ session filmRolls =
   for_ filmRolls $ \(path, filmRoll) -> do
     filmRollId <- insertFilmRoll path
     images <- for (HashMap.toList filmRoll.imageSettings) $ \(_, settings) ->
-      insertImageSettings filmRollId settings
+      insertImageSettings filmRollId settings.filename
     let poster =
           fst
             <$> List.find

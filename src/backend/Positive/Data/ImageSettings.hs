@@ -73,8 +73,8 @@ data Zones = Zones
     )
     via Elm.ElmType Zones
 
-initZones :: Zones
-initZones =
+emptyZones :: Zones
+emptyZones =
   Zones 0 0 0 0 0 0 0 0 0
 
 -- EXPR
@@ -133,8 +133,8 @@ data ImageCrop = ImageCrop
     )
     via Elm.ElmType ImageCrop
 
-noCrop :: ImageCrop
-noCrop =
+emptyCrop :: ImageCrop
+emptyCrop =
   ImageCrop 0 0 100
 
 -- COORDINATE
