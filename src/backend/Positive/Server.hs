@@ -94,24 +94,24 @@ run logger_ isDev_ port =
 handlers :: CLI.IsDev -> Chan ServerEvent -> Api (AsServerT (PositiveT Handler))
 handlers isDev_ chan =
   Api
-    { aImageApi =
+    { imageApi =
         genericServerT
           ImageApi
-            { iaImage = handleImage,
-              iaEvents = pure $ eventSourceAppChan chan,
-              iaRaw = Static.serve isDev_
+            { image = handleImage,
+              events = pure $ eventSourceAppChan chan,
+              raw = Static.serve isDev_
             },
-      aSettingsApi =
+      settingsApi =
         genericServerT
           SettingsApi
-            { saSaveSettings = handleSaveSettings,
-              saCheckExpressions = handleCheckExpressions,
-              saGetSettings = handleGetSettings,
-              saGetSettingsHistogram = handleGetSettingsHistogram,
-              saGenerateHighRes = handleGenerateHighRes,
-              saOpenExternalEditor = handleOpenExternalEditor,
-              saGetCoordinateInfo = handleGetCoordinateInfo,
-              saGenerateWallpaper = handleGenerateWallpaper
+            { saveFilmRoll = handleSaveFilmRoll,
+              checkExpressions = handleCheckExpressions,
+              getSettings = handleGetSettings,
+              getSettingsHistogram = handleGetSettingsHistogram,
+              generateHighRes = handleGenerateHighRes,
+              openExternalEditor = handleOpenExternalEditor,
+              getCoordinateInfo = handleGetCoordinateInfo,
+              generateWallpaper = handleGenerateWallpaper
             }
     }
 
@@ -139,11 +139,13 @@ handleImage dir settings = do
 
 -- SAVE
 
-handleSaveSettings :: Text -> FilmRoll -> PositiveT Handler FilmRoll
-handleSaveSettings dir newSettings = do
+handleSaveFilmRoll :: Int32 -> FilmRoll -> PositiveT Handler FilmRoll
+handleSaveFilmRoll filmRollId newSettings = do
   pool <- asks sqlPool
-  liftIO . Hasql.Pool.use pool $
-    Transaction.transaction Serializable Write (Session.updateFilmRoll newSettings)
+  _ <-
+    liftIO . Hasql.Pool.use pool $
+      Transaction.transaction Serializable Write $
+        Session.updateFilmRoll filmRollId newSettings
   logDebug "Wrote settings"
   env <- ask
   missing <- Preview.findMissingPreviews False
@@ -162,7 +164,7 @@ handleCheckExpressions exprs =
             [Language.eval p v expr - p | p <- [0.1, 0.2 .. 1.0]]
       parseAndCheck e =
         first TypeError . Language.check =<< first SyntaxError (Language.parse e.eExpr)
-   in pure [either id (eval e.eValue) (parseAndCheck e) | e <- exprs]
+   in pure [either identity (eval e.eValue) (parseAndCheck e) | e <- exprs]
 
 -- GENERATE
 
@@ -170,7 +172,8 @@ handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
 handleGenerateHighRes dir settings = do
   let input = Text.unpack dir </> Filename.toFilePath settings.filename
   env <- ask
-  SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
+  error "todo"
+  -- SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
   pure NoContent
 
 handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent

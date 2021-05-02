@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -28,93 +29,75 @@ import Positive.Prelude
 -- FILMROLLSETTINGS
 
 data FilmRoll = FilmRoll
-  { frsPoster :: !(Maybe Filename),
-    frsRatings :: !(HashMap Filename Int),
-    frsSettings :: !(HashMap Filename ImageSettings)
+  { id :: Int32,
+    poster :: Maybe Filename,
+    imageSettings :: HashMap Filename ImageSettings
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
-    ( Elm.HasElmType,
+    ( ToJSON,
+      FromJSON,
+      Elm.HasElmType,
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
     via Elm.ElmType FilmRoll
 
-instance Semigroup FilmRoll where
-  (<>) a b =
-    FilmRoll
-      { frsPoster = b.frsPoster <|> a.frsPoster,
-        frsRatings = a.frsRatings <> b.frsRatings,
-        frsSettings = a.frsSettings <> b.frsSettings
-      }
+empty :: Int32 -> FilmRoll
+empty id =
+  FilmRoll id Nothing mempty
 
-instance Aeson.FromJSON FilmRoll where
-  parseJSON =
-    Aeson.withObject "FilmRoll" $ \o ->
-      FilmRoll
-        <$> o .:? "frsPoster"
-        <*> o .:? "frsRatings" .!= mempty
-        <*> (o .: "unFilmRollSettings" <|> o .: "frsSettings")
+-- isEmpty :: FilmRoll -> Bool
+-- isEmpty =
+--   error "still needed?"
 
-instance Aeson.ToJSON FilmRoll where
-  toJSON filmRollSettings =
-    Aeson.object
-      [ "frsPoster" .= filmRollSettings.frsPoster,
-        "frsSettings" .= filmRollSettings.frsSettings,
-        "frsRatings" .= filmRollSettings.frsRatings
-      ]
+-- -- (==) empty
 
-empty :: FilmRoll
-empty =
-  FilmRoll Nothing mempty mempty
+-- init :: ImageSettings -> FilmRoll
+-- init imageSettings =
+--   error "still needed?"
 
-isEmpty :: FilmRoll -> Bool
-isEmpty =
-  (==) empty
+-- -- empty{imageSettings =
+-- --         HashMap.insert imageSettings.filename imageSettings mempty
+-- --      }
 
-init :: ImageSettings -> FilmRoll
-init imageSettings =
-  empty{frsSettings =
-          HashMap.insert imageSettings.filename imageSettings mempty
-       }
+-- insert :: ImageSettings -> FilmRoll -> FilmRoll
+-- insert imageSettings filmRollSettings =
+--   filmRollSettings{imageSettings =
+--                      HashMap.insert
+--                        imageSettings.filename
+--                        imageSettings
+--                        filmRollSettings.imageSettings
+--                   }
 
-insert :: ImageSettings -> FilmRoll -> FilmRoll
-insert imageSettings filmRollSettings =
-  filmRollSettings{frsSettings =
-                     HashMap.insert
-                       imageSettings.filename
-                       imageSettings
-                       filmRollSettings.frsSettings
-                  }
+-- fromList :: [ImageSettings] -> FilmRoll
+-- fromList settings =
+--   empty{imageSettings =
+--           HashMap.fromList $
+--             fmap (\is -> (is.filename, is)) settings
+--        }
 
-fromList :: [ImageSettings] -> FilmRoll
-fromList settings =
-  empty{frsSettings =
-          HashMap.fromList $
-            fmap (\is -> (is.filename, is)) settings
-       }
-
-fromFilenames :: [Filename] -> FilmRoll
-fromFilenames xs =
-  empty{frsSettings =
-          HashMap.fromList $
-            fmap (\x -> (x, plainImageSettings x)) xs
-       }
+-- fromFilenames :: [Filename] -> FilmRoll
+-- fromFilenames xs =
+--   empty{imageSettings =
+--           HashMap.fromList $
+--             fmap (\x -> (x, plainImageSettings x)) xs
+--        }
 
 toList :: FilmRoll -> [ImageSettings]
 toList =
-  HashMap.elems . frsSettings
+  HashMap.elems . imageSettings
 
-difference :: FilmRoll -> FilmRoll -> FilmRoll
-difference (FilmRoll pa sa a) (FilmRoll pb sb b) =
-  FilmRoll
-    (pa <|> pb)
-    (sa <> sb)
-    (HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b)
+-- difference :: FilmRoll -> FilmRoll -> FilmRoll
+-- difference (FilmRoll pa sa a) (FilmRoll pb sb b) =
+--   FilmRoll
+--     (pa <|> pb)
+--     (sa <> sb)
+--     (HashMap.differenceWith (\x y -> if x /= y then Just x else Nothing) a b)
 
-plainImageSettings :: Filename -> ImageSettings
-plainImageSettings x =
-  ImageSettings x 0 noCrop 2.2 initZones 0 1 mempty
+-- plainImageSettings :: Filename -> ImageSettings
+-- plainImageSettings x =
+--   ImageSettings x 0 noCrop 2.2 initZones 0 1 mempty
 
 instance Elm.HasElmType a => Elm.HasElmType (HashMap Filename a) where
   elmType =

@@ -59,17 +59,19 @@ addCount log xs t =
 
 findMissingPreviews :: MonadIO m => Bool -> m [(FilePath, ImageSettings)]
 findMissingPreviews replace =
-  let toSettings dir =
-        if replace
-          then
-            maybe (fail "Something went wrong reading the settings file") pure
-              =<< Aeson.decodeFileStrict (dir </> "image-settings.json")
-          else Util.diffedPreviewSettings dir (dir </> "previews")
-   in liftIO $
-        fmap (sortOn fst . concat)
-          . mapM (\dir -> prependDir dir <$> toSettings dir)
-          . fmap dropFileName
-          =<< Util.findImageSettingFiles
+  error "todo"
+
+-- let toSettings dir =
+--       if replace
+--         then
+--           maybe (fail "Something went wrong reading the settings file") pure
+--             =<< Aeson.decodeFileStrict (dir </> "image-settings.json")
+--         else Util.diffedPreviewSettings dir (dir </> "previews")
+--  in liftIO $
+--       fmap (sortOn fst . concat)
+--         . mapM (\dir -> prependDir dir <$> toSettings dir)
+--         . fmap dropFileName
+--         =<< Util.findImageSettingFiles
 
 prependDir :: FilePath -> FilmRoll -> [(FilePath, ImageSettings)]
 prependDir dir settings =
@@ -79,21 +81,23 @@ prependDir dir settings =
 
 generatePreview :: (Text -> IO ()) -> (FilePath, ImageSettings) -> IO ()
 generatePreview log (input, is) = do
-  let dir = dropFileName input
-      output = dir </> "previews" </> replaceExtension (Filename.toFilePath is.filename) ".jpg"
-  start <- Time.getCurrentTime
-  maybeImage <- Image.fromDiskPreProcess (Just 750) is.crop input
-  case maybeImage of
-    Left _ ->
-      log $ Text.unwords ["Error generating preview", Text.pack output]
-    Right image -> do
-      HIP.writeImage output $ Image.applySettings is image
-      Util.insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
-      done <- liftIO Time.getCurrentTime
-      log $
-        Text.unwords
-          [ "Took",
-            tshow (Time.diffUTCTime done start),
-            "generating preview",
-            Text.pack output
-          ]
+  error "todo"
+
+-- let dir = dropFileName input
+--     output = dir </> "previews" </> replaceExtension (Filename.toFilePath is.filename) ".jpg"
+-- start <- Time.getCurrentTime
+-- maybeImage <- Image.fromDiskPreProcess (Just 750) is.crop input
+-- case maybeImage of
+--   Left _ ->
+--     log $ Text.unwords ["Error generating preview", Text.pack output]
+--   Right image -> do
+--     HIP.writeImage output $ Image.applySettings is image
+--     Util.insertPreviewSettings (dir </> "previews" </> "image-settings.json") is
+--     done <- liftIO Time.getCurrentTime
+--     log $
+--       Text.unwords
+--         [ "Took",
+--           tshow (Time.diffUTCTime done start),
+--           "generating preview",
+--           Text.pack output
+--         ]

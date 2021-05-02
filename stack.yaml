@@ -52,7 +52,7 @@ extra-deps:
 - megaparsec-9.0.1@sha256:2244ab77521a52a0083966c5405b3151f149e1db50b1a5b104cd9b1e56617203,3248
 
 - git: git@github.com:folq/servant-to-elm.git
-  commit: 6c34971ae3076858135f447540780ba861c2d94e
+  commit: 618214dfbb211ae709fa95bd5b3ef60d85838a35
 - git: git@github.com:folq/haskell-to-elm.git
   commit: 57faee3020b52b80e3a528e9b84e73d923e23501
 - git: git@github.com:lehins/hip.git

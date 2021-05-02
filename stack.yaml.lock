@@ -69,15 +69,15 @@ packages:
     hackage: megaparsec-9.0.1@sha256:2244ab77521a52a0083966c5405b3151f149e1db50b1a5b104cd9b1e56617203,3248
 - completed:
     name: servant-to-elm
-    version: 0.4.1.0
+    version: 0.4.2.0
     git: git@github.com:folq/servant-to-elm.git
     pantry-tree:
-      size: 636
-      sha256: 1114cd83f06aeedd52957d51c89f3eb41544e0662f1347596bc5ede8e1369051
-    commit: 6c34971ae3076858135f447540780ba861c2d94e
+      size: 811
+      sha256: fa7ce07157a00adef14289e7615bc761e703afb7d8ecebdaaa966065806c4762
+    commit: 618214dfbb211ae709fa95bd5b3ef60d85838a35
   original:
     git: git@github.com:folq/servant-to-elm.git
-    commit: 6c34971ae3076858135f447540780ba861c2d94e
+    commit: 618214dfbb211ae709fa95bd5b3ef60d85838a35
 - completed:
     name: haskell-to-elm
     version: 0.3.1.0

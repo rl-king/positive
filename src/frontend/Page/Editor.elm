@@ -681,7 +681,7 @@ nextKey (Key k) =
 saveSettings : Model -> Cmd Msg
 saveSettings model =
     Cmd.map GotSaveImageSettings <|
-        Request.postImageSettings model.route.dir <|
+        Request.postFilmrollByFilmRollId model.filmRoll.id <|
             fromZipper model.poster model.ratings model.filmRoll
 
 

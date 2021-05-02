@@ -198,8 +198,8 @@ onNavigation route model =
             Image.filenameToString << .filename
 
         toSortedZipper filmRoll =
-            Zipper.fromList (List.sortBy sortFun (Dict.Fun.values filmRoll.frsSettings))
-                |> Maybe.map (\x -> ( x, filmRoll.frsRatings, filmRoll.frsPoster ))
+            Zipper.fromList (List.sortBy sortFun (Dict.Fun.values filmRoll.imageSettings))
+                |> Maybe.map (\x -> ( x, filmRoll.frsRatings, filmRoll.poster ))
 
         toFilmRoll editorRoute filmRolls =
             Dict.get editorRoute.dir filmRolls

@@ -25,6 +25,7 @@ import Servant
 
 data ImageSettings = ImageSettings
   { filename :: !Filename,
+    rating :: !Int16,
     rotate :: !Double,
     crop :: !ImageCrop,
     gamma :: !Double,
@@ -42,32 +43,6 @@ data ImageSettings = ImageSettings
       Elm.HasElmEncoder Aeson.Value
     )
     via Elm.ElmType ImageSettings
-
--- instance Aeson.FromJSON ImageSettings where
---   parseJSON =
---     Aeson.withObject "ImageSettings" $ \o -> do
---       filename <- o .: "filename"
---       rotate <- o .: "rotate"
---       crop <- o .: "crop"
---       gamma <- o .: "gamma"
---       zone1 <- o .:? "iZone1" .!= 0
---       zone5 <- o .:? "iZone5" .!= 0
---       zone9 <- o .:? "iZone9" .!= 0
---       zones <- o .:? "zones" .!= Zones zone1 0 0 0 zone5 0 0 0 zone9
---       blackpoint <- o .: "blackpoint"
---       whitepoint <- o .: "whitepoint"
---       expressions <- o .:? "expressions" .!= mempty
---       pure $
---         ImageSettings
---           { filename = filename,
---             rotate = rotate,
---             crop = crop,
---             gamma = gamma,
---             zones = zones,
---             blackpoint = blackpoint,
---             whitepoint = whitepoint,
---             expressions = expressions
---           }
 
 instance FromHttpApiData ImageSettings where
   parseUrlPiece piece =

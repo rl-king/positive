@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
 module Positive.Database.Session where
@@ -22,14 +23,13 @@ import Positive.Prelude
 insertImageSettings ::
   Int32 ->
   ImageSettings ->
-  HashMap Filename Int ->
   Transaction (Int32, Text)
-insertImageSettings filmRollId imageSettings ratings =
-  Transaction.statement (filmRollId, imageSettings, ratings) $
+insertImageSettings filmRollId imageSettings =
+  Transaction.statement (filmRollId, imageSettings) $
     lmap
-      ( \(frid, s, r) ->
+      ( \(frid, s) ->
           ( toText s.filename,
-            toEnum . fromMaybe 0 $ HashMap.lookup s.filename r,
+            s.rating,
             s.rotate,
             Aeson.toJSON s.crop,
             s.gamma,
@@ -48,9 +48,10 @@ insertFilmRoll path =
 
 -- UPDATE
 
-updateFilmRoll :: FilmRoll -> Transaction ()
-updateFilmRoll filmRoll =
-  traverse_ (updateImageSettings 1) $ HashMap.elems filmRoll.frsSettings
+updateFilmRoll :: Int32 -> FilmRoll -> Transaction ()
+updateFilmRoll filmRollId filmRoll =
+  traverse_ (updateImageSettings filmRollId) $
+    HashMap.elems filmRoll.imageSettings
 
 updateImageSettings :: Int32 -> ImageSettings -> Transaction Int32
 updateImageSettings imageId imageSettings =
@@ -78,7 +79,7 @@ updatePoster imageId filmRollId =
 selectFilmRolls :: Session (HashMap Text FilmRoll)
 selectFilmRolls =
   let toPair
-        ( _filmRollId,
+        ( filmRollId,
           path,
           poster,
           _imageId,
@@ -98,14 +99,14 @@ selectFilmRolls =
           pure
             ( path,
               FilmRoll
-                { frsPoster = fmap Filename poster,
-                  frsRatings =
-                    HashMap.singleton (Filename filename) $ fromEnum rating,
-                  frsSettings =
+                { id = filmRollId,
+                  poster = fmap Filename poster,
+                  imageSettings =
                     HashMap.singleton
                       (Filename filename)
                       ImageSettings
                         { filename = Filename filename,
+                          rating = rating,
                           rotate = orientation,
                           crop = crop,
                           gamma = gamma,
@@ -116,7 +117,22 @@ selectFilmRolls =
                         }
                 }
             )
+      merge (path, newFilmRoll) acc =
+        HashMap.alter
+          ( \case
+              Nothing ->
+                Just newFilmRoll
+              Just existingFilmRoll ->
+                Just $
+                  existingFilmRoll
+                    { poster = newFilmRoll.poster <|> existingFilmRoll.poster,
+                      imageSettings =
+                        newFilmRoll.imageSettings <> existingFilmRoll.imageSettings
+                    }
+          )
+          path
+          acc
       toHashMap =
-        bimap Text.pack (HashMap.fromListWith (<>)) . traverse toPair
+        bimap Text.pack (foldr merge mempty) . traverse toPair
    in Session.statement () $
         refineResult (toHashMap . Vector.toList) Statement.selectFilmRolls

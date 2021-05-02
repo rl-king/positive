@@ -47,7 +47,7 @@ fromDiskPreProcess ::
   String ->
   m (Either SomeException Monochrome)
 fromDiskPreProcess targetSize imageCrop path =
-  fmap (fromDoubleI . maybe id resize targetSize . normalize . toDoubleI . crop imageCrop)
+  fmap (fromDoubleI . maybe identity resize targetSize . normalize . toDoubleI . crop imageCrop)
     <$> fromDisk path
 
 -- EDIT
@@ -55,7 +55,7 @@ fromDiskPreProcess targetSize imageCrop path =
 applySettings :: ImageSettings -> Monochrome -> Monochrome
 applySettings !is !image =
   let applyZones =
-        foldr (\(z, v) acc -> acc . zone z v) id $
+        foldr (\(z, v) acc -> acc . zone z v) identity $
           filter
             ((/=) 0 . snd)
             [ (0.1, is.zones.z1),
@@ -69,7 +69,7 @@ applySettings !is !image =
               (0.9, is.zones.z9)
             ]
       expressions =
-        either (const id) (foldr (.) id) $
+        either (const identity) (foldr (.) identity) $
           traverse
             ( \e ->
                 (\expr p -> Language.eval p e.eValue expr)
@@ -143,7 +143,7 @@ rotate !rad =
     90 -> HIP.rotate90
     180 -> HIP.rotate180
     270 -> HIP.rotate270
-    _ -> id
+    _ -> identity
 {-# INLINE rotate #-}
 
 encode ::

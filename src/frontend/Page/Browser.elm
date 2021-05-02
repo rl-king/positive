@@ -40,7 +40,7 @@ subscriptions model =
         Maybe.map2
             (\filmRoll ( dir, offset ) ->
                 Browser.Events.onKeyDown <|
-                    matchKey "p" (SetPoster dir (focusWithOffset offset filmRoll.frsSettings))
+                    matchKey "p" (SetPoster dir (focusWithOffset offset filmRoll.imageSettings))
             )
             (Maybe.andThen (\( k, _ ) -> Dict.get k model.filmRolls) model.filmRollHover)
             model.filmRollHover
@@ -118,8 +118,8 @@ update key msg model =
                 Just filmRoll ->
                     ( model
                     , Cmd.map (GotSaveImageSettings dir) <|
-                        Request.postImageSettings dir <|
-                            { filmRoll | frsPoster = poster }
+                        Request.postFilmrollByFilmRollId filmRoll.id <|
+                            { filmRoll | poster = poster }
                     )
 
         SetMinRating 0 ->
@@ -203,7 +203,7 @@ view model =
                 , text <|
                     String.fromInt <|
                         Dict.foldl
-                            (\_ v acc -> Dict.Fun.size v.frsSettings + acc)
+                            (\_ v acc -> Dict.Fun.size v.imageSettings + acc)
                             0
                             model.filmRolls
                 ]
@@ -272,15 +272,15 @@ viewFilmRollBrowserRoll columns filmRollHover ( dir, filmRoll ) =
         poster =
             case Maybe.map (Tuple.mapFirst ((==) dir)) filmRollHover of
                 Just ( True, offset ) ->
-                    focusWithOffset offset filmRoll.frsSettings
+                    focusWithOffset offset filmRoll.imageSettings
 
                 _ ->
                     Maybe.map .filename <|
                         choice
                             [ Maybe.andThen
-                                (\filename -> Dict.Fun.get filename filmRoll.frsSettings)
-                                filmRoll.frsPoster
-                            , List.head (Dict.Fun.values filmRoll.frsSettings)
+                                (\filename -> Dict.Fun.get filename filmRoll.imageSettings)
+                                filmRoll.poster
+                            , List.head (Dict.Fun.values filmRoll.imageSettings)
                             ]
 
         width =

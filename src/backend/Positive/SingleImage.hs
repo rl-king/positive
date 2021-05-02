@@ -20,23 +20,25 @@ import System.FilePath.Posix
 
 run :: (Text -> IO ()) -> FilePath -> IO ()
 run log filepath = do
-  maybeSettings <-
-    join . rightToMaybe
-      <$> tryAny (Aeson.decodeFileStrict "image-settings.json")
-  let filename = Filename.fromFilePath $ takeFileName filepath
-  case HashMap.lookup filename . FilmRoll.frsSettings =<< maybeSettings of
-    Nothing ->
-      generate log "No settings file found, generating plain image: " filepath $
-        FilmRoll.plainImageSettings filename
-    Just settings ->
-      generate log "ImageSettings file found, generating image: " filepath settings
+  error "todo"
 
-generate :: MonadIO m => (Text -> m ()) -> Text -> FilePath -> ImageSettings -> m ()
-generate log message filepath is = do
-  image <- Image.fromDiskPreProcess Nothing is.crop filepath
-  liftIO $ createDirectoryIfMissing False (dropFileName filepath </> "highres")
-  outputWithCount <-
-    Util.ensureUniqueFilename $
-      dropFileName filepath </> "highres" </> takeFileName filepath
-  log $ message <> Text.pack outputWithCount
-  either (log . tshow) (HIP.writeImage outputWithCount . Image.applySettings is) image
+-- maybeSettings <-
+--     join . rightToMaybe
+--       <$> tryAny (Aeson.decodeFileStrict "image-settings.json")
+--   let filename = Filename.fromFilePath $ takeFileName filepath
+--   case HashMap.lookup filename . FilmRoll.imageSettings =<< maybeSettings of
+--     Nothing ->
+--       generate log "No settings file found, generating plain image: " filepath $
+--         FilmRoll.plainImageSettings filename
+--     Just settings ->
+--       generate log "ImageSettings file found, generating image: " filepath settings
+
+-- generate :: MonadIO m => (Text -> m ()) -> Text -> FilePath -> ImageSettings -> m ()
+-- generate log message filepath is = do
+--   image <- Image.fromDiskPreProcess Nothing is.crop filepath
+--   liftIO $ createDirectoryIfMissing False (dropFileName filepath </> "highres")
+--   outputWithCount <-
+--     Util.ensureUniqueFilename $
+--       dropFileName filepath </> "highres" </> takeFileName filepath
+--   log $ message <> Text.pack outputWithCount
+--   either (log . tshow) (HIP.writeImage outputWithCount . Image.applySettings is) image

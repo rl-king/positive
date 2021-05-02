@@ -12,9 +12,9 @@ import qualified Hasql.Session
 import Hasql.Transaction (Transaction)
 import Hasql.Transaction.Sessions (IsolationLevel (..), Mode (..))
 import qualified Hasql.Transaction.Sessions as Transaction
+import Positive.Data.Filename
 import Positive.Data.FilmRoll (FilmRoll)
 import Positive.Database.Session
-import Positive.Data.Filename
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
 import System.Directory
@@ -43,11 +43,11 @@ session :: [(Text, FilmRoll)] -> Transaction ()
 session filmRolls =
   for_ filmRolls $ \(path, filmRoll) -> do
     filmRollId <- insertFilmRoll path
-    images <- for (HashMap.toList filmRoll.frsSettings) $ \(_, settings) ->
-      insertImageSettings filmRollId settings filmRoll.frsRatings
+    images <- for (HashMap.toList filmRoll.imageSettings) $ \(_, settings) ->
+      insertImageSettings filmRollId settings
     let poster =
           fst
             <$> List.find
-              (\(_, filename) -> Just filename == fmap toText filmRoll.frsPoster)
+              (\(_, filename) -> Just filename == fmap toText filmRoll.poster)
               images
     updatePoster poster filmRollId

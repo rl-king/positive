@@ -2,6 +2,7 @@ module Positive.Prelude
   ( module X,
     rightToMaybe,
     tshow,
+    identity,
     unlessM,
     whenM,
   )
@@ -52,7 +53,10 @@ import GHC.Float as X (int2Double)
 import GHC.Generics as X (Generic, Generic1, Rep)
 import Numeric.Natural as X (Natural)
 import Text.Read as X (readMaybe)
-import Prelude as X hiding (log, undefined)
+import Prelude as X hiding (id, log, undefined)
+
+identity :: a -> a
+identity x = x
 
 tshow :: Show a => a -> Text
 tshow =
