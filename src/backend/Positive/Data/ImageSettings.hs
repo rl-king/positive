@@ -18,13 +18,16 @@ import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
 import Positive.Data.Filename
+import Positive.Data.Id (ImageSettingsId)
+import qualified Positive.Data.Id as Id
 import Positive.Prelude
 import Servant
 
 -- SETTINGS
 
 data ImageSettings = ImageSettings
-  { filename :: !Filename,
+  { imageSettingsId :: ImageSettingsId,
+    filename :: !Filename,
     rating :: !Int16,
     rotate :: !Double,
     crop :: !ImageCrop,
@@ -49,6 +52,10 @@ instance FromHttpApiData ImageSettings where
     first Text.pack $
       Aeson.eitherDecodeStrict =<< Base64.decode (encodeUtf8 piece)
   parseQueryParam = parseUrlPiece
+
+emptyImageSettings :: Filename -> ImageSettings
+emptyImageSettings x =
+  ImageSettings (Id.pack 0) x 0 0 emptyCrop 2.2 emptyZones 0 1 mempty
 
 -- Zones
 

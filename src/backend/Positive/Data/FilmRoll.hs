@@ -23,13 +23,15 @@ import qualified Language.Elm.Type as Type
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
 import Positive.Data.Filename
+import Positive.Data.Id
 import Positive.Data.ImageSettings
 import Positive.Prelude
 
 -- FILMROLLSETTINGS
 
 data FilmRoll = FilmRoll
-  { id :: Int32,
+  { filmRollId :: FilmRollId,
+    directoryPath :: Text,
     poster :: Maybe Filename,
     imageSettings :: HashMap Filename ImageSettings
   }
@@ -43,9 +45,9 @@ data FilmRoll = FilmRoll
     )
     via Elm.ElmType FilmRoll
 
-empty :: Int32 -> FilmRoll
+empty :: FilmRollId -> FilmRoll
 empty id =
-  FilmRoll id Nothing mempty
+  FilmRoll id "" Nothing mempty
 
 -- isEmpty :: FilmRoll -> Bool
 -- isEmpty =

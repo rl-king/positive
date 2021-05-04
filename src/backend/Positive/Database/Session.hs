@@ -1,5 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
+{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 
 module Positive.Database.Session where
 
@@ -14,13 +16,15 @@ import Hasql.Transaction (Transaction)
 import qualified Hasql.Transaction as Transaction
 import Positive.Data.Filename
 import Positive.Data.FilmRoll
+import Positive.Data.Id
+import qualified Positive.Data.Id as Id
 import Positive.Data.ImageSettings
 import qualified Positive.Database.Statement as Statement
 import Positive.Prelude
 
 -- INSERT
 
-insertImageSettings :: Int32 -> Filename -> Transaction (Int32, Text)
+insertImageSettings :: FilmRollId -> Filename -> Transaction (ImageSettingsId, Text)
 insertImageSettings filmRollId filename =
   let toInitalSettings (filmRollId, filename) =
         ( toText filename,
@@ -32,28 +36,29 @@ insertImageSettings filmRollId filename =
           0,
           1,
           Aeson.toJSON @[Expression] [],
-          filmRollId
+          Id.unpack filmRollId
         )
    in Transaction.statement (filmRollId, filename) $
-        lmap toInitalSettings Statement.insertImageSettings
+        dimap toInitalSettings (first Id.pack) Statement.insertImageSettings
 
-insertFilmRoll :: Text -> Transaction Int32
+insertFilmRoll :: Text -> Transaction FilmRollId
 insertFilmRoll path =
-  Transaction.statement path Statement.insertFilmRoll
+  Transaction.statement path $
+    rmap Id.pack Statement.insertFilmRoll
 
 -- UPDATE
 
-updateFilmRoll :: Int32 -> FilmRoll -> Transaction ()
-updateFilmRoll filmRollId filmRoll =
-  traverse_ (updateImageSettings filmRollId) $
+updateFilmRoll :: FilmRoll -> Transaction ()
+updateFilmRoll filmRoll =
+  traverse_ updateImageSettings $
     HashMap.elems filmRoll.imageSettings
 
-updateImageSettings :: Int32 -> ImageSettings -> Transaction Int32
-updateImageSettings imageId imageSettings =
-  Transaction.statement (imageId, imageSettings) $
+updateImageSettings :: ImageSettings -> Transaction Int32
+updateImageSettings imageSettings =
+  Transaction.statement imageSettings $
     lmap
-      ( \(iId, s) ->
-          ( iId,
+      ( \s ->
+          ( Id.unpack s.imageSettingsId,
             s.rotate,
             Aeson.toJSON s.crop,
             s.gamma,
@@ -65,54 +70,16 @@ updateImageSettings imageId imageSettings =
       )
       Statement.updateImageSettings
 
-updatePoster :: Maybe Int32 -> Int32 -> Transaction Int32
+updatePoster :: Maybe ImageSettingsId -> FilmRollId -> Transaction FilmRollId
 updatePoster imageId filmRollId =
-  Transaction.statement (imageId, filmRollId) Statement.updatePoster
+  Transaction.statement (imageId, filmRollId) $
+    dimap (bimap (fmap Id.unpack) Id.unpack) Id.pack Statement.updatePoster
 
 -- SELECT
 
 selectFilmRolls :: Session (HashMap Text FilmRoll)
 selectFilmRolls =
-  let toPair
-        ( filmRollId,
-          path,
-          poster,
-          _imageId,
-          filename,
-          rating,
-          orientation,
-          cropValue,
-          gamma,
-          zonesValue,
-          blackpoint,
-          whitepoint,
-          expressionsValue
-          ) = do
-          crop <- Aeson.parseEither Aeson.parseJSON cropValue
-          zones <- Aeson.parseEither Aeson.parseJSON zonesValue
-          expressions <- Aeson.parseEither Aeson.parseJSON expressionsValue
-          pure
-            ( path,
-              FilmRoll
-                { id = filmRollId,
-                  poster = fmap Filename poster,
-                  imageSettings =
-                    HashMap.singleton
-                      (Filename filename)
-                      ImageSettings
-                        { filename = Filename filename,
-                          rating = rating,
-                          rotate = orientation,
-                          crop = crop,
-                          gamma = gamma,
-                          zones = zones,
-                          blackpoint = blackpoint,
-                          whitepoint = whitepoint,
-                          expressions = expressions
-                        }
-                }
-            )
-      merge (path, newFilmRoll) acc =
+  let merge newFilmRoll acc =
         HashMap.alter
           ( \case
               Nothing ->
@@ -125,9 +92,58 @@ selectFilmRolls =
                         newFilmRoll.imageSettings <> existingFilmRoll.imageSettings
                     }
           )
-          path
+          newFilmRoll.directoryPath
           acc
       toHashMap =
-        bimap Text.pack (foldr merge mempty) . traverse toPair
+        fmap (foldr merge mempty) . traverse filmRollFromTuple
    in Session.statement () $
         refineResult (toHashMap . Vector.toList) Statement.selectFilmRolls
+
+selectFilmRoll :: FilmRollId -> Session FilmRoll
+selectFilmRoll filmRollId =
+  Session.statement filmRollId
+    . lmap Id.unpack
+    $ refineResult filmRollFromTuple Statement.selectFilmRoll
+
+-- MAPPING
+
+filmRollFromTuple :: _ -> Either Text FilmRoll
+filmRollFromTuple
+  ( filmRollId,
+    directoryPath,
+    poster,
+    imageSettingsId,
+    filename,
+    rating,
+    orientation,
+    cropValue,
+    gamma,
+    zonesValue,
+    blackpoint,
+    whitepoint,
+    expressionsValue
+    ) = do
+    crop <- first Text.pack $ Aeson.parseEither Aeson.parseJSON cropValue
+    zones <- first Text.pack $ Aeson.parseEither Aeson.parseJSON zonesValue
+    expressions <- first Text.pack $ Aeson.parseEither Aeson.parseJSON expressionsValue
+    pure $
+      FilmRoll
+        { filmRollId = Id.pack filmRollId,
+          directoryPath = directoryPath,
+          poster = fmap Filename poster,
+          imageSettings =
+            HashMap.singleton
+              (Filename filename)
+              ImageSettings
+                { imageSettingsId = Id.pack imageSettingsId,
+                  filename = Filename filename,
+                  rating = rating,
+                  rotate = orientation,
+                  crop = crop,
+                  gamma = gamma,
+                  zones = zones,
+                  blackpoint = blackpoint,
+                  whitepoint = whitepoint,
+                  expressions = expressions
+                }
+        }

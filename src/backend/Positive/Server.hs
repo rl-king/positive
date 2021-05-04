@@ -24,6 +24,7 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import qualified Hasql.Pool
+import qualified Hasql.Session as Hasql
 import Hasql.Transaction.Sessions (IsolationLevel (..), Mode (..))
 import qualified Hasql.Transaction.Sessions as Transaction
 import Network.Wai.EventSource
@@ -32,6 +33,7 @@ import Positive.Api
 import qualified Positive.CLI as CLI
 import qualified Positive.Data.Filename as Filename
 import Positive.Data.FilmRoll (FilmRoll)
+import Positive.Data.Id
 import Positive.Data.ImageSettings
   ( CoordinateInfo (..),
     Expression (..),
@@ -139,19 +141,19 @@ handleImage dir settings = do
 
 -- SAVE
 
-handleSaveFilmRoll :: Int32 -> FilmRoll -> PositiveT Handler FilmRoll
-handleSaveFilmRoll filmRollId newSettings = do
+handleSaveFilmRoll :: FilmRollId -> FilmRoll -> PositiveT Handler FilmRoll
+handleSaveFilmRoll _filmRollId filmRoll = do
   pool <- asks sqlPool
   _ <-
     liftIO . Hasql.Pool.use pool $
       Transaction.transaction Serializable Write $
-        Session.updateFilmRoll filmRollId newSettings
+        Session.updateFilmRoll filmRoll
   logDebug "Wrote settings"
   env <- ask
   missing <- Preview.findMissingPreviews False
   void . liftIO $ MVar.tryPutMVar env.previewMVar missing
   logDebug $ "Updating " <> tshow (length missing) <> " preview(s)"
-  pure newSettings
+  pure filmRoll
 
 -- CHECK EXPRESSIONS
 
@@ -168,21 +170,22 @@ handleCheckExpressions exprs =
 
 -- GENERATE
 
-handleGenerateHighRes :: Text -> ImageSettings -> PositiveT Handler NoContent
-handleGenerateHighRes dir settings = do
-  let input = Text.unpack dir </> Filename.toFilePath settings.filename
+handleGenerateHighRes :: FilmRollId -> ImageSettings -> PositiveT Handler NoContent
+handleGenerateHighRes filmRollId settings = do
+  filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+  let input = Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename
   env <- ask
-  error "todo"
-  -- SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
+  SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
   pure NoContent
 
-handleGenerateWallpaper :: Text -> ImageSettings -> PositiveT Handler NoContent
-handleGenerateWallpaper dir settings = do
-  let input = Text.unpack dir </> Filename.toFilePath settings.filename
+handleGenerateWallpaper :: FilmRollId -> ImageSettings -> PositiveT Handler NoContent
+handleGenerateWallpaper filmRollId settings = do
+  filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+  let input = Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename
       outputBase homeDir =
         homeDir
           </> "Documents/wallpapers/positive"
-          </> filter (\c -> not (isPathSeparator c || c == '.')) (Text.unpack dir)
+          </> filter (\c -> not (isPathSeparator c || c == '.')) (Text.unpack filmRoll.directoryPath)
           <> " | "
           <> Filename.toFilePath settings.filename
   log $ "Generating wallpaper version of: " <> Text.pack input
@@ -195,9 +198,10 @@ handleGenerateWallpaper dir settings = do
 
 -- OPEN EXTERNALEDITOR
 
-handleOpenExternalEditor :: Text -> ImageSettings -> PositiveT Handler NoContent
-handleOpenExternalEditor dir settings = do
-  let input = Text.unpack dir </> Filename.toFilePath settings.filename
+handleOpenExternalEditor :: FilmRollId -> ImageSettings -> PositiveT Handler NoContent
+handleOpenExternalEditor filmRollId settings = do
+  filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+  let input = Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename
   log $ "Opening in external editor: " <> Text.pack input
   image <-
     handleLeft $
@@ -207,8 +211,8 @@ handleOpenExternalEditor dir settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Text -> ImageSettings -> PositiveT Handler [Int]
-handleGetSettingsHistogram dir settings =
+handleGetSettingsHistogram :: FilmRollId -> ImageSettings -> PositiveT Handler [Int]
+handleGetSettingsHistogram filmRollId settings =
   let toHistogram arr =
         Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
           (Massiv.Sz1 (1 + fromIntegral (maxBound :: Word8)))
@@ -216,9 +220,10 @@ handleGetSettingsHistogram dir settings =
             Massiv.forM_ arr $
               \(HIP.PixelY p) -> Massiv.modify marr (pure . (+) 1) (fromIntegral (HIP.toWord8 p))
    in do
+        filmRoll <- runSession $ Session.selectFilmRoll filmRollId
         (image, putMVarBack) <-
           getCachedImage settings.crop $
-            Text.pack (Text.unpack dir </> Filename.toFilePath settings.filename)
+            Text.pack (Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename)
         liftIO putMVarBack
         logDebug $ "Creating histogram for: " <> Filename.toText settings.filename
         pure . Massiv.toList . toHistogram . HIP.unImage $
@@ -227,10 +232,10 @@ handleGetSettingsHistogram dir settings =
 -- COORDINATE
 
 handleGetCoordinateInfo ::
-  Text ->
+  FilmRollId ->
   ([(Double, Double)], ImageSettings) ->
   PositiveT Handler [CoordinateInfo]
-handleGetCoordinateInfo dir (coordinates, settings) =
+handleGetCoordinateInfo filmRollId (coordinates, settings) =
   let toInfo image (x, y) =
         CoordinateInfo x y
           . (\(HIP.PixelY p) -> HIP.toDouble p)
@@ -239,24 +244,31 @@ handleGetCoordinateInfo dir (coordinates, settings) =
             (floor (int2Double (HIP.rows image) * y))
             (floor (int2Double (HIP.cols image) * x))
    in do
+        filmRoll <- runSession $ Session.selectFilmRoll filmRollId
         (image, putMVarBack) <-
           first (Image.applySettings settings)
             <$> getCachedImage settings.crop
-              (Text.pack (Text.unpack dir </> Filename.toFilePath settings.filename))
+              ( Text.pack
+                  ( Text.unpack filmRoll.directoryPath
+                      </> Filename.toFilePath settings.filename
+                  )
+              )
         liftIO putMVarBack
         pure $ fmap (toInfo image) coordinates
 
 -- LIST DIRECTORIES
 
 handleGetSettings :: PositiveT Handler [(Text, FilmRoll)]
-handleGetSettings = do
-  pool <- asks sqlPool
-  result <- liftIO $ Hasql.Pool.use pool Session.selectFilmRolls
-  case result of
-    Left _ -> throwError err500
-    Right filmRolls -> pure $ HashMap.toList filmRolls
+handleGetSettings =
+  HashMap.toList <$> runSession Session.selectFilmRolls
 
 -- HANDLER HELPERS
+
+runSession :: Hasql.Session a -> PositiveT Handler a
+runSession session = do
+  pool <- asks sqlPool
+  result <- liftIO $ Hasql.Pool.use pool session
+  either (\err -> log (tshow err) >> throwError err500) pure result
 
 handleLeft :: PositiveT Handler (Either err a) -> PositiveT Handler a
 handleLeft m =

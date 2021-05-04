@@ -8,6 +8,7 @@ module Positive.Api where
 import Data.ByteString.Lazy (ByteString)
 import Network.HTTP.Media ((//))
 import Positive.Data.FilmRoll
+import Positive.Data.Id
 import Positive.Data.ImageSettings
 import Positive.Prelude hiding (ByteString)
 import Servant
@@ -35,7 +36,7 @@ data ImageApi route = ImageApi
 data SettingsApi route = SettingsApi
   { saveFilmRoll ::
       route :- "film-roll"
-        :> Capture "filmRollId" Int32
+        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] FilmRoll
         :> Post '[JSON] FilmRoll,
     checkExpressions ::
@@ -47,27 +48,27 @@ data SettingsApi route = SettingsApi
         :> Get '[JSON] [(Text, FilmRoll)],
     getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
-        :> QueryParam' '[Required, Strict] "dir" Text
+        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
     generateHighRes ::
       route :- "image" :> "settings" :> "highres"
-        :> QueryParam' '[Required, Strict] "dir" Text
+        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     openExternalEditor ::
       route :- "image" :> "settings" :> "externaleditor"
-        :> QueryParam' '[Required, Strict] "dir" Text
+        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     getCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
-        :> QueryParam' '[Required, Strict] "dir" Text
+        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)
         :> Post '[JSON] [CoordinateInfo],
     generateWallpaper ::
       route :- "image" :> "settings" :> "wallpaper"
-        :> QueryParam' '[Required, Strict] "dir" Text
+        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent
   }
