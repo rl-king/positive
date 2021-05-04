@@ -1,8 +1,12 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Positive.Data.Id
   ( pack,
@@ -14,30 +18,39 @@ module Positive.Data.Id
 where
 
 import qualified Data.Aeson as Aeson
-import qualified Generics.SOP as SOP
+import qualified Data.String as String
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Prelude hiding (pack)
 import Servant
 
 newtype Id (a :: Symbol)
   = Id Int32
-  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
-  deriving (ToHttpApiData, FromHttpApiData) via Int32
+  deriving (Show, Eq, Generic, NFData)
   deriving
-    ( Aeson.ToJSON,
-      Aeson.FromJSON,
-      Elm.HasElmType,
-      Elm.HasElmDecoder Aeson.Value,
-      Elm.HasElmEncoder Aeson.Value,
-      Elm.HasElmEncoder Text
+    ( ToHttpApiData,
+      FromHttpApiData,
+      Aeson.ToJSON,
+      Aeson.FromJSON
     )
     via Int32
 
+instance KnownSymbol a => Elm.HasElmType (Id a) where
+  elmType =
+    String.fromString $ "Data.Id." <> symbolVal (Proxy @a)
+
+instance KnownSymbol a => Elm.HasElmDecoder Aeson.Value (Id a) where
+  elmDecoder =
+    "Data.Id.fromJson"
+
+instance KnownSymbol a => Elm.HasElmEncoder Aeson.Value (Id a) where
+  elmEncoder =
+    "Data.Id.toJson"
+
 type FilmRollId =
-  Id "FilmRoll"
+  Id "FilmRollId"
 
 type ImageSettingsId =
-  Id "ImageSettings"
+  Id "ImageSettingsId"
 
 unpack :: Id a -> Int32
 unpack (Id id) = id
