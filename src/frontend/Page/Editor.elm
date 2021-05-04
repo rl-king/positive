@@ -427,7 +427,7 @@ update key msg model =
             let
                 getHistogram =
                     Cmd.map GotHistogram <|
-                        Request.postImageSettingsHistogram dir settings
+                        Request.postImageSettingsHistogramByFilmRollId dir settings
 
                 updateCoordinateInfo =
                     if Dict.isEmpty model.coordinateInfo then
@@ -435,7 +435,7 @@ update key msg model =
 
                     else
                         Cmd.map GotCoordinateInfo <|
-                            Request.postImageSettingsCoordinate model.route.dir
+                            Request.postImageSettingsCoordinateByFilmRollId model.route.dir
                                 ( Dict.keys model.coordinateInfo
                                 , Zipper.current model.filmRoll
                                 )
@@ -486,7 +486,7 @@ update key msg model =
                     (\cmds ->
                         Cmd.batch
                             [ Cmd.map (GotGenerate "highres") <|
-                                Request.postImageSettingsHighres
+                                Request.postImageSettingsHighresByFilmRollId
                                     model.route.dir
                                     (Zipper.current model.filmRoll)
                             , cmds
@@ -499,7 +499,7 @@ update key msg model =
                     (\cmds ->
                         Cmd.batch
                             [ Cmd.map (GotGenerate "wallpaper") <|
-                                Request.postImageSettingsWallpaper
+                                Request.postImageSettingsWallpaperByFilmRollId
                                     model.route.dir
                                     (Zipper.current model.filmRoll)
                             , cmds
@@ -623,7 +623,7 @@ update key msg model =
                     Dict.insert ( cX, cY ) (CoordinateInfo cX cY 0) model.coordinateInfo
               }
             , Cmd.map GotCoordinateInfo <|
-                Request.postImageSettingsCoordinate model.route.dir
+                Request.postImageSettingsCoordinateByFilmRollId model.route.dir
                     ( [ ( cX, cY ) ], Zipper.current model.filmRoll )
             )
 
@@ -655,7 +655,7 @@ update key msg model =
         OpenExternalEditor ->
             ( model
             , Cmd.map GotOpenExternalEditor <|
-                Request.postImageSettingsExternaleditor model.route.dir <|
+                Request.postImageSettingsExternaleditorByFilmRollId model.route.dir <|
                     Zipper.current model.filmRoll
             )
 

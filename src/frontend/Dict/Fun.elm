@@ -1,5 +1,6 @@
 module Dict.Fun exposing
     ( Dict
+    , Id
     , decoder
     , empty
     , encode
@@ -14,6 +15,7 @@ module Dict.Fun exposing
     , values
     )
 
+import Data.Id
 import Dict
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -21,6 +23,10 @@ import Json.Encode as Encode
 
 type Dict k comparable v
     = Dict (k -> comparable) (comparable -> k) (Dict.Dict comparable v)
+
+
+type alias Id a v =
+    Dict (Data.Id.Id a) Int v
 
 
 empty : (k -> comparable) -> (comparable -> k) -> Dict k comparable v
@@ -83,10 +89,10 @@ foldl f acc (Dict _ g dict) =
 
 
 decoder :
-    (k -> String)
-    -> (String -> k)
+    (k -> Int)
+    -> (Int -> k)
     -> Decode.Decoder v
-    -> Decode.Decoder (Dict k String v)
+    -> Decode.Decoder (Dict k Int v)
 decoder f g =
     Decode.map (fromList f g << List.map (Tuple.mapFirst g))
         << Decode.keyValuePairs

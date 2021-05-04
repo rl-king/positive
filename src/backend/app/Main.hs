@@ -1,7 +1,6 @@
 module Main where
 
 import qualified Positive.CLI as CLI
-import qualified Positive.Import as Import
 import qualified Positive.Init as Init
 import qualified Positive.Log as Log
 import Positive.Prelude
@@ -23,5 +22,4 @@ main = do
         CLI.Init replace -> Init.run replace >> Preview.run log replace
         CLI.Previews replace -> Preview.run log replace
         CLI.SingleImage filepath -> SingleImage.run log filepath
-        CLI.Import -> Import.run log
         CLI.Server isDev port -> Server.run logger isDev port

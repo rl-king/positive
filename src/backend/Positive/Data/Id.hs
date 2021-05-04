@@ -18,7 +18,6 @@ module Positive.Data.Id
 where
 
 import qualified Data.Aeson as Aeson
-import qualified Data.String as String
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Prelude hiding (pack)
 import Servant
@@ -36,7 +35,7 @@ newtype Id (a :: Symbol)
 
 instance KnownSymbol a => Elm.HasElmType (Id a) where
   elmType =
-    String.fromString $ "Data.Id." <> symbolVal (Proxy @a)
+    fromString $ "Data.Id." <> symbolVal (Proxy @a)
 
 instance KnownSymbol a => Elm.HasElmDecoder Aeson.Value (Id a) where
   elmDecoder =
@@ -45,6 +44,10 @@ instance KnownSymbol a => Elm.HasElmDecoder Aeson.Value (Id a) where
 instance KnownSymbol a => Elm.HasElmEncoder Aeson.Value (Id a) where
   elmEncoder =
     "Data.Id.toJson"
+
+instance KnownSymbol a => Elm.HasElmEncoder Text (Id a) where
+  elmEncoder =
+    "Data.Id.toString"
 
 type FilmRollId =
   Id "FilmRollId"

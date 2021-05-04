@@ -75,7 +75,7 @@ findMissingPreviews replace =
 
 prependDir :: FilePath -> FilmRoll -> [(FilePath, ImageSettings)]
 prependDir dir settings =
-  (\x -> (dir </> Filename.toFilePath x.filename, x)) <$> FilmRoll.toList settings
+  (\x -> (dir </> Filename.toFilePath x.filename, x)) <$> settings.imageSettings
 
 -- WRITE
 

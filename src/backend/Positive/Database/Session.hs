@@ -49,9 +49,8 @@ insertFilmRoll path =
 -- UPDATE
 
 updateFilmRoll :: FilmRoll -> Transaction ()
-updateFilmRoll filmRoll =
-  traverse_ updateImageSettings $
-    HashMap.elems filmRoll.imageSettings
+updateFilmRoll =
+  traverse_ updateImageSettings . imageSettings
 
 updateImageSettings :: ImageSettings -> Transaction Int32
 updateImageSettings imageSettings =
@@ -130,11 +129,9 @@ filmRollFromTuple
       FilmRoll
         { filmRollId = Id.pack filmRollId,
           directoryPath = directoryPath,
-          poster = fmap Filename poster,
+          poster = fmap Id.pack poster,
           imageSettings =
-            HashMap.singleton
-              (Filename filename)
-              ImageSettings
+            [ ImageSettings
                 { imageSettingsId = Id.pack imageSettingsId,
                   filename = Filename filename,
                   rating = rating,
@@ -146,4 +143,5 @@ filmRollFromTuple
                   whitepoint = whitepoint,
                   expressions = expressions
                 }
+            ]
         }

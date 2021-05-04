@@ -3,7 +3,6 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
@@ -25,8 +24,7 @@ import Positive.Prelude
 
 newtype Filename = Filename Text
   deriving (Show, Eq, Generic)
-  deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo, NFData, Hashable)
-  deriving newtype (Aeson.ToJSONKey, Aeson.FromJSONKey)
+  deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
     ( Aeson.ToJSON,
       Aeson.FromJSON,

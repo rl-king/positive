@@ -1,10 +1,10 @@
 module Route exposing
-    ( EditorRoute
-    , Route(..)
+    ( Route(..)
     , fromUrl
     , toUrl
     )
 
+import Data.Id exposing (FilmRollId, ImageSettingsId)
 import Generated.Data exposing (Filename(..))
 import String.Interpolate exposing (interpolate)
 import Url exposing (Url)
@@ -19,31 +19,19 @@ import Url.Parser.Query
 
 type Route
     = Browser { minimumRating : Maybe Int }
-    | Editor EditorRoute
+    | Editor FilmRollId ImageSettingsId
     | DecodeError String
-
-
-type alias EditorRoute =
-    { dir : String
-    , filename : Filename
-    }
 
 
 fromUrl : Url -> Route
 fromUrl url =
     let
-        toEditorRoute a b =
-            Maybe.withDefault (DecodeError (interpolate "Failed to decode {0} {1}" [ a, b ])) <|
-                Maybe.map2 (\x y -> Editor { dir = x, filename = Filename y })
-                    (Url.percentDecode a)
-                    (Url.percentDecode b)
-
         parser =
             Url.Parser.oneOf
-                [ Url.Parser.map toEditorRoute <|
+                [ Url.Parser.map Editor <|
                     Url.Parser.s "editor"
-                        </> Url.Parser.string
-                        </> Url.Parser.string
+                        </> Data.Id.fromUrl
+                        </> Data.Id.fromUrl
                 , Url.Parser.map (\x -> Browser { minimumRating = x }) <|
                     Url.Parser.top
                         <?> Url.Parser.Query.int "rating"
@@ -61,12 +49,13 @@ toUrl route =
                 Maybe.withDefault [] <|
                     Maybe.map (List.singleton << Url.Builder.int "rating") minimumRating
 
-        Editor { dir, filename } ->
-            let
-                (Filename name) =
-                    filename
-            in
-            Url.Builder.absolute [ "editor", Url.percentEncode dir, Url.percentEncode name ] []
+        Editor filmRollId imageSettingsId ->
+            Url.Builder.absolute
+                [ "editor"
+                , Data.Id.toString filmRollId
+                , Data.Id.toString imageSettingsId
+                ]
+                []
 
         DecodeError _ ->
             Url.Builder.absolute [] []
