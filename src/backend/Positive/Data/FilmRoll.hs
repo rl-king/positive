@@ -20,7 +20,7 @@ import Positive.Prelude
 -- FILMROLL
 
 data FilmRoll = FilmRoll
-  { filmRollId :: FilmRollId,
+  { id :: FilmRollId,
     directoryPath :: Text,
     poster :: Maybe ImageSettingsId,
     imageSettings :: [ImageSettings]

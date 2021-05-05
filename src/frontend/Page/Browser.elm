@@ -37,12 +37,11 @@ import Util exposing (..)
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Maybe.withDefault Sub.none <|
-        Maybe.map2
-            (\filmRoll ( dir, offset ) ->
+        Maybe.map
+            (\( filmRoll, offset ) ->
                 Browser.Events.onKeyDown <|
                     matchKey "p" (SetPoster (focusWithOffset offset filmRoll))
             )
-            (Maybe.andThen (\( id, _ ) -> Dict.Fun.get id model.filmRolls) model.filmRollHover)
             model.filmRollHover
 
 
@@ -50,19 +49,15 @@ subscriptions model =
 -- MODEL
 
 
-type alias FilmRolls =
-    Dict.Fun.Id { filmRollId : () } FilmRoll
-
-
 type alias Model =
-    { filmRolls : FilmRolls
-    , filmRollHover : Maybe ( FilmRollId, Float )
+    { filmRolls : List FilmRoll
+    , filmRollHover : Maybe ( FilmRoll, Float )
     , minimumRating : Maybe Int
     , columns : Int
     }
 
 
-init : { minimumRating : Maybe Int } -> FilmRolls -> Model
+init : { minimumRating : Maybe Int } -> List FilmRoll -> Model
 init { minimumRating } filmRolls =
     { filmRolls = filmRolls
     , filmRollHover = Nothing
@@ -76,10 +71,10 @@ init { minimumRating } filmRolls =
 
 
 type Msg
-    = OnFilmRollHoverStart FilmRollId Float
+    = OnFilmRollHoverStart FilmRoll Float
     | OnFilmRollHoverMove Float
     | OnFilmRollHoverEnd
-    | SetPoster (Maybe ( FilmRoll, ImageSettingsId ))
+    | SetPoster (Maybe ( FilmRoll, ImageSettings ))
     | GotSaveImageSettings FilmRollId (HttpResult FilmRoll)
     | SetMinRating Int
     | SetColumnCount Int
@@ -88,8 +83,8 @@ type Msg
 update : Browser.Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
 update key msg model =
     case msg of
-        OnFilmRollHoverStart id offset ->
-            ( { model | filmRollHover = Just ( id, offset ) }, Cmd.none )
+        OnFilmRollHoverStart filmRoll offset ->
+            ( { model | filmRollHover = Just ( filmRoll, offset ) }, Cmd.none )
 
         OnFilmRollHoverMove offset ->
             ( { model
@@ -102,8 +97,11 @@ update key msg model =
         OnFilmRollHoverEnd ->
             ( { model | filmRollHover = Nothing }, Cmd.none )
 
-        GotSaveImageSettings id (Ok settings) ->
-            ( { model | filmRolls = Dict.Fun.insert id settings model.filmRolls }
+        GotSaveImageSettings id (Ok filmRoll) ->
+            ( { model
+                | filmRolls =
+                    filmRoll :: List.filter ((/=) id << .id) model.filmRolls
+              }
             , Cmd.none
             )
 
@@ -113,11 +111,11 @@ update key msg model =
         SetPoster Nothing ->
             ( model, Cmd.none )
 
-        SetPoster (Just ( filmRoll, imageSettingsId )) ->
+        SetPoster (Just ( filmRoll, imageSettings )) ->
             ( model
-            , Cmd.map (GotSaveImageSettings filmRoll.filmRollId) <|
-                Request.postFilmrollByFilmRollId filmRoll.filmRollId <|
-                    { filmRoll | poster = Just imageSettingsId }
+            , Cmd.map (GotSaveImageSettings filmRoll.id) <|
+                Request.postFilmroll <|
+                    { filmRoll | poster = Just imageSettings.id }
             )
 
         SetMinRating 0 ->
@@ -188,20 +186,18 @@ view model =
                 Nothing ->
                     div [ class "browser-filmrolls" ] <|
                         List.map (viewFilmRollBrowserRoll model.columns model.filmRollHover) <|
-                            List.sortWith sorter <|
-                                Dict.Fun.values model.filmRolls
+                            List.sortWith sorter model.filmRolls
 
                 Just n ->
                     div [ class "browser-rated" ] <|
                         List.map (viewFilmRollBrowserRated n) <|
-                            List.sortWith sorter <|
-                                Dict.Fun.values model.filmRolls
+                            List.sortWith sorter model.filmRolls
             , footer []
                 [ text "Total photos: "
                 , text <|
                     String.fromInt <|
-                        Dict.Fun.foldl
-                            (\_ v acc -> Dict.Fun.size v.imageSettings + acc)
+                        List.foldl
+                            (\v acc -> List.length v.imageSettings + acc)
                             0
                             model.filmRolls
                 ]
@@ -215,7 +211,7 @@ view model =
 
 viewFilmRollBrowserRated : Int -> FilmRoll -> Html Msg
 viewFilmRollBrowserRated minimumRating filmRoll =
-    case List.filter ((<=) minimumRating << .rating) (Dict.Fun.values filmRoll.imageSettings) of
+    case List.filter ((<=) minimumRating << .rating) filmRoll.imageSettings of
         [] ->
             div [] []
 
@@ -237,7 +233,7 @@ viewRatedImage filmRoll imageSettings =
             else
                 Icon.unstarred
     in
-    a [ href (Route.toUrl (Route.Editor filmRoll.filmRollId imageSettings.imageSettingsId)) ]
+    a [ href (Route.toUrl (Route.Editor filmRoll.id imageSettings.id)) ]
         [ img [ src (toPreviewUrl filmRoll imageSettings) ] []
         , text <|
             Image.filenameToString imageSettings.filename
@@ -250,7 +246,7 @@ viewRatedImage filmRoll imageSettings =
 -- ROLLS
 
 
-viewFilmRollBrowserRoll : Int -> Maybe ( FilmRollId, Float ) -> FilmRoll -> Html Msg
+viewFilmRollBrowserRoll : Int -> Maybe ( FilmRoll, Float ) -> FilmRoll -> Html Msg
 viewFilmRollBrowserRoll columns filmRollHover filmRoll =
     let
         name =
@@ -268,18 +264,16 @@ viewFilmRollBrowserRoll columns filmRollHover filmRoll =
                 name
 
         poster =
-            case Maybe.map (Tuple.mapFirst ((==) filmRoll.filmRollId)) filmRollHover of
+            case Maybe.map (Tuple.mapFirst ((==) filmRoll)) filmRollHover of
                 Just ( True, offset ) ->
-                    focusWithOffset offset filmRoll
+                    Maybe.map Tuple.second <|
+                        focusWithOffset offset filmRoll
 
                 _ ->
-                    Maybe.map .imageSettingsId <|
-                        choice
-                            [ Maybe.andThen
-                                (\imageSettingsId -> Dict.Fun.get imageSettingsId filmRoll.imageSettings)
-                                filmRoll.poster
-                            , List.head (Dict.Fun.values filmRoll.imageSettings)
-                            ]
+                    choice
+                        [ currentPoster filmRoll
+                        , List.head filmRoll.imageSettings
+                        ]
 
         width =
             style "width" <|
@@ -287,11 +281,11 @@ viewFilmRollBrowserRoll columns filmRollHover filmRoll =
     in
     div
         [ classList [ ( "browser-filmroll", True ), ( "browser-filmroll-small", columns > 4 ) ]
-        , title dir
+        , title filmRoll.directoryPath
         , width
         ]
         [ viewMaybe poster <|
-            viewFilmRollBrowserImage dir
+            viewFilmRollBrowserImage filmRoll
         , h2 [] [ text shortTitle ]
         ]
 
@@ -306,12 +300,12 @@ viewFilmRollBrowserImage filmRoll imageSettings =
     in
     a
         [ on "mouseover" <|
-            decodeOffset (OnFilmRollHoverStart dir)
+            decodeOffset (OnFilmRollHoverStart filmRoll)
         , on "mousemove" <|
             decodeOffset OnFilmRollHoverMove
         , on "mouseleave" <|
             Decode.succeed OnFilmRollHoverEnd
-        , href (Route.toUrl (Route.Editor filmRoll.filmRollId imageSettings.imageSettingsId))
+        , href (Route.toUrl (Route.Editor filmRoll.id imageSettings.id))
         ]
         [ span
             [ style "background-image" <|
@@ -338,9 +332,15 @@ toPreviewUrl filmRoll imageSettings =
 -- HELPERS
 
 
-focusWithOffset : Float -> FilmRoll -> Maybe ( FilmRoll, ImageSettingsId )
+currentPoster : FilmRoll -> Maybe ImageSettings
+currentPoster filmRoll =
+    Maybe.andThen
+        (\posterId -> List.head (List.filter ((==) posterId << .id) filmRoll.imageSettings))
+        filmRoll.poster
+
+
+focusWithOffset : Float -> FilmRoll -> Maybe ( FilmRoll, ImageSettings )
 focusWithOffset offset filmRoll =
-    Dict.Fun.values filmRoll.imageSettings
-        |> List.drop (round (toFloat (Dict.Fun.size filmRoll.imageSettings) * offset) - 1)
+    List.drop (round (toFloat (List.length filmRoll.imageSettings) * offset) - 1) filmRoll.imageSettings
         |> List.head
-        |> Maybe.map (\imageSettins -> ( filmRoll, imageSettins.imageSettingsId ))
+        |> Maybe.map (\imageSettings -> ( filmRoll, imageSettings ))

@@ -26,7 +26,7 @@ import Servant
 -- SETTINGS
 
 data ImageSettings = ImageSettings
-  { imageSettingsId :: ImageSettingsId,
+  { id :: ImageSettingsId,
     filename :: !Filename,
     rating :: !Int16,
     rotate :: !Double,

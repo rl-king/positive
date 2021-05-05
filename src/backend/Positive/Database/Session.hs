@@ -57,7 +57,7 @@ updateImageSettings imageSettings =
   Transaction.statement imageSettings $
     lmap
       ( \s ->
-          ( Id.unpack s.imageSettingsId,
+          ( Id.unpack s.id,
             s.rotate,
             Aeson.toJSON s.crop,
             s.gamma,
@@ -76,7 +76,7 @@ updatePoster imageId filmRollId =
 
 -- SELECT
 
-selectFilmRolls :: Session (HashMap Text FilmRoll)
+selectFilmRolls :: Session [FilmRoll]
 selectFilmRolls =
   let merge newFilmRoll acc =
         HashMap.alter
@@ -91,18 +91,24 @@ selectFilmRolls =
                         newFilmRoll.imageSettings <> existingFilmRoll.imageSettings
                     }
           )
-          newFilmRoll.directoryPath
+          newFilmRoll.id
           acc
-      toHashMap =
-        fmap (foldr merge mempty) . traverse filmRollFromTuple
+      toFilmRolls =
+        fmap (HashMap.elems . foldr merge mempty) . traverse filmRollFromTuple
    in Session.statement () $
-        refineResult (toHashMap . Vector.toList) Statement.selectFilmRolls
+        refineResult toFilmRolls Statement.selectFilmRolls
 
 selectFilmRoll :: FilmRollId -> Session FilmRoll
 selectFilmRoll filmRollId =
   Session.statement filmRollId
     . lmap Id.unpack
     $ refineResult filmRollFromTuple Statement.selectFilmRoll
+
+selectFilmRollByImageSettings :: ImageSettingsId -> Session FilmRoll
+selectFilmRollByImageSettings imageSettingsId =
+  Session.statement imageSettingsId
+    . lmap Id.unpack
+    $ refineResult filmRollFromTuple Statement.selectFilmRollByImageSettings
 
 -- MAPPING
 
@@ -127,12 +133,12 @@ filmRollFromTuple
     expressions <- first Text.pack $ Aeson.parseEither Aeson.parseJSON expressionsValue
     pure $
       FilmRoll
-        { filmRollId = Id.pack filmRollId,
+        { id = Id.pack filmRollId,
           directoryPath = directoryPath,
           poster = fmap Id.pack poster,
           imageSettings =
             [ ImageSettings
-                { imageSettingsId = Id.pack imageSettingsId,
+                { id = Id.pack imageSettingsId,
                   filename = Filename filename,
                   rating = rating,
                   rotate = orientation,

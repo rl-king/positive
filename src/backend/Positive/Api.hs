@@ -36,7 +36,6 @@ data ImageApi route = ImageApi
 data SettingsApi route = SettingsApi
   { saveFilmRoll ::
       route :- "film-roll"
-        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] FilmRoll
         :> Post '[JSON] FilmRoll,
     checkExpressions ::
@@ -45,30 +44,25 @@ data SettingsApi route = SettingsApi
         :> Post '[JSON] [ExpressionResult],
     getSettings ::
       route :- "image" :> "settings"
-        :> Get '[JSON] [(Text, FilmRoll)],
+        :> Get '[JSON] [FilmRoll],
     getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
-        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> Post '[JSON] [Int],
     generateHighRes ::
       route :- "image" :> "settings" :> "highres"
-        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     openExternalEditor ::
       route :- "image" :> "settings" :> "externaleditor"
-        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
     getCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
-        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)
         :> Post '[JSON] [CoordinateInfo],
     generateWallpaper ::
       route :- "image" :> "settings" :> "wallpaper"
-        :> Capture "filmRollId" FilmRollId
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent
   }

@@ -70,6 +70,19 @@ selectFilmRoll =
     where film_roll.id = $1 :: int4
   |]
 
+selectFilmRollByImageSettings :: Statement Int32 _
+selectFilmRollByImageSettings =
+  [singletonStatement|
+    select
+      film_roll.id :: int4, directory_path :: text, poster :: int4?,
+      image.id :: int4, filename :: text, rating :: int2, orientation :: float8,
+      crop :: jsonb, gamma :: float8, zones :: jsonb, blackpoint :: float8,
+      whitepoint :: float8, expressions :: jsonb
+    from positive.film_roll
+      join positive.image on film_roll.id = image.film_roll_id
+    where image.id = $1 :: int4
+  |]
+
 selectFilmRolls :: Statement () (Vector _)
 selectFilmRolls =
   [vectorStatement|

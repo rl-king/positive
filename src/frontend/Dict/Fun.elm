@@ -1,9 +1,7 @@
 module Dict.Fun exposing
     ( Dict
     , Id
-    , decoder
     , empty
-    , encode
     , foldl
     , fromList
     , get
@@ -86,18 +84,3 @@ fromList f g list =
 foldl : (k -> v -> b -> b) -> b -> Dict k comparable v -> b
 foldl f acc (Dict _ g dict) =
     Dict.foldl (\a b c -> f (g a) b c) acc dict
-
-
-decoder :
-    (k -> Int)
-    -> (Int -> k)
-    -> Decode.Decoder v
-    -> Decode.Decoder (Dict k Int v)
-decoder f g =
-    Decode.map (fromList f g << List.map (Tuple.mapFirst g))
-        << Decode.keyValuePairs
-
-
-encode : (v -> Encode.Value) -> Dict k String v -> Encode.Value
-encode g (Dict _ _ dict) =
-    Encode.dict identity g dict

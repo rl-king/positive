@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Navigation as Navigation
+import Data.Id as Id
 import Dict exposing (Dict)
 import Dict.Fun
 import Generated.Data as Image exposing (Filename(..), FilmRoll)
@@ -72,7 +73,7 @@ subscriptions model =
 
 
 type alias Model =
-    { filmRolls : Status FilmRolls
+    { filmRolls : Status (List FilmRoll)
     , page : Page
     , key : Navigation.Key
     , scrollTo : ScrollTo.State
@@ -84,10 +85,6 @@ type Page
     = Browser Page.Browser.Model
     | Editor Page.Editor.Model
     | Loading
-
-
-type alias FilmRolls =
-    Dict String FilmRoll
 
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
@@ -110,7 +107,7 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | CancelScroll
-    | GotFilmRolls Route (HttpResult (List ( String, FilmRoll )))
+    | GotFilmRolls Route (HttpResult (List FilmRoll))
     | RemoveNotification
     | OnServerMessage String
     | EditorMsg Page.Editor.Msg
@@ -145,7 +142,7 @@ update msg model =
 
         GotFilmRolls route (Ok filmRolls) ->
             onNavigation route <|
-                { model | filmRolls = Success (Dict.fromList filmRolls) }
+                { model | filmRolls = Success filmRolls }
 
         GotFilmRolls _ (Err _) ->
             pushNotification Warning
@@ -198,11 +195,12 @@ onNavigation route model =
             Image.filenameToString << .filename
 
         toSortedZipper filmRoll =
-            Zipper.fromList (List.sortBy sortFun (Dict.Fun.values filmRoll.imageSettings))
-                |> Maybe.map (\x -> ( x, filmRoll.frsRatings, filmRoll.poster ))
+            Zipper.fromList (List.sortBy sortFun filmRoll.imageSettings)
+                |> Maybe.map (Tuple.pair filmRoll)
 
-        toFilmRoll editorRoute filmRolls =
-            Dict.get editorRoute.dir filmRolls
+        toFilmRoll filmRollId filmRolls =
+            List.filter ((/=) filmRollId << .id) filmRolls
+                |> List.head
                 |> Maybe.andThen toSortedZipper
     in
     checkScrollPosition model.page <|
@@ -225,17 +223,17 @@ onNavigation route model =
                         , Cmd.none
                         )
 
-                    Route.Editor editorRoute ->
-                        case toFilmRoll editorRoute filmRolls of
+                    Route.Editor filmRollId imageSettingsId ->
+                        case toFilmRoll filmRollId filmRolls of
                             Nothing ->
                                 pushNotification Warning RemoveNotification "Error loading filmroll" model
 
-                            Just ( filmRoll, ratings, poster ) ->
+                            Just ( filmRoll, images ) ->
                                 case model.page of
                                     Editor m ->
                                         ( { model
                                             | page =
-                                                Editor (Page.Editor.continue editorRoute filmRoll ratings poster m)
+                                                Editor (Page.Editor.continue imageSettingsId images m)
                                           }
                                         , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                                         )
@@ -243,7 +241,7 @@ onNavigation route model =
                                     _ ->
                                         ( { model
                                             | page =
-                                                Editor (Page.Editor.init editorRoute filmRoll ratings poster)
+                                                Editor (Page.Editor.init filmRoll imageSettingsId images)
                                           }
                                         , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                                         )
@@ -279,9 +277,7 @@ extractUpdates model =
             { model
                 | filmRolls =
                     mapStatus
-                        (Dict.insert m.route.dir
-                            (FilmRoll m.poster m.ratings (fromZipper m.filmRoll))
-                        )
+                        ((::) m.filmRoll << List.filter ((/=) m.filmRoll.id << .id))
                         model.filmRolls
             }
 
@@ -294,7 +290,7 @@ checkScrollPosition : Page -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 checkScrollPosition previousPage ( model, cmd ) =
     case ( previousPage, model.page ) of
         ( Editor m1, Editor m2 ) ->
-            if m1.route /= m2.route then
+            if m1.images /= m2.images then
                 ( model, Cmd.batch [ cmd, Cmd.map ScrollToMsg ScrollTo.scrollToTop ] )
 
             else
@@ -335,7 +331,7 @@ view model =
         Editor m ->
             { title =
                 interpolate "{0} | {1} | Editor"
-                    [ Image.filenameToString m.route.filename, m.route.dir ]
+                    [ "todo", "todo" ]
             , body =
                 [ Html.map EditorMsg <|
                     Page.Editor.view m model.notifications

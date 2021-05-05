@@ -33,7 +33,6 @@ import Positive.Api
 import qualified Positive.CLI as CLI
 import qualified Positive.Data.Filename as Filename
 import Positive.Data.FilmRoll (FilmRoll)
-import Positive.Data.Id
 import Positive.Data.ImageSettings
   ( CoordinateInfo (..),
     Expression (..),
@@ -141,8 +140,8 @@ handleImage dir settings = do
 
 -- SAVE
 
-handleSaveFilmRoll :: FilmRollId -> FilmRoll -> PositiveT Handler FilmRoll
-handleSaveFilmRoll _filmRollId filmRoll = do
+handleSaveFilmRoll :: FilmRoll -> PositiveT Handler FilmRoll
+handleSaveFilmRoll filmRoll = do
   pool <- asks sqlPool
   _ <-
     liftIO . Hasql.Pool.use pool $
@@ -170,17 +169,17 @@ handleCheckExpressions exprs =
 
 -- GENERATE
 
-handleGenerateHighRes :: FilmRollId -> ImageSettings -> PositiveT Handler NoContent
-handleGenerateHighRes filmRollId settings = do
-  filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+handleGenerateHighRes :: ImageSettings -> PositiveT Handler NoContent
+handleGenerateHighRes settings = do
+  filmRoll <- runSession $ Session.selectFilmRollByImageSettings settings.id
   let input = Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename
   env <- ask
   SingleImage.generate (Log.log env.logger) "Generating highres version: " input settings
   pure NoContent
 
-handleGenerateWallpaper :: FilmRollId -> ImageSettings -> PositiveT Handler NoContent
-handleGenerateWallpaper filmRollId settings = do
-  filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+handleGenerateWallpaper :: ImageSettings -> PositiveT Handler NoContent
+handleGenerateWallpaper settings = do
+  filmRoll <- runSession $ Session.selectFilmRollByImageSettings settings.id
   let input = Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename
       outputBase homeDir =
         homeDir
@@ -198,9 +197,9 @@ handleGenerateWallpaper filmRollId settings = do
 
 -- OPEN EXTERNALEDITOR
 
-handleOpenExternalEditor :: FilmRollId -> ImageSettings -> PositiveT Handler NoContent
-handleOpenExternalEditor filmRollId settings = do
-  filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+handleOpenExternalEditor :: ImageSettings -> PositiveT Handler NoContent
+handleOpenExternalEditor settings = do
+  filmRoll <- runSession $ Session.selectFilmRollByImageSettings settings.id
   let input = Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename
   log $ "Opening in external editor: " <> Text.pack input
   image <-
@@ -211,8 +210,8 @@ handleOpenExternalEditor filmRollId settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: FilmRollId -> ImageSettings -> PositiveT Handler [Int]
-handleGetSettingsHistogram filmRollId settings =
+handleGetSettingsHistogram :: ImageSettings -> PositiveT Handler [Int]
+handleGetSettingsHistogram settings =
   let toHistogram arr =
         Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
           (Massiv.Sz1 (1 + fromIntegral (maxBound :: Word8)))
@@ -220,7 +219,7 @@ handleGetSettingsHistogram filmRollId settings =
             Massiv.forM_ arr $
               \(HIP.PixelY p) -> Massiv.modify marr (pure . (+) 1) (fromIntegral (HIP.toWord8 p))
    in do
-        filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+        filmRoll <- runSession $ Session.selectFilmRollByImageSettings settings.id
         (image, putMVarBack) <-
           getCachedImage settings.crop $
             Text.pack (Text.unpack filmRoll.directoryPath </> Filename.toFilePath settings.filename)
@@ -231,11 +230,8 @@ handleGetSettingsHistogram filmRollId settings =
 
 -- COORDINATE
 
-handleGetCoordinateInfo ::
-  FilmRollId ->
-  ([(Double, Double)], ImageSettings) ->
-  PositiveT Handler [CoordinateInfo]
-handleGetCoordinateInfo filmRollId (coordinates, settings) =
+handleGetCoordinateInfo :: ([(Double, Double)], ImageSettings) -> PositiveT Handler [CoordinateInfo]
+handleGetCoordinateInfo (coordinates, settings) =
   let toInfo image (x, y) =
         CoordinateInfo x y
           . (\(HIP.PixelY p) -> HIP.toDouble p)
@@ -244,7 +240,7 @@ handleGetCoordinateInfo filmRollId (coordinates, settings) =
             (floor (int2Double (HIP.rows image) * y))
             (floor (int2Double (HIP.cols image) * x))
    in do
-        filmRoll <- runSession $ Session.selectFilmRoll filmRollId
+        filmRoll <- runSession $ Session.selectFilmRollByImageSettings settings.id
         (image, putMVarBack) <-
           first (Image.applySettings settings)
             <$> getCachedImage settings.crop
@@ -258,9 +254,9 @@ handleGetCoordinateInfo filmRollId (coordinates, settings) =
 
 -- LIST DIRECTORIES
 
-handleGetSettings :: PositiveT Handler [(Text, FilmRoll)]
+handleGetSettings :: PositiveT Handler [FilmRoll]
 handleGetSettings =
-  HashMap.toList <$> runSession Session.selectFilmRolls
+  runSession Session.selectFilmRolls
 
 -- HANDLER HELPERS
 

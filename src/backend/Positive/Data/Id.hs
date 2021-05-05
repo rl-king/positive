@@ -24,7 +24,7 @@ import Servant
 
 newtype Id (a :: Symbol)
   = Id Int32
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Generic, NFData, Hashable)
   deriving
     ( ToHttpApiData,
       FromHttpApiData,
