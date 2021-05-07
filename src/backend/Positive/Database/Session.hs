@@ -8,7 +8,6 @@ module Positive.Database.Session where
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
-import qualified Data.Vector as Vector
 import Hasql.Session (Session)
 import qualified Hasql.Session as Session
 import Hasql.Statement (refineResult)
@@ -109,6 +108,10 @@ selectFilmRollByImageSettings imageSettingsId =
   Session.statement imageSettingsId
     . lmap Id.unpack
     $ refineResult filmRollFromTuple Statement.selectFilmRollByImageSettings
+
+selectOutdatedPreview :: Session (Maybe ImageSettingsId)
+selectOutdatedPreview =
+  Session.statement () $ rmap (fmap Id.pack) Statement.selectOutdatedPreview
 
 -- MAPPING
 

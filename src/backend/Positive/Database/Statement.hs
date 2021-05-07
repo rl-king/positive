@@ -94,3 +94,12 @@ selectFilmRolls =
     from positive.film_roll
       join positive.image on film_roll.id = image.film_roll_id
   |]
+
+selectOutdatedPreview :: Statement () (Maybe Int32)
+selectOutdatedPreview =
+  [maybeStatement|
+    select id :: int4
+      from positive.image
+      where modified > preview
+      order by film_roll_id, modified
+  |]
