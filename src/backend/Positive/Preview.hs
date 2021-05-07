@@ -35,16 +35,21 @@ loop pool lock eventChan log = do
     Left err -> do
       log (tshow err)
     Right [] -> do
-      log "No outdated previews"
-    Right ((dir, imageSettings) : rest) -> do
+      log $ "Found no outdated previews"
+      loop pool lock eventChan log
+    Right outdatedPreviews@((dir, imageSettings) : rest) -> do
       -- FIXME: catch exc
+      log $ "Found " <> tshow (length outdatedPreviews) <> " outdated previews"
       _ <- generatePreview (dir, imageSettings)
       writeChan eventChan $
         ServerEvent
           (Just "preview")
           Nothing
           [Builder.byteString $ Filename.toByteString imageSettings.filename]
-      putMVar lock key
+      _ <-
+        Hasql.use pool $
+          Session.updatePreviewTimestamp imageSettings.id
+      unless (null rest) $ void (tryPutMVar lock key)
       loop pool lock eventChan log
 
 addCount :: (Text -> IO ()) -> [a] -> Text -> IO ()

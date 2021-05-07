@@ -86,7 +86,9 @@ run logger_ isDev_ port =
         eventChan_ <- Chan.newChan
         pool <- Hasql.Pool.acquire (3, 10, "host=localhost port=5432 dbname=positive")
         let env = Env imageMVar_ previewMVar_ eventChan_ isDev_ pool logger_
-        Preview.loop pool previewMVar_ eventChan_ (Log.log logger_)
+        _ <-
+          forkIO $
+            Preview.loop pool previewMVar_ eventChan_ (Log.log logger_)
         Warp.runSettings settings $
           genericServeT (`runReaderT` env) (handlers isDev_ eventChan_)
 

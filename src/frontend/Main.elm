@@ -199,7 +199,7 @@ onNavigation route model =
                 |> Maybe.map (Tuple.pair filmRoll)
 
         toFilmRoll filmRollId filmRolls =
-            List.filter ((/=) filmRollId << .id) filmRolls
+            List.filter ((==) filmRollId << .id) filmRolls
                 |> List.head
                 |> Maybe.andThen toSortedZipper
     in

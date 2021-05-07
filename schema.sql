@@ -41,10 +41,12 @@ create or replace function positive.update_modified_timestamp()
   returns trigger
   language plpgsql
   as $$
-      begin
-          new.modified = now();
-          return new;
-      end
+    begin
+      if new <> old then
+        new.modified = now();
+        return new;
+      end if;
+    end
   $$;
 
 -- TRIGGER
