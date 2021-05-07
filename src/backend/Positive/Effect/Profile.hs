@@ -37,7 +37,7 @@ instance (Algebra sig m, Has (Lift IO) sig m, HasLabelled "stdout" Log sig m) =>
         start <- sendIO Time.getCurrentTime
         a <- sendIO . evaluate $ force m
         done <- sendIO Time.getCurrentTime
-        logInfo @"stdout" $ name <> " - took: " <> tshow (Time.diffUTCTime done start)
+        logInfo @"stdout" "profile" $ name <> " - took: " <> tshow (Time.diffUTCTime done start)
         pure $ a <$ ctx
 
 runProfile :: ProfileC m a -> m a

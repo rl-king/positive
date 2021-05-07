@@ -11,7 +11,7 @@ module Positive.Server.Handler where
 
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.DeepSeq as DeepSeq
-import Control.Effect.Labelled
+import Control.Effect.Labelled hiding (Handler)
 import Control.Effect.Lift
 import Control.Effect.Reader
 import Control.Effect.Throw
@@ -40,14 +40,15 @@ import qualified Positive.Effect.PostgreSQL as PostgreSQL
 import qualified Positive.Image as Image
 import qualified Positive.Image.Util as Util
 import qualified Positive.Language as Language
-import qualified Positive.Log as Log
 import Positive.Prelude hiding (ByteString)
 import qualified Positive.SingleImage as SingleImage
-import Servant hiding (throwError)
+import Servant hiding (Handler, throwError)
 import qualified System.Directory as Directory
 import System.FilePath.Posix (isPathSeparator, (</>))
 
-type PositiveT sig m =
+-- HANDLER
+
+type Handler sig m =
   ( HasLabelled "stdout" Log sig m,
     HasLabelled "sse" Log sig m,
     Has PostgreSQL sig m,
@@ -65,9 +66,9 @@ data Env = Env
 
 -- IMAGE
 
-handleImage :: PositiveT sig m => Text -> ImageSettings -> m ByteString
+handleImage :: Handler sig m => Text -> ImageSettings -> m ByteString
 handleImage dir settings = do
-  logInfo @"sse" $ "Requested image " <> Path.unpack settings.filename
+  logInfo @"sse" "log" $ "Requested image " <> Path.unpack settings.filename
   evv <- ask @Env
   (image, putMVarBack) <-
     getCachedImage settings.crop $
@@ -79,25 +80,25 @@ handleImage dir settings = do
       sendIO putMVarBack
       pure encoded
     else do
-      logInfo @"stdout" $ "Apply settings and encode: " <> Path.unpack settings.filename
+      logInfo @"stdout" "handler" $ "Apply settings and encode: " <> Path.unpack settings.filename
       !encoded <- sendIO . Image.encode "_.png" $ Image.applySettings settings image
       sendIO putMVarBack
-      logInfo @"sse" $ "Processed image " <> Path.unpack settings.filename
+      logInfo @"sse" "log" $ "Processed image " <> Path.unpack settings.filename
       pure encoded
 
 -- SAVE
 
-handleSaveFilmRoll :: PositiveT sig m => FilmRoll -> m FilmRoll
+handleSaveFilmRoll :: Handler sig m => FilmRoll -> m FilmRoll
 handleSaveFilmRoll filmRoll = do
   _ <- PostgreSQL.runTransaction $ Session.updateFilmRoll filmRoll
-  logDebug @"stdout" "Wrote settings"
+  logDebug @"stdout" "handler" "Wrote settings"
   evv <- ask @Env
   void . sendIO $ MVar.tryPutMVar evv.previewMVar ()
   pure filmRoll
 
 -- CHECK EXPRESSIONS
 
-handleCheckExpressions :: PositiveT sig m => [Expression] -> m [ExpressionResult]
+handleCheckExpressions :: Handler sig m => [Expression] -> m [ExpressionResult]
 handleCheckExpressions exprs =
   let eval v expr =
         SampleEval $
@@ -111,16 +112,16 @@ handleCheckExpressions exprs =
 
 -- GENERATE
 
-handleGenerateHighRes :: PositiveT sig m => ImageSettings -> m NoContent
+handleGenerateHighRes :: Handler sig m => ImageSettings -> m NoContent
 handleGenerateHighRes settings = do
   filmRoll <- PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
   let input = Path.toFilePath filmRoll.directoryPath </> Path.toFilePath settings.filename
   -- evv <- ask @Env
   -- FIXME
-  -- SingleImage.generate (Log.logInfo @"stdout" evv.logger) "Generating highres version: " input settings
+  -- SingleImage.generate (Log.logInfo @"stdout" "handler" evv.logger) "Generating highres version: " input settings
   pure NoContent
 
-handleGenerateWallpaper :: PositiveT sig m => ImageSettings -> m NoContent
+handleGenerateWallpaper :: Handler sig m => ImageSettings -> m NoContent
 handleGenerateWallpaper settings = do
   filmRoll <- PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
   let input = Path.toFilePath filmRoll.directoryPath </> Path.toFilePath settings.filename
@@ -130,22 +131,22 @@ handleGenerateWallpaper settings = do
           </> filter (\c -> not (isPathSeparator c || c == '.')) (Path.toFilePath filmRoll.directoryPath)
           <> " | "
           <> Path.toFilePath settings.filename
-  logInfo @"stdout" $ "Generating wallpaper version of: " <> Text.pack input
+  logInfo @"stdout" "handler" $ "Generating wallpaper version of: " <> Text.pack input
   output <- sendIO $ Util.ensureUniqueFilename . outputBase =<< sendIO Directory.getHomeDirectory
   image <-
     handleLeft
       . sendIO
       $ Image.fromDiskPreProcess (Just 2560) settings.crop input
   sendIO . HIP.writeImage output $ Image.applySettings settings image
-  NoContent <$ logInfo @"stdout" ("Wrote wallpaper version of: " <> Text.pack input)
+  NoContent <$ logInfo @"stdout" "handler" ("Wrote wallpaper version of: " <> Text.pack input)
 
 -- OPEN EXTERNALEDITOR
 
-handleOpenExternalEditor :: PositiveT sig m => ImageSettings -> m NoContent
+handleOpenExternalEditor :: Handler sig m => ImageSettings -> m NoContent
 handleOpenExternalEditor settings = do
   filmRoll <- PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
   let input = Path.toFilePath filmRoll.directoryPath </> Path.toFilePath settings.filename
-  logInfo @"stdout" $ "Opening in external editor: " <> Text.pack input
+  logInfo @"stdout" "handler" $ "Opening in external editor: " <> Text.pack input
   image <-
     handleLeft
       . sendIO
@@ -155,7 +156,7 @@ handleOpenExternalEditor settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: PositiveT sig m => ImageSettings -> m [Int]
+handleGetSettingsHistogram :: Handler sig m => ImageSettings -> m [Int]
 handleGetSettingsHistogram settings =
   let toHistogram arr =
         Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
@@ -169,13 +170,13 @@ handleGetSettingsHistogram settings =
           getCachedImage settings.crop $
             Text.pack (Path.toFilePath filmRoll.directoryPath </> Path.toFilePath settings.filename)
         sendIO putMVarBack
-        logDebug @"stdout" $ "Creating histogram for: " <> Path.unpack settings.filename
+        logDebug @"stdout" "handler" $ "Creating histogram for: " <> Path.unpack settings.filename
         pure . Massiv.toList . toHistogram . HIP.unImage $
           Image.applySettings settings image
 
 -- COORDINATE
 
-handleGetCoordinateInfo :: PositiveT sig m => ([(Double, Double)], ImageSettings) -> m [CoordinateInfo]
+handleGetCoordinateInfo :: Handler sig m => ([(Double, Double)], ImageSettings) -> m [CoordinateInfo]
 handleGetCoordinateInfo (coordinates, settings) =
   let toInfo image (x, y) =
         CoordinateInfo x y
@@ -199,32 +200,32 @@ handleGetCoordinateInfo (coordinates, settings) =
 
 -- LIST DIRECTORIES
 
-handleGetSettings :: PositiveT sig m => m [FilmRoll]
+handleGetSettings :: Handler sig m => m [FilmRoll]
 handleGetSettings =
   PostgreSQL.runSession Session.selectFilmRolls
 
 -- HANDLER HELPERS
-handleLeft :: PositiveT sig m => m (Either err a) -> m a
+handleLeft :: Handler sig m => m (Either err a) -> m a
 handleLeft m =
-  m >>= either (\(_ :: err) -> logInfo @"stdout" "Image read error" >> throwError err404) pure
+  m >>= either (\(_ :: err) -> logInfo @"stdout" "handler" "Image read error" >> throwError err404) pure
 
 -- | Read image from disk, normalize before crop, keep result in MVar
-getCachedImage :: PositiveT sig m => ImageCrop -> Text -> m (Image.Monochrome, IO ())
+getCachedImage :: Handler sig m => ImageCrop -> Text -> m (Image.Monochrome, IO ())
 getCachedImage crop path = do
   evv <- ask @Env
   now <- sendIO Time.getCurrentTime
   cache <- sendIO $ MVar.takeMVar evv.imageMVar
-  logInfo @"stdout" $ "Cached images: " <> tshow (OrdPSQ.size cache)
+  logInfo @"stdout" "handler" $ "Cached images: " <> tshow (OrdPSQ.size cache)
   case checkCrop crop =<< OrdPSQ.lookup path cache of
     Just (_, cached@(_, loadedImage)) -> do
-      logDebug @"stdout" "From cache"
+      logDebug @"stdout" "handler" "From cache"
       pure
         ( loadedImage,
           MVar.putMVar evv.imageMVar
             =<< evaluate (DeepSeq.force (insertAndTrim path now cached cache))
         )
     Nothing -> do
-      logDebug @"stdout" "From disk"
+      logDebug @"stdout" "handler" "From disk"
       image <-
         handleLeft . sendIO $
           Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
@@ -249,29 +250,29 @@ insertAndTrim k v p psq =
 
 -- LOG
 
--- logInfo @"stdout" :: MonadIO m => Text -> PositiveT m ()
--- logInfo @"stdout" !msg = do
+-- logInfo @"stdout" "handler" :: MonadIO m => Text -> Handler m ()
+-- logInfo @"stdout" "handler" !msg = do
 --   evv <- ask @Env
 --   sendIO . evv.logger $ Log.format "info" msg
 
--- logDebug :: MonadIO m => Text -> PositiveT m ()
+-- logDebug :: MonadIO m => Text -> Handler m ()
 -- logDebug !msg = do
 --   evv <- ask @Env
 --   when evv.isDev . sendIO . evv.logger $ Log.format "debug" msg
 
--- logInfo @"sse" :: MonadIO m => Text -> PositiveT m ()
--- logInfo @"sse" !msg = do
+-- logInfo @"sse" "log" :: MonadIO m => Text -> Handler m ()
+-- logInfo @"sse" "log" !msg = do
 --   evv <- ask @Env
 --   sendIO . Chan.writeChan evv.eventChan $
---     ServerEvent (Just "logInfo @"stdout"") Nothing [Builder.byteString $ encodeUtf8 msg]
+--     ServerEvent (Just "logInfo @"stdout" "handler"") Nothing [Builder.byteString $ encodeUtf8 msg]
 
 -- PROFILE
 
-timed :: PositiveT sig m => Text -> a -> m a
+timed :: Handler sig m => Text -> a -> m a
 timed name action = do
-  logDebug @"stdout" $ name <> " - started"
+  logDebug @"stdout" "handler" $ name <> " - started"
   start <- sendIO Time.getCurrentTime
   a <- sendIO $ evaluate action
   done <- sendIO Time.getCurrentTime
-  logDebug @"stdout" $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
+  logDebug @"stdout" "handler" $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
   pure a

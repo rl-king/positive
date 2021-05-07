@@ -21,7 +21,6 @@ import qualified Positive.CLI as CLI
 import Positive.Effect.Log
 import Positive.Effect.PostgreSQL
 import qualified Positive.Effect.PostgreSQL as PostgreSQL
-import qualified Positive.Log as Log
 import Positive.Prelude
 import qualified Positive.Preview as Preview
 import Positive.Server.Api
@@ -29,15 +28,16 @@ import qualified Positive.Server.Handler as Handler
 import qualified Positive.Static as Static
 import Servant hiding (throwError)
 import Servant.Server.Generic
+import System.Log.FastLogger (TimedFastLogger)
 
 -- SERVER
 
-start :: Log.TimedFastLogger -> CLI.IsDev -> CLI.Port -> IO ()
+start :: TimedFastLogger -> CLI.IsDev -> CLI.Port -> IO ()
 start logger isDev port =
   let settings =
         Warp.setPort port $
           Warp.setBeforeMainLoop
-            ( Log.log logger $
+            ( putLogStr logger Info "server" $
                 Text.concat
                   ["listening on port: ", tshow port, ", is dev: ", tshow isDev]
             )
@@ -50,7 +50,15 @@ start logger isDev port =
         let env = Handler.Env imageMVar previewMVar isDev
         _ <-
           forkIO $
-            Preview.loop pool previewMVar eventChan (Log.log logger)
+            Preview.loop previewMVar
+              & runLabelled @"sse"
+              & runLogServerEvent eventChan
+              & runPostgreSQL pool
+              & Error.Church.runError @PostgreSQL.Error
+                (logError @"stdout" "preview" . tshow)
+                pure
+              & runLabelled @"stdout"
+              & runLogStdout logger
         Warp.runSettings settings $
           genericServeT
             ( runLabelled @"sse"
@@ -58,7 +66,7 @@ start logger isDev port =
                 >>> runReader env
                 >>> runPostgreSQL pool
                 >>> Error.Church.runError @PostgreSQL.Error
-                  (\err -> logError @"stdout" (tshow err) >> throwError err500)
+                  (\err -> logError @"stdout" "postgresql" (tshow err) >> throwError err500)
                   pure
                 >>> Error.Either.runError
                 >>> runLabelled @"stdout"

@@ -27,7 +27,7 @@ import Positive.Prelude
 import System.Log.FastLogger (TimedFastLogger, ToLogStr, toLogStr)
 
 data Log (m :: Type -> Type) k where
-  Log :: LogLevel -> Text -> Log m ()
+  Log :: LogLevel -> Text -> Text -> Log m ()
 
 data LogLevel
   = Debug
@@ -40,7 +40,7 @@ instance ToLogStr LogLevel where
   toLogStr = \case
     Debug -> "[debug]"
     Info -> "[info]"
-    Warning -> "[warning]"
+    Warning -> "[warn]"
     Error -> "[error]"
 
 logDebug,
@@ -50,11 +50,12 @@ logDebug,
     forall label sig m.
     HasLabelled (label :: Symbol) Log sig m =>
     Text ->
+    Text ->
     m ()
-logDebug = runUnderLabel @label . send . Log Debug
-logInfo = runUnderLabel @label . send . Log Info
-logWarning = runUnderLabel @label . send . Log Warning
-logError = runUnderLabel @label . send . Log Error
+logDebug context = runUnderLabel @label . send . Log Debug context
+logInfo context = runUnderLabel @label . send . Log Info context
+logWarning context = runUnderLabel @label . send . Log Warning context
+logError context = runUnderLabel @label . send . Log Error context
 
 -- STDOUT
 
@@ -68,13 +69,25 @@ instance (Algebra sig m, Has (Lift IO) sig m) => Algebra (Log :+: sig) (LogStdou
     case sig of
       R other ->
         LogStdoutC (alg (unLogStdout . hdl) (R other) ctx)
-      L (Log logLevel msg) -> do
+      L (Log logLevel context msg) -> do
         logger <- LogStdoutC ask
-        (<$ ctx) <$> sendIO (putLogStr logger logLevel msg)
+        (<$ ctx) <$> sendIO (putLogStr logger logLevel context msg)
 
-putLogStr :: TimedFastLogger -> LogLevel -> Text -> IO ()
-putLogStr logger logLevel msg =
-  logger (\t -> toLogStr t <> " " <> toLogStr logLevel <> " " <> toLogStr msg <> "\n")
+putLogStr :: TimedFastLogger -> LogLevel -> Text -> Text -> IO ()
+putLogStr logger logLevel context msg =
+  logger
+    ( \t ->
+        mconcat
+          [ toLogStr t,
+            " ",
+            toLogStr logLevel,
+            " <",
+            toLogStr context,
+            "> ",
+            toLogStr msg,
+            "\n"
+          ]
+    )
 
 runLogStdout :: TimedFastLogger -> LogStdoutC m a -> m a
 runLogStdout logger =
@@ -92,10 +105,13 @@ instance (Algebra sig m, Has (Lift IO) sig m) => Algebra (Log :+: sig) (LogServe
     case sig of
       R other ->
         LogServerEventC (alg (unLogServerEvent . hdl) (R other) ctx)
-      L (Log _ msg) -> do
+      L (Log _ context msg) -> do
         eventChan <- LogServerEventC ask
         sendIO . Chan.writeChan eventChan $
-          ServerEvent (Just "log") Nothing [Builder.byteString $ encodeUtf8 msg]
+          ServerEvent
+            (Just (Builder.byteString $ encodeUtf8 context))
+            Nothing
+            [Builder.byteString $ encodeUtf8 msg]
         pure (() <$ ctx)
 
 runLogServerEvent :: Chan ServerEvent -> LogServerEventC m a -> m a
