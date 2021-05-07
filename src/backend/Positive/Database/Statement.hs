@@ -95,11 +95,16 @@ selectFilmRolls =
       join positive.image on film_roll.id = image.film_roll_id
   |]
 
-selectOutdatedPreview :: Statement () (Maybe Int32)
-selectOutdatedPreview =
-  [maybeStatement|
-    select id :: int4
-      from positive.image
-      where modified > preview
-      order by film_roll_id, modified
+selectOutdatedPreviews :: Statement () (Vector _)
+selectOutdatedPreviews =
+  [vectorStatement|
+    select
+      directory_path :: text, image.id :: int4, filename :: text,
+      rating :: int2, orientation :: float8, crop :: jsonb, gamma :: float8,
+      zones :: jsonb, blackpoint :: float8, whitepoint :: float8,
+      expressions :: jsonb
+    from positive.image
+      join positive.film_roll on film_roll.id = image.film_roll_id
+    where image.modified > image.preview
+    order by film_roll_id, image.modified
   |]

@@ -61,7 +61,7 @@ type PositiveT m =
 
 data Env = Env
   { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.Monochrome))),
-    previewMVar :: !(MVar [(FilePath, ImageSettings)]),
+    previewMVar :: !(MVar ()),
     eventChan :: !(Chan ServerEvent),
     isDev :: !CLI.IsDev,
     sqlPool :: !Hasql.Pool.Pool,
@@ -82,11 +82,11 @@ run logger_ isDev_ port =
             Warp.defaultSettings
    in do
         imageMVar_ <- MVar.newMVar OrdPSQ.empty
-        previewMVar_ <- MVar.newEmptyMVar
+        previewMVar_ <- MVar.newMVar ()
         eventChan_ <- Chan.newChan
         pool <- Hasql.Pool.acquire (3, 10, "host=localhost port=5432 dbname=positive")
         let env = Env imageMVar_ previewMVar_ eventChan_ isDev_ pool logger_
-        Preview.loop previewMVar_ imageMVar_ eventChan_ (Log.log logger_)
+        Preview.loop pool previewMVar_ eventChan_ (Log.log logger_)
         Warp.runSettings settings $
           genericServeT (`runReaderT` env) (handlers isDev_ eventChan_)
 
@@ -149,9 +149,7 @@ handleSaveFilmRoll filmRoll = do
         Session.updateFilmRoll filmRoll
   logDebug "Wrote settings"
   env <- ask
-  missing <- Preview.findMissingPreviews False
-  void . liftIO $ MVar.tryPutMVar env.previewMVar missing
-  logDebug $ "Updating " <> tshow (length missing) <> " preview(s)"
+  void . liftIO $ MVar.tryPutMVar env.previewMVar ()
   pure filmRoll
 
 -- CHECK EXPRESSIONS

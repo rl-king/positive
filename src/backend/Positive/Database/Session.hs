@@ -8,6 +8,7 @@ module Positive.Database.Session where
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
+import qualified Data.Vector as Vector
 import Hasql.Session (Session)
 import qualified Hasql.Session as Session
 import Hasql.Statement (refineResult)
@@ -109,9 +110,12 @@ selectFilmRollByImageSettings imageSettingsId =
     . lmap Id.unpack
     $ refineResult filmRollFromTuple Statement.selectFilmRollByImageSettings
 
-selectOutdatedPreview :: Session (Maybe ImageSettingsId)
-selectOutdatedPreview =
-  Session.statement () $ rmap (fmap Id.pack) Statement.selectOutdatedPreview
+selectOutdatedPreviews :: Session [(Text, ImageSettings)]
+selectOutdatedPreviews =
+  Session.statement () $
+    refineResult
+      (traverse imageSettingsFromTuple . Vector.toList)
+      Statement.selectOutdatedPreviews
 
 -- MAPPING
 
@@ -154,3 +158,36 @@ filmRollFromTuple
                 }
             ]
         }
+
+imageSettingsFromTuple :: _ -> Either Text (Text, ImageSettings)
+imageSettingsFromTuple
+  ( directoryPath,
+    imageSettingsId,
+    filename,
+    rating,
+    orientation,
+    cropValue,
+    gamma,
+    zonesValue,
+    blackpoint,
+    whitepoint,
+    expressionsValue
+    ) = do
+    crop <- first Text.pack $ Aeson.parseEither Aeson.parseJSON cropValue
+    zones <- first Text.pack $ Aeson.parseEither Aeson.parseJSON zonesValue
+    expressions <- first Text.pack $ Aeson.parseEither Aeson.parseJSON expressionsValue
+    pure
+      ( directoryPath,
+        ImageSettings
+          { id = Id.pack imageSettingsId,
+            filename = Filename filename,
+            rating = rating,
+            rotate = orientation,
+            crop = crop,
+            gamma = gamma,
+            zones = zones,
+            blackpoint = blackpoint,
+            whitepoint = whitepoint,
+            expressions = expressions
+          }
+      )
