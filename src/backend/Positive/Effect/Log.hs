@@ -22,9 +22,10 @@ import qualified Control.Concurrent.Chan as Chan
 import Control.Effect.Labelled
 import Control.Effect.Lift
 import qualified Data.ByteString.Builder as Builder
+import qualified Data.Text as Text
 import Network.Wai.EventSource
 import Positive.Prelude
-import System.Log.FastLogger (TimedFastLogger, ToLogStr, toLogStr)
+import System.Log.FastLogger (TimedFastLogger, toLogStr)
 
 data Log (m :: Type -> Type) k where
   Log :: LogLevel -> Text -> Text -> Log m ()
@@ -36,12 +37,12 @@ data LogLevel
   | Error
   deriving (Bounded, Eq, Ord)
 
-instance ToLogStr LogLevel where
-  toLogStr = \case
-    Debug -> "[debug]"
-    Info -> "[info]"
-    Warning -> "[warn]"
-    Error -> "[error]"
+logLevelToText :: LogLevel -> Text
+logLevelToText = \case
+  Debug -> "[debug]"
+  Info -> "[info]"
+  Warning -> "[warn]"
+  Error -> "[error]"
 
 logDebug,
   logInfo,
@@ -80,10 +81,8 @@ putLogStr logger logLevel context msg =
         mconcat
           [ toLogStr t,
             " ",
-            toLogStr logLevel,
-            " <",
-            toLogStr context,
-            "> ",
+            toLogStr (Text.justifyLeft 8 ' ' (logLevelToText logLevel)),
+            toLogStr (Text.justifyLeft 10 ' ' ("<" <> context <> ">")),
             toLogStr msg,
             "\n"
           ]
