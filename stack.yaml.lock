@@ -33,6 +33,13 @@ packages:
   original:
     hackage: servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
 - completed:
+    hackage: fused-effects-1.1.1.1@sha256:c029c5fb0b2154281221a71ff25709d2a11347fe061fa8c2398e7fe52a16008d,4932
+    pantry-tree:
+      size: 6345
+      sha256: 7d09ba6d70fc49a5fd2feef0e6b06122589b9f5e4539680c9d7933773e7273d7
+  original:
+    hackage: fused-effects-1.1.1.1@sha256:c029c5fb0b2154281221a71ff25709d2a11347fe061fa8c2398e7fe52a16008d,4932
+- completed:
     hackage: hasql-th-0.4.0.8@sha256:e77af01c354fcebb0fc8358a4bb2f7b361329bce28f783d8d6b17fbd5fa43279,2245
     pantry-tree:
       size: 864
@@ -104,7 +111,7 @@ packages:
     commit: de485419b25c071be8fc8e8072894c9da00206c2
 snapshots:
 - completed:
-    size: 533252
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/27.yaml
-    sha256: c2aaae52beeacf6a5727c1010f50e89d03869abfab6d2c2658ade9da8ed50c73
-  original: lts-16.27
+    size: 533053
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/29.yaml
+    sha256: eb8ccc595466edefb9a679f19aec2e283d12f4c6ea5eefded1ebe8bd157d77d1
+  original: lts-16.29

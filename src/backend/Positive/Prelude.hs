@@ -17,7 +17,7 @@ import Control.DeepSeq as X (NFData)
 import Control.Exception.Safe as X (SomeException, catch, throwIO, tryAny)
 import Control.Monad as X (foldM, forM, forever, guard, join, unless, when, (<=<))
 import Control.Monad.IO.Class as X
-import Control.Monad.Reader as X (ReaderT, ask, asks, runReaderT)
+import Control.Monad.Trans.Except as X (ExceptT (..))
 import Data.Aeson as X (FromJSON, ToJSON)
 import Data.Bifoldable as X (biconcat)
 import Data.Bifunctor as X

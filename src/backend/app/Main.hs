@@ -20,4 +20,4 @@ main = do
       case mode of
         CLI.Init replace -> Init.run replace
         CLI.SingleImage filepath -> SingleImage.run log filepath
-        CLI.Server isDev port -> Server.run logger isDev port
+        CLI.Server isDev port -> Server.start logger isDev port

@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-16.27
+resolver: lts-16.29
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -44,6 +44,7 @@ extra-deps:
 - Color-0.2.0@sha256:94c43c4d8f943ba0642ee58a9b8a665b01a3ac2893c40a16ffdabaacb956c58f,8159
 - massiv-io-0.3.0.1@sha256:393df632ea8c3b0549a2b3a2fbaa6a9ef1202a05dd9b3f44555a9f6a31327652,3667
 - servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
+- fused-effects-1.1.1.1@sha256:c029c5fb0b2154281221a71ff25709d2a11347fe061fa8c2398e7fe52a16008d,4932
 
 - hasql-th-0.4.0.8@sha256:e77af01c354fcebb0fc8358a4bb2f7b361329bce28f783d8d6b17fbd5fa43279,2245
 - postgresql-syntax-0.3.0.3@sha256:b93a73c388811e331327561d85ed268f232be6c7f8f90ff27b2091c64c6aea90,4170
