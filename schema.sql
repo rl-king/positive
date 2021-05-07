@@ -44,19 +44,21 @@ create or replace function positive.update_modified_timestamp()
     begin
       if new <> old then
         new.modified = now();
-        return new;
       end if;
+      return new;
     end
   $$;
 
 -- TRIGGER
 
+drop trigger if exists on_image_modified on positive.image;
 create trigger on_image_modified
   before update
   on positive.image
   for each row
   execute procedure positive.update_modified_timestamp();
 
+drop trigger if exists on_film_roll_modified on positive.film_roll;
 create trigger on_film_roll_modified
   before update
   on positive.film_roll

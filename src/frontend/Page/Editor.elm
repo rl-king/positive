@@ -682,7 +682,7 @@ updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
     let
         unlessUnchanged old new =
-            if old.filmRoll == new.filmRoll then
+            if old.images == new.images then
                 old
 
             else
@@ -767,7 +767,6 @@ viewNav : FilmRoll -> Images -> Html Msg
 viewNav filmRoll images =
     nav []
         [ a [ href "/" ] [ text "browser" ]
-        , text "/"
         , text filmRoll.directoryPath
         , text "/"
         , text <|
