@@ -19,8 +19,8 @@ import System.FilePath.Posix
 
 -- CONTACT
 
-run :: (Text -> IO ()) -> FilePath -> IO ()
-run log filepath = do
+run :: FilePath -> IO ()
+run filepath = do
   error "todo"
 
 -- maybeSettings <-

@@ -42,6 +42,7 @@ import qualified Positive.Image.Util as Util
 import qualified Positive.Language as Language
 import Positive.Prelude hiding (ByteString)
 import qualified Positive.SingleImage as SingleImage
+import Positive.Timed
 import Servant hiding (Handler, throwError)
 import qualified System.Directory as Directory
 import System.FilePath.Posix (isPathSeparator, (</>))
@@ -247,32 +248,3 @@ insertAndTrim :: (Ord k, Ord p) => k -> p -> v -> OrdPSQ k p v -> OrdPSQ k p v
 insertAndTrim k v p psq =
   let q = OrdPSQ.insert k v p psq
    in if OrdPSQ.size q > 40 then OrdPSQ.deleteMin q else q
-
--- LOG
-
--- logInfo @"stdout" "handler" :: MonadIO m => Text -> Handler m ()
--- logInfo @"stdout" "handler" !msg = do
---   evv <- ask @Env
---   sendIO . evv.logger $ Log.format "info" msg
-
--- logDebug :: MonadIO m => Text -> Handler m ()
--- logDebug !msg = do
---   evv <- ask @Env
---   when evv.isDev . sendIO . evv.logger $ Log.format "debug" msg
-
--- logInfo @"sse" "log" :: MonadIO m => Text -> Handler m ()
--- logInfo @"sse" "log" !msg = do
---   evv <- ask @Env
---   sendIO . Chan.writeChan evv.eventChan $
---     ServerEvent (Just "logInfo @"stdout" "handler"") Nothing [Builder.byteString $ encodeUtf8 msg]
-
--- PROFILE
-
-timed :: Handler sig m => Text -> a -> m a
-timed name action = do
-  logDebug @"stdout" "handler" $ name <> " - started"
-  start <- sendIO Time.getCurrentTime
-  a <- sendIO $ evaluate action
-  done <- sendIO Time.getCurrentTime
-  logDebug @"stdout" "handler" $ name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
-  pure a

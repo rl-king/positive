@@ -69,10 +69,10 @@ updateImageSettings imageSettings =
       )
       Statement.updateImageSettings
 
-updatePreviewTimestamp :: ImageSettingsId -> Session ()
+updatePreviewTimestamp :: ImageSettingsId -> Session ImageSettingsId
 updatePreviewTimestamp imageSettingsId =
   Session.statement imageSettingsId $
-    lmap Id.unpack Statement.updatePreviewTimestamp
+    dimap Id.unpack Id.pack Statement.updatePreviewTimestamp
 
 updatePoster :: Maybe ImageSettingsId -> FilmRollId -> Transaction FilmRollId
 updatePoster imageSettingsId filmRollId =

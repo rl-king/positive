@@ -17,5 +17,5 @@ main = do
       mode <- CLI.parseArgs
       case mode of
         CLI.Init replace -> Init.run replace
-        -- CLI.SingleImage filepath -> SingleImage.run log filepath
+        CLI.SingleImage filepath -> SingleImage.run filepath
         CLI.Server isDev port -> Server.start logger isDev port

@@ -55,12 +55,13 @@ updatePoster =
       returning id :: int4
   |]
 
-updatePreviewTimestamp :: Statement Int32 ()
+updatePreviewTimestamp :: Statement Int32 Int32
 updatePreviewTimestamp =
   [singletonStatement|
     update positive.image set
       preview = now()
     where id = $1 :: int4
+      returning id :: int4
   |]
 
 -- SELECT
