@@ -14,20 +14,20 @@ import qualified Hasql.Session as Session
 import Hasql.Statement (refineResult)
 import Hasql.Transaction (Transaction)
 import qualified Hasql.Transaction as Transaction
-import Positive.Data.Filename
 import Positive.Data.FilmRoll
 import Positive.Data.Id
 import qualified Positive.Data.Id as Id
 import Positive.Data.ImageSettings
+import qualified Positive.Data.Path as Path
 import qualified Positive.Database.Statement as Statement
 import Positive.Prelude
 
 -- INSERT
 
-insertImageSettings :: FilmRollId -> Filename -> Transaction (ImageSettingsId, Text)
+insertImageSettings :: FilmRollId -> Path.Filename -> Transaction (ImageSettingsId, Text)
 insertImageSettings filmRollId filename =
   let toInitalSettings (filmRollId, filename) =
-        ( toText filename,
+        ( Path.unpack filename,
           0,
           0,
           Aeson.toJSON emptyCrop,
@@ -115,7 +115,7 @@ selectFilmRollByImageSettings imageSettingsId =
     . lmap Id.unpack
     $ refineResult filmRollFromTuple Statement.selectFilmRollByImageSettings
 
-selectOutdatedPreviews :: Session [(Text, ImageSettings)]
+selectOutdatedPreviews :: Session [(Path.Directory, ImageSettings)]
 selectOutdatedPreviews =
   Session.statement () $
     refineResult
@@ -146,12 +146,12 @@ filmRollFromTuple
     pure $
       FilmRoll
         { id = Id.pack filmRollId,
-          directoryPath = directoryPath,
+          directoryPath = Path.pack directoryPath,
           poster = fmap Id.pack poster,
           imageSettings =
             [ ImageSettings
                 { id = Id.pack imageSettingsId,
-                  filename = Filename filename,
+                  filename = Path.pack filename,
                   rating = rating,
                   rotate = orientation,
                   crop = crop,
@@ -164,7 +164,7 @@ filmRollFromTuple
             ]
         }
 
-imageSettingsFromTuple :: _ -> Either Text (Text, ImageSettings)
+imageSettingsFromTuple :: _ -> Either Text (Path.Directory, ImageSettings)
 imageSettingsFromTuple
   ( directoryPath,
     imageSettingsId,
@@ -182,10 +182,10 @@ imageSettingsFromTuple
     zones <- first Text.pack $ Aeson.parseEither Aeson.parseJSON zonesValue
     expressions <- first Text.pack $ Aeson.parseEither Aeson.parseJSON expressionsValue
     pure
-      ( directoryPath,
+      ( Path.pack directoryPath,
         ImageSettings
           { id = Id.pack imageSettingsId,
-            filename = Filename filename,
+            filename = Path.pack filename,
             rating = rating,
             rotate = orientation,
             crop = crop,

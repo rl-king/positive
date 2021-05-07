@@ -15,13 +15,14 @@ import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
 import Positive.Data.Id
 import Positive.Data.ImageSettings
+import Positive.Data.Path
 import Positive.Prelude
 
 -- FILMROLL
 
 data FilmRoll = FilmRoll
   { id :: FilmRollId,
-    directoryPath :: Text,
+    directoryPath :: Directory,
     poster :: Maybe ImageSettingsId,
     imageSettings :: [ImageSettings]
   }

@@ -7,10 +7,10 @@ import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
-import qualified Positive.Data.Filename as Filename
 import qualified Positive.Data.FilmRoll as FilmRoll
 import Positive.Data.ImageSettings (ImageSettings)
 import qualified Positive.Data.ImageSettings as ImageSettings
+import qualified Positive.Data.Path as Path
 import qualified Positive.Image as Image
 import qualified Positive.Image.Util as Util
 import Positive.Prelude hiding (ByteString)
@@ -26,7 +26,7 @@ run log filepath = do
 -- maybeSettings <-
 --   join . rightToMaybe
 --     <$> tryAny (Aeson.decodeFileStrict "image-settings.json")
--- let filename = Filename.fromFilePath $ takeFileName filepath
+-- let filename = Path.fromFilePath $ takeFileName filepath
 -- case HashMap.lookup filename . FilmRoll.imageSettings =<< maybeSettings of
 --   Nothing ->
 --     generate log "No settings file found, generating plain image: " filepath $

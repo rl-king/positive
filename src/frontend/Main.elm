@@ -3,9 +3,10 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation as Navigation
 import Data.Id as Id
+import Data.Path as Path exposing (Directory, Filename)
 import Dict exposing (Dict)
 import Dict.Fun
-import Generated.Data as Image exposing (Filename(..), FilmRoll)
+import Generated.Data as Image exposing (FilmRoll)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -192,7 +193,7 @@ onNavigation : Route -> Model -> ( Model, Cmd Msg )
 onNavigation route model =
     let
         sortFun =
-            Image.filenameToString << .filename
+            Path.toString << .filename
 
         toSortedZipper filmRoll =
             Zipper.fromList (List.sortBy sortFun filmRoll.imageSettings)
@@ -262,7 +263,7 @@ extractUpdates model =
                     x
 
         fromZipper xs =
-            Dict.Fun.fromList Image.filenameToString Filename <|
+            Dict.Fun.fromList Path.toString Path.fromString <|
                 List.map (\x -> ( x.filename, x )) <|
                     Zipper.toList xs
     in

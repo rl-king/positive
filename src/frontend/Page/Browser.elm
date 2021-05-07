@@ -10,13 +10,9 @@ module Page.Browser exposing
 import Browser.Events
 import Browser.Navigation
 import Data.Id exposing (FilmRollId, ImageSettingsId)
+import Data.Path as Path exposing (Directory, Filename)
 import Dict.Fun
-import Generated.Data as Image
-    exposing
-        ( Filename(..)
-        , FilmRoll
-        , ImageSettings
-        )
+import Generated.Data as Image exposing (FilmRoll, ImageSettings)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -149,6 +145,7 @@ view model =
                 << List.take 1
                 << List.reverse
                 << String.split "/"
+                << Path.toString
 
         sorter a b =
             case Maybe.map2 Tuple.pair (firstNumber a.directoryPath) (firstNumber b.directoryPath) of
@@ -156,7 +153,8 @@ view model =
                     down x y
 
                 Nothing ->
-                    down a.directoryPath b.directoryPath
+                    down (Path.toString a.directoryPath)
+                        (Path.toString b.directoryPath)
 
         down a b =
             case compare a b of
@@ -217,7 +215,7 @@ viewFilmRollBrowserRated minimumRating filmRoll =
 
         rated ->
             div [ class "browser-rated-roll" ]
-                [ h2 [] [ text filmRoll.directoryPath ]
+                [ h2 [] [ text (Path.toString filmRoll.directoryPath) ]
                 , div [ class "browser-rated-images" ] <|
                     List.map (viewRatedImage filmRoll) rated
                 ]
@@ -236,7 +234,7 @@ viewRatedImage filmRoll imageSettings =
     a [ href (Route.toUrl (Route.Editor filmRoll.id imageSettings.id)) ]
         [ img [ src (toPreviewUrl filmRoll imageSettings) ] []
         , text <|
-            Image.filenameToString imageSettings.filename
+            Path.toString imageSettings.filename
         , div [ class "browser-rated-rating" ] <|
             List.map (\n -> span [] [ gliph n ]) (List.range 1 5)
         ]
@@ -250,8 +248,11 @@ viewFilmRollBrowserRoll : Int -> Maybe ( FilmRoll, Float ) -> FilmRoll -> Html M
 viewFilmRollBrowserRoll columns filmRollHover filmRoll =
     let
         name =
-            Maybe.withDefault filmRoll.directoryPath <|
-                List.head (List.reverse (String.split "/" filmRoll.directoryPath))
+            Maybe.withDefault (Path.toString filmRoll.directoryPath) <|
+                List.head <|
+                    List.reverse <|
+                        String.split "/" <|
+                            Path.toString filmRoll.directoryPath
 
         shortTitle =
             if String.length name > 30 then
@@ -277,11 +278,15 @@ viewFilmRollBrowserRoll columns filmRollHover filmRoll =
 
         width =
             style "width" <|
-                interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
+                interpolate "calc({0}% - 1rem)"
+                    [ String.fromInt (100 // columns) ]
     in
     div
-        [ classList [ ( "browser-filmroll", True ), ( "browser-filmroll-small", columns > 4 ) ]
-        , title filmRoll.directoryPath
+        [ classList
+            [ ( "browser-filmroll", True )
+            , ( "browser-filmroll-small", columns > 4 )
+            ]
+        , title (Path.toString filmRoll.directoryPath)
         , width
         ]
         [ viewMaybe poster <|
@@ -319,11 +324,11 @@ viewFilmRollBrowserImage filmRoll imageSettings =
 toPreviewUrl : FilmRoll -> ImageSettings -> String
 toPreviewUrl filmRoll imageSettings =
     let
-        previewExtension (Filename x) =
-            String.dropRight 3 x ++ "jpg"
+        previewExtension filename =
+            String.dropRight 3 (Path.toString filename) ++ "jpg"
     in
     Url.Builder.crossOrigin
-        filmRoll.directoryPath
+        (Path.toString filmRoll.directoryPath)
         [ "previews", previewExtension imageSettings.filename ]
         []
 

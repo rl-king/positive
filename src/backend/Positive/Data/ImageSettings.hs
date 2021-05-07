@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -17,9 +18,9 @@ import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
-import Positive.Data.Filename
 import Positive.Data.Id (ImageSettingsId)
 import qualified Positive.Data.Id as Id
+import Positive.Data.Path
 import Positive.Prelude
 import Servant
 
@@ -27,15 +28,15 @@ import Servant
 
 data ImageSettings = ImageSettings
   { id :: ImageSettingsId,
-    filename :: !Filename,
-    rating :: !Int16,
-    rotate :: !Double,
-    crop :: !ImageCrop,
-    gamma :: !Double,
-    zones :: !Zones,
-    blackpoint :: !Double,
-    whitepoint :: !Double,
-    expressions :: !(Vector Expression)
+    filename :: Filename,
+    rating :: Int16,
+    rotate :: Double,
+    crop :: ImageCrop,
+    gamma :: Double,
+    zones :: Zones,
+    blackpoint :: Double,
+    whitepoint :: Double,
+    expressions :: Vector Expression
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
@@ -60,15 +61,15 @@ emptyImageSettings x =
 -- Zones
 
 data Zones = Zones
-  { z1 :: !Double,
-    z2 :: !Double,
-    z3 :: !Double,
-    z4 :: !Double,
-    z5 :: !Double,
-    z6 :: !Double,
-    z7 :: !Double,
-    z8 :: !Double,
-    z9 :: !Double
+  { z1 :: Double,
+    z2 :: Double,
+    z3 :: Double,
+    z4 :: Double,
+    z5 :: Double,
+    z6 :: Double,
+    z7 :: Double,
+    z8 :: Double,
+    z9 :: Double
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
@@ -87,11 +88,11 @@ emptyZones =
 -- EXPR
 
 data Expression = Expression
-  { eValue :: !Double,
-    eMin :: !Double,
-    eMax :: !Double,
-    eLabel :: !Text,
-    eExpr :: !Text
+  { eValue :: Double,
+    eMin :: Double,
+    eMax :: Double,
+    eLabel :: Text,
+    eExpr :: Text
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
@@ -126,9 +127,9 @@ data ExpressionResult
 -- CROP
 
 data ImageCrop = ImageCrop
-  { icTop :: !Double,
-    icLeft :: !Double,
-    icWidth :: !Double
+  { icTop :: Double,
+    icLeft :: Double,
+    icWidth :: Double
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
@@ -147,9 +148,9 @@ emptyCrop =
 -- COORDINATE
 
 data CoordinateInfo = CoordinateInfo
-  { ciX :: !Double,
-    ciY :: !Double,
-    ciValue :: !Double
+  { ciX :: Double,
+    ciY :: Double,
+    ciValue :: Double
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo)
   deriving

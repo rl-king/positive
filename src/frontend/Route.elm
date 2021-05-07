@@ -5,7 +5,6 @@ module Route exposing
     )
 
 import Data.Id exposing (FilmRollId, ImageSettingsId)
-import Generated.Data exposing (Filename(..))
 import String.Interpolate exposing (interpolate)
 import Url exposing (Url)
 import Url.Builder

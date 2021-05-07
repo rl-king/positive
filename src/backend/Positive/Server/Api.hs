@@ -3,12 +3,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Positive.Api where
+module Positive.Server.Api where
 
 import Data.ByteString.Lazy (ByteString)
 import Network.HTTP.Media ((//))
 import Positive.Data.FilmRoll
-import Positive.Data.Id
 import Positive.Data.ImageSettings
 import Positive.Prelude hiding (ByteString)
 import Servant

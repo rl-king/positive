@@ -13,7 +13,8 @@ import Base64
 import Browser.Dom exposing (Element)
 import Browser.Events
 import Browser.Navigation as Navigation
-import Data.Id exposing (FilmRollId, ImageSettingsId)
+import Data.Id as Id exposing (FilmRollId, ImageSettingsId)
+import Data.Path as Path exposing (Directory, Filename)
 import Dict exposing (Dict)
 import Dict.Fun
 import Generated.Data as Image
@@ -21,7 +22,6 @@ import Generated.Data as Image
         ( CoordinateInfo
         , Expression
         , ExpressionResult(..)
-        , Filename(..)
         , FilmRoll
         , ImageCrop
         , ImageSettings
@@ -98,7 +98,7 @@ subscriptions { clipboard, imageCropMode, images } =
                 matchKey "Escape" (CopySettings Nothing)
             )
             clipboard
-        , previewReady (OnPreviewReady << Filename)
+        , previewReady (OnPreviewReady << Path.fromString)
         , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
 
@@ -136,10 +136,6 @@ type alias Images =
     Zipper ImageSettings
 
 
-type alias Ratings =
-    Dict.Fun.Dict Filename String Int
-
-
 type alias PreviewVersions =
     Dict.Fun.Dict Filename String Int
 
@@ -171,7 +167,7 @@ init filmRoll imageSettingsId images =
     , minimumRating = 0
     , previewColumns = 4
     , notifications = []
-    , previewVersions = Dict.Fun.empty (\(Filename n) -> n) Filename
+    , previewVersions = Dict.Fun.empty Path.toString Path.fromString
     , imageElement =
         { scene = { width = 0, height = 0 }
         , viewport = { x = 0, y = 0, width = 0, height = 0 }
@@ -210,7 +206,7 @@ type Msg
     = GotSaveImageSettings (HttpResult Image.FilmRoll)
     | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (List Int))
-    | RotatePreview Filename Float
+    | RotatePreview ImageSettingsId Float
     | OnImageSettingsChange ImageSettings
     | OnExpressionValueChange EditorIndex Expression
     | OnExpressionChange EditorIndex Expression
@@ -277,12 +273,12 @@ update key msg model =
             , Cmd.none
             )
 
-        RotatePreview filename rotation ->
+        RotatePreview imageSettingsId rotation ->
             let
                 images =
                     Zipper.map
                         (\s ->
-                            if s.filename == filename then
+                            if s.id == imageSettingsId then
                                 { s | rotate = rotation }
 
                             else
@@ -467,7 +463,7 @@ update key msg model =
             in
             pushNotification Normal
                 RemoveNotification
-                ("Preview ready: " ++ Image.filenameToString filename)
+                ("Preview ready: " ++ Path.toString filename)
                 { model | previewVersions = Dict.Fun.update filename f model.previewVersions }
 
         SaveSettings ->
@@ -767,10 +763,11 @@ viewNav : FilmRoll -> Images -> Html Msg
 viewNav filmRoll images =
     nav []
         [ a [ href "/" ] [ text "browser" ]
-        , text filmRoll.directoryPath
+        , text <|
+            Path.toString filmRoll.directoryPath
         , text "/"
         , text <|
-            (Image.filenameToString << .filename) <|
+            (Path.toString << .filename) <|
                 Zipper.current images
         ]
 
@@ -785,7 +782,7 @@ viewFiles filmRoll columns minimumRating previewVersions images =
         [ Input.viewRangeInt 1 ( 2, 13, 5 ) "Columns" columns SetColumnCount
         , Input.viewRangeInt 1 ( 0, 5, 0 ) "Rating" minimumRating SetMinRating
         , Html.Keyed.ul [] <|
-            List.map (\( _, Filename filename, x ) -> ( filename, x )) <|
+            List.map (\( _, imageSettingsId, x ) -> ( Id.toString imageSettingsId, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
                     List.concat
                         [ List.map (viewFilesLink False filmRoll columns previewVersions) <|
@@ -805,7 +802,7 @@ viewFilesLink :
     -> Int
     -> PreviewVersions
     -> ImageSettings
-    -> ( Int, Filename, Html Msg )
+    -> ( Int, ImageSettingsId, Html Msg )
 viewFilesLink isCurrent filmRoll columns previewVersions settings =
     let
         width =
@@ -816,12 +813,12 @@ viewFilesLink isCurrent filmRoll columns previewVersions settings =
             fractionalModBy (degrees -360) (settings.rotate - degrees deg)
     in
     ( settings.rating
-    , settings.filename
+    , settings.id
     , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 4 ) ], width ]
         [ a [ href (Route.toUrl (Route.Editor filmRoll.id settings.id)) ]
             [ img
                 [ src <|
-                    Url.Builder.crossOrigin filmRoll.directoryPath
+                    Url.Builder.crossOrigin (Path.toString filmRoll.directoryPath)
                         [ "previews", previewExtension settings.filename ]
                         [ Url.Builder.int "v" <|
                             Maybe.withDefault 0 (Dict.Fun.get settings.filename previewVersions)
@@ -831,21 +828,21 @@ viewFilesLink isCurrent filmRoll columns previewVersions settings =
             ]
         , span [ class "files-file-rotate" ]
             [ button
-                [ onClick (RotatePreview settings.filename (rotate 270))
+                [ onClick (RotatePreview settings.id (rotate 270))
                 ]
                 [ text "⊤" ]
             , button
-                [ onClick (RotatePreview settings.filename (rotate 180))
+                [ onClick (RotatePreview settings.id (rotate 180))
                 ]
                 [ text "⊤" ]
             , button
-                [ onClick (RotatePreview settings.filename (rotate 90))
+                [ onClick (RotatePreview settings.id (rotate 90))
                 ]
                 [ text "⊤" ]
             ]
         , span [ class "files-file-footer" ]
             [ text <|
-                Image.filenameToString settings.filename
+                Path.toString settings.filename
             , button [ onClick (CopySettings (Just settings)) ] [ Icon.copy ]
             , viewRating settings
             ]
@@ -941,7 +938,7 @@ viewSettingsLeft images undoState imageCropMode clipboard_ processingState =
             settingsFromState processingState images
 
         clipboardTitle x clipboard =
-            interpolate "{0} from {1}" [ x, Image.filenameToString clipboard.filename ]
+            interpolate "{0} from {1}" [ x, Path.toString clipboard.filename ]
     in
     div [ class "image-settings-left" ]
         [ viewSettingsGroup
@@ -1210,7 +1207,7 @@ viewImage images filmRoll imageCropMode scale_ processingState previewVersions c
                         , scale
                         , src <|
                             Url.Builder.crossOrigin
-                                filmRoll.directoryPath
+                                (Path.toString filmRoll.directoryPath)
                                 [ "previews", previewExtension current.filename ]
                                 [ Url.Builder.int "v" <|
                                     Maybe.withDefault 0 <|
@@ -1229,7 +1226,8 @@ viewImage images filmRoll imageCropMode scale_ processingState previewVersions c
                         , src <|
                             Url.Builder.absolute [ "image" ]
                                 [ toImageUrlParams (ifCropping current)
-                                , Url.Builder.string "dir" filmRoll.directoryPath
+                                , Url.Builder.string "dir" <|
+                                    Path.toString filmRoll.directoryPath
                                 ]
                         ]
                         []
@@ -1410,8 +1408,8 @@ threeDecimalFloat x =
 
 
 previewExtension : Filename -> String
-previewExtension (Filename x) =
-    String.dropRight 3 x ++ "jpg"
+previewExtension filename =
+    String.dropRight 3 (Path.toString filename) ++ "jpg"
 
 
 resetAll : ImageSettings -> ImageSettings
