@@ -18,6 +18,8 @@ create table if not exists positive.image
   , unique (id, filename)
   );
 
+-- TABLE
+
 create table if not exists positive.film_roll
   ( id serial primary key
   , poster integer null references positive.image(id)
@@ -29,8 +31,32 @@ create table if not exists positive.film_roll
 alter table positive.image
 add film_roll_id integer references positive.film_roll(id);
 
--- create table positive.collection
---   ( id serial primary key
---   , name text not null
---   , image_id serial references positive.image id
---   )
+alter table positive.film_roll
+add created timestamptz default now(),
+add modified timestamptz default now();
+
+-- FUN
+
+create or replace function positive.update_modified_timestamp()
+  returns trigger
+  language plpgsql
+  as $$
+      begin
+          new.modified = now();
+          return new;
+      end
+  $$;
+
+-- TRIGGER
+
+create trigger on_image_modified
+  before update
+  on positive.image
+  for each row
+  execute procedure positive.update_modified_timestamp();
+
+create trigger on_film_roll_modified
+  before update
+  on positive.film_roll
+  for each row
+  execute procedure film_roll.update_modified_timestamp();
