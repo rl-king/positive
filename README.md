@@ -1,6 +1,6 @@
 # Positive
 
-Lightroom for linear scanned monochrome film.
+Tool for converting linear scanned monochrome film.
 
 * Non destructive editing
 * No "intelligent" tone corrections

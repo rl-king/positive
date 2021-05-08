@@ -15,30 +15,31 @@ import Positive.Prelude
 import Servant
 
 serve :: Bool -> Tagged (m :: Type -> Type) Application
-serve isDev
-  | isDev =
-    pure $ \req resp ->
-      case Wai.pathInfo req of
-        "editor" : _ ->
-          resp $ Wai.responseFile Http.status200 [] "./index.html" Nothing
-        [] ->
-          resp $ Wai.responseFile Http.status200 [] "./index.html" Nothing
-        _ ->
-          staticApp (defaultFileServerSettings "./") req resp
-  | otherwise =
-    pure $ \req resp -> do
-      let assets = HashMap.fromList (fmap (first Text.pack) static)
-       in case Wai.pathInfo req of
-            "dist" : "icons" : rest ->
-              resp $ toFile [(Http.hContentType, "image/svg+xml")] ("icons" : rest) assets
-            "dist" : rest ->
-              resp $ toFile [] rest assets
-            "editor" : _ ->
-              resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
-            [] ->
-              resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
-            _ ->
-              staticApp (defaultFileServerSettings "./") req resp
+serve True =
+  pure $ \req resp ->
+    case Wai.pathInfo req of
+      [] ->
+        resp $ Wai.responseFile Http.status200 [] "./index.html" Nothing
+      "editor" : _ ->
+        resp $ Wai.responseFile Http.status200 [] "./index.html" Nothing
+      "dist" : _ ->
+        staticApp (defaultFileServerSettings "./") req resp
+      _ ->
+        staticApp (defaultFileServerSettings "/") req resp
+serve False =
+  pure $ \req resp -> do
+    let assets = HashMap.fromList (fmap (first Text.pack) static)
+     in case Wai.pathInfo req of
+          "dist" : "icons" : rest ->
+            resp $ toFile [(Http.hContentType, "image/svg+xml")] ("icons" : rest) assets
+          "dist" : rest ->
+            resp $ toFile [] rest assets
+          "editor" : _ ->
+            resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
+          [] ->
+            resp $ Wai.responseLBS Http.status200 [] (fromStrict indexHtml)
+          _ ->
+            staticApp (defaultFileServerSettings "/") req resp
 
 toFile :: Http.ResponseHeaders -> [Text] -> HashMap Text ByteString -> Wai.Response
 toFile headers path assets =

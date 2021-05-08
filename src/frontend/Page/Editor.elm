@@ -13,6 +13,8 @@ import Base64
 import Browser.Dom exposing (Element)
 import Browser.Events
 import Browser.Navigation as Navigation
+import Data.Id as Id exposing (ImageSettingsId)
+import Data.Path as Path exposing (Filename)
 import Dict exposing (Dict)
 import Dict.Fun
 import Generated.Data as Image
@@ -20,8 +22,9 @@ import Generated.Data as Image
         ( CoordinateInfo
         , Expression
         , ExpressionResult(..)
-        , Filename(..)
+        , FilmRoll
         , ImageCrop
+        , ImageSettings
         , Zones
         )
 import Generated.Request as Request
@@ -50,7 +53,7 @@ import Util exposing (..)
 -- PORT
 
 
-port previewReady : (String -> msg) -> Sub msg
+port previewReady : (Int -> msg) -> Sub msg
 
 
 
@@ -58,10 +61,10 @@ port previewReady : (String -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
-subscriptions { clipboard, imageCropMode, filmRoll } =
+subscriptions { clipboard, imageCropMode, images } =
     let
         current =
-            Zipper.current filmRoll
+            Zipper.current images
 
         ifJust f =
             Maybe.withDefault Sub.none << Maybe.map (Browser.Events.onKeyDown << f)
@@ -95,7 +98,7 @@ subscriptions { clipboard, imageCropMode, filmRoll } =
                 matchKey "Escape" (CopySettings Nothing)
             )
             clipboard
-        , previewReady (OnPreviewReady << Filename)
+        , previewReady (OnPreviewReady << Id.fromInt)
         , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
 
@@ -105,22 +108,20 @@ subscriptions { clipboard, imageCropMode, filmRoll } =
 
 
 type alias Model =
-    { checkExpressionsKey : Key { checkExpressionsKey : () }
-    , clipboard : Maybe Image.Settings
+    { filmRoll : FilmRoll
+    , checkExpressionsKey : Key { checkExpressionsKey : () }
+    , clipboard : Maybe ImageSettings
     , coordinateInfo : Dict ( Float, Float ) CoordinateInfo
     , draftExpressions : DraftExpressions
-    , filmRoll : Images
+    , images : Images
     , fullscreen : Bool
     , histogram : List Int
     , imageCropMode : Maybe ImageCrop
     , imageElement : Element
     , minimumRating : Int
     , notifications : List ( Level, String )
-    , poster : Maybe Filename
     , previewColumns : Int
     , previewVersions : PreviewVersions
-    , ratings : Ratings
-    , route : Route.EditorRoute
     , scale : Float
     , undoState : UndoHistory
     , processingState : ProcessingState
@@ -132,15 +133,11 @@ type alias UndoHistory =
 
 
 type alias Images =
-    Zipper Image.Settings
-
-
-type alias Ratings =
-    Dict.Fun.Dict Filename String Int
+    Zipper ImageSettings
 
 
 type alias PreviewVersions =
-    Dict.Fun.Dict Filename String Int
+    Dict.Fun.Dict ImageSettingsId Int Int
 
 
 type alias DraftExpressions =
@@ -151,17 +148,16 @@ type alias EditorIndex =
     Index { editor : () }
 
 
-init : Route.EditorRoute -> Images -> Ratings -> Maybe Filename -> Model
-init route filmRoll ratings poster =
+init : FilmRoll -> ImageSettingsId -> Images -> Model
+init filmRoll imageSettingsId images =
     let
         focussed =
-            focus route filmRoll
+            focus imageSettingsId images
     in
-    { processingState = ProcessingState.preview
-    , ratings = ratings
-    , poster = poster
-    , filmRoll = focussed
-    , draftExpressions = fromArray (.iExpressions (Zipper.current focussed))
+    { filmRoll = filmRoll
+    , processingState = ProcessingState.preview
+    , images = focussed
+    , draftExpressions = fromArray (.expressions (Zipper.current focussed))
     , checkExpressionsKey = Key 0
     , imageCropMode = Nothing
     , clipboard = Nothing
@@ -170,9 +166,8 @@ init route filmRoll ratings poster =
     , scale = 1
     , minimumRating = 0
     , previewColumns = 4
-    , route = route
     , notifications = []
-    , previewVersions = Dict.Fun.empty (\(Filename n) -> n) Filename
+    , previewVersions = Dict.Fun.empty Id.toInt Id.fromInt
     , imageElement =
         { scene = { width = 0, height = 0 }
         , viewport = { x = 0, y = 0, width = 0, height = 0 }
@@ -183,27 +178,24 @@ init route filmRoll ratings poster =
     }
 
 
-continue : Route.EditorRoute -> Images -> Ratings -> Maybe Filename -> Model -> Model
-continue route filmRoll ratings poster model =
+continue : ImageSettingsId -> Images -> Model -> Model
+continue imageSettingsId images model =
     let
         focussed =
-            focus route filmRoll
+            focus imageSettingsId images
     in
     { model
         | processingState = ProcessingState.preview
-        , ratings = ratings
-        , poster = poster
-        , draftExpressions = fromArray (.iExpressions (Zipper.current focussed))
-        , filmRoll = focussed
-        , route = route
+        , draftExpressions = fromArray (.expressions (Zipper.current focussed))
+        , images = focussed
         , coordinateInfo = Dict.empty
     }
 
 
-focus : Route.EditorRoute -> Images -> Images
-focus route filmRoll =
-    Maybe.withDefault filmRoll <|
-        Zipper.findFirst ((==) route.filename << .iFilename) filmRoll
+focus : ImageSettingsId -> Images -> Images
+focus imageSettingsId images =
+    Maybe.withDefault images <|
+        Zipper.findFirst ((==) imageSettingsId << .id) images
 
 
 
@@ -214,19 +206,19 @@ type Msg
     = GotSaveImageSettings (HttpResult Image.FilmRoll)
     | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (List Int))
-    | RotatePreview Filename Float
-    | OnImageSettingsChange Image.Settings
+    | RotatePreview ImageSettingsId Float
+    | OnImageSettingsChange ImageSettings
     | OnExpressionValueChange EditorIndex Expression
     | OnExpressionChange EditorIndex Expression
     | AddExpression
     | RemoveExpression EditorIndex
     | CheckExpressions (Key { checkExpressionsKey : () })
     | GotCheckExpressions (HttpResult (List ExpressionResult))
-    | OnImageLoad String Image.Settings
+    | OnImageLoad ImageSettings
     | SaveSettings
     | GenerateHighres
     | GenerateWallpaper
-    | CopySettings (Maybe Image.Settings)
+    | CopySettings (Maybe ImageSettings)
     | ApplyCopyToAll Images
     | UpdateImageCropMode (Maybe ImageCrop)
     | ApplyCrop ImageCrop
@@ -235,11 +227,11 @@ type Msg
     | Undo
     | UpdateScale Float
     | SetColumnCount Int
-    | Rate Filename Int
+    | Rate ImageSettingsId Int
     | SetMinRating Int
     | Rotate
     | RemoveNotification
-    | OnPreviewReady Filename
+    | OnPreviewReady ImageSettingsId
     | LoadOriginal
     | OnImageClick ( Float, Float )
     | RemoveCoordinate CoordinateInfo
@@ -274,27 +266,19 @@ update key msg model =
             ( updateSettings
                 (\s ->
                     { s
-                        | iRotate = fractionalModBy (degrees -360) (s.iRotate - degrees 90)
+                        | rotate = fractionalModBy (degrees -360) (s.rotate - degrees 90)
                     }
                 )
                 model
             , Cmd.none
             )
 
-        RotatePreview filename rotation ->
+        RotatePreview imageSettingsId rotation ->
             let
-                filmRoll =
-                    Zipper.map
-                        (\s ->
-                            if s.iFilename == filename then
-                                { s | iRotate = rotation }
-
-                            else
-                                s
-                        )
-                        model.filmRoll
+                rotate imageSettings =
+                    { imageSettings | rotate = rotation }
             in
-            ( { model | filmRoll = filmRoll }
+            ( { model | images = updateZipperById imageSettingsId rotate model.images }
             , Cmd.none
             )
 
@@ -343,7 +327,7 @@ update key msg model =
                         (Array.slice (i + 1) (Array.length arr) arr)
             in
             ( updateSettings
-                (\s -> { s | iExpressions = Index.withIndex remove index s.iExpressions })
+                (\s -> { s | expressions = Index.withIndex remove index s.expressions })
                 { model
                     | draftExpressions = Index.withIndex Reorderable.drop index model.draftExpressions
                 }
@@ -388,7 +372,7 @@ update key msg model =
                             result
             in
             if List.all isOk result then
-                ( updateSettings (\s -> { s | iExpressions = toArray model.draftExpressions })
+                ( updateSettings (\s -> { s | expressions = toArray model.draftExpressions })
                     { model | draftExpressions = draftExpressions }
                 , Cmd.none
                 )
@@ -409,24 +393,24 @@ update key msg model =
             , Cmd.none
             )
 
-        ApplyCopyToAll filmRoll ->
+        ApplyCopyToAll images ->
             let
                 currentChanged =
-                    Zipper.current model.filmRoll /= Zipper.current filmRoll
+                    Zipper.current model.images /= Zipper.current images
             in
             if currentChanged then
-                ( updateSettings identity { model | filmRoll = filmRoll }
+                ( updateSettings identity { model | images = images }
                 , Cmd.none
                 )
 
             else
-                ( { model | filmRoll = filmRoll }, Cmd.none )
+                ( { model | images = images }, Cmd.none )
 
-        OnImageLoad dir settings ->
+        OnImageLoad settings ->
             let
                 getHistogram =
                     Cmd.map GotHistogram <|
-                        Request.postImageSettingsHistogram dir settings
+                        Request.postImageSettingsHistogram settings
 
                 updateCoordinateInfo =
                     if Dict.isEmpty model.coordinateInfo then
@@ -434,9 +418,9 @@ update key msg model =
 
                     else
                         Cmd.map GotCoordinateInfo <|
-                            Request.postImageSettingsCoordinate model.route.dir
+                            Request.postImageSettingsCoordinate
                                 ( Dict.keys model.coordinateInfo
-                                , Zipper.current model.filmRoll
+                                , Zipper.current model.images
                                 )
             in
             case model.processingState of
@@ -454,12 +438,12 @@ update key msg model =
                 Queued state ->
                     ( { model
                         | processingState = ProcessingState.toProcessing state
-                        , filmRoll = ProcessingState.toData state
+                        , images = ProcessingState.toData state
                       }
                     , Cmd.none
                     )
 
-        OnPreviewReady filename ->
+        OnPreviewReady imageSettingsId ->
             let
                 f x =
                     case x of
@@ -471,8 +455,8 @@ update key msg model =
             in
             pushNotification Normal
                 RemoveNotification
-                ("Preview ready: " ++ Image.filenameToString filename)
-                { model | previewVersions = Dict.Fun.update filename f model.previewVersions }
+                ("Preview ready: " ++ Id.toString imageSettingsId)
+                { model | previewVersions = Dict.Fun.update imageSettingsId f model.previewVersions }
 
         SaveSettings ->
             ( model
@@ -485,9 +469,8 @@ update key msg model =
                     (\cmds ->
                         Cmd.batch
                             [ Cmd.map (GotGenerate "highres") <|
-                                Request.postImageSettingsHighres
-                                    model.route.dir
-                                    (Zipper.current model.filmRoll)
+                                Request.postImageSettingsHighres <|
+                                    Zipper.current model.images
                             , cmds
                             ]
                     )
@@ -498,9 +481,8 @@ update key msg model =
                     (\cmds ->
                         Cmd.batch
                             [ Cmd.map (GotGenerate "wallpaper") <|
-                                Request.postImageSettingsWallpaper
-                                    model.route.dir
-                                    (Zipper.current model.filmRoll)
+                                Request.postImageSettingsWallpaper <|
+                                    Zipper.current model.images
                             , cmds
                             ]
                     )
@@ -515,33 +497,25 @@ update key msg model =
             )
 
         ApplyCrop imageCrop ->
-            ( updateSettings (\s -> { s | iCrop = imageCrop })
+            ( updateSettings (\s -> { s | crop = imageCrop })
                 { model | imageCropMode = Nothing }
             , Cmd.none
             )
 
         PreviousImage ->
-            let
-                f x =
-                    { dir = model.route.dir, filename = x.iFilename }
-            in
             ( { model | undoState = [] }
             , Navigation.pushUrl key <|
-                (Route.toUrl << Route.Editor << f << Zipper.current) <|
-                    Maybe.withDefault (Zipper.last model.filmRoll) <|
-                        Zipper.previous model.filmRoll
+                (Route.toUrl << Route.Editor model.filmRoll.id << .id << Zipper.current) <|
+                    Maybe.withDefault (Zipper.last model.images) <|
+                        Zipper.previous model.images
             )
 
         NextImage ->
-            let
-                f x =
-                    { dir = model.route.dir, filename = x.iFilename }
-            in
             ( { model | undoState = [] }
             , Navigation.pushUrl key <|
-                (Route.toUrl << Route.Editor << f << Zipper.current) <|
-                    Maybe.withDefault (Zipper.first model.filmRoll) <|
-                        Zipper.next model.filmRoll
+                (Route.toUrl << Route.Editor model.filmRoll.id << .id << Zipper.current) <|
+                    Maybe.withDefault (Zipper.first model.images) <|
+                        Zipper.next model.images
             )
 
         Undo ->
@@ -550,7 +524,7 @@ update key msg model =
                     ( model, Cmd.none )
 
                 x :: xs ->
-                    ( { model | undoState = xs, filmRoll = x }
+                    ( { model | undoState = xs, images = x }
                     , Cmd.none
                     )
 
@@ -563,22 +537,16 @@ update key msg model =
         SetColumnCount scale ->
             ( { model | previewColumns = scale }, Cmd.none )
 
-        Rate filename rating ->
+        Rate imageSettingsId rating ->
             let
-                check x =
-                    case x of
-                        Nothing ->
-                            Just rating
-
-                        Just y ->
-                            if y == rating then
-                                Nothing
-
-                            else
-                                Just rating
+                rate imageSettings =
+                    { imageSettings | rating = rating }
 
                 newModel =
-                    { model | ratings = Dict.Fun.update filename check model.ratings }
+                    { model
+                        | images =
+                            updateZipperById imageSettingsId rate model.images
+                    }
             in
             ( newModel
             , saveSettings newModel
@@ -597,7 +565,9 @@ update key msg model =
             )
 
         LoadOriginal ->
-            ( { model | processingState = fromPreview model.processingState }, Cmd.none )
+            ( { model | processingState = fromPreview model.processingState }
+            , Cmd.none
+            )
 
         RemoveCoordinate { ciX, ciY } ->
             ( { model | coordinateInfo = Dict.remove ( ciX, ciY ) model.coordinateInfo }
@@ -622,8 +592,8 @@ update key msg model =
                     Dict.insert ( cX, cY ) (CoordinateInfo cX cY 0) model.coordinateInfo
               }
             , Cmd.map GotCoordinateInfo <|
-                Request.postImageSettingsCoordinate model.route.dir
-                    ( [ ( cX, cY ) ], Zipper.current model.filmRoll )
+                Request.postImageSettingsCoordinate
+                    ( [ ( cX, cY ) ], Zipper.current model.images )
             )
 
         GotCoordinateInfo (Ok coordinateInfo) ->
@@ -654,8 +624,8 @@ update key msg model =
         OpenExternalEditor ->
             ( model
             , Cmd.map GotOpenExternalEditor <|
-                Request.postImageSettingsExternaleditor model.route.dir <|
-                    Zipper.current model.filmRoll
+                Request.postImageSettingsExternaleditor <|
+                    Zipper.current model.images
             )
 
         GotOpenExternalEditor (Ok _) ->
@@ -678,10 +648,10 @@ nextKey (Key k) =
 
 
 saveSettings : Model -> Cmd Msg
-saveSettings model =
+saveSettings { filmRoll, images } =
     Cmd.map GotSaveImageSettings <|
-        Request.postImageSettings model.route.dir <|
-            fromZipper model.poster model.ratings model.filmRoll
+        Request.postFilmroll <|
+            { filmRoll | imageSettings = Zipper.toList images }
 
 
 fromPreview : ProcessingState -> ProcessingState
@@ -694,11 +664,11 @@ fromPreview state =
             other
 
 
-updateSettings : (Image.Settings -> Image.Settings) -> Model -> Model
+updateSettings : (ImageSettings -> ImageSettings) -> Model -> Model
 updateSettings f model =
     let
         unlessUnchanged old new =
-            if old.filmRoll == new.filmRoll then
+            if old.images == new.images then
                 old
 
             else
@@ -709,39 +679,31 @@ updateSettings f model =
             unlessUnchanged model
                 { model
                     | processingState = ProcessingState.toProcessing state
-                    , filmRoll = Zipper.mapCurrent f model.filmRoll
-                    , undoState = model.filmRoll :: model.undoState
+                    , images = Zipper.mapCurrent f model.images
+                    , undoState = model.images :: model.undoState
                 }
 
         Ready state ->
             unlessUnchanged model
                 { model
                     | processingState = ProcessingState.toProcessing state
-                    , filmRoll = Zipper.mapCurrent f model.filmRoll
-                    , undoState = model.filmRoll :: model.undoState
+                    , images = Zipper.mapCurrent f model.images
+                    , undoState = model.images :: model.undoState
                 }
 
         Processing state ->
             { model
                 | processingState =
                     ProcessingState.toQueued
-                        (Zipper.mapCurrent f model.filmRoll)
+                        (Zipper.mapCurrent f model.images)
                         state
-                , undoState = model.filmRoll :: model.undoState
+                , undoState = model.images :: model.undoState
             }
 
         Queued state ->
             { model
                 | processingState = ProcessingState.map (Zipper.mapCurrent f) state
             }
-
-
-fromZipper : Maybe Filename -> Ratings -> Images -> Image.FilmRoll
-fromZipper poster ratings =
-    Image.FilmRoll poster ratings
-        << Dict.Fun.fromList Image.filenameToString Filename
-        << List.map (\x -> ( x.iFilename, x ))
-        << Zipper.toList
 
 
 
@@ -751,11 +713,11 @@ fromZipper poster ratings =
 view : Model -> List ( Level, String ) -> Html Msg
 view model otherNotifications =
     main_ [ classList [ ( "fullscreen", model.fullscreen ) ] ]
-        [ Html.Lazy.lazy viewNav model.route
+        [ Html.Lazy.lazy2 viewNav model.filmRoll model.images
         , Html.Lazy.lazy viewLoading model.processingState
         , Html.Lazy.lazy8 viewImage
+            model.images
             model.filmRoll
-            model.route
             model.imageCropMode
             model.scale
             model.processingState
@@ -763,23 +725,22 @@ view model otherNotifications =
             model.coordinateInfo
             model.imageElement
         , Html.Lazy.lazy5 viewSettingsLeft
-            model.filmRoll
+            model.images
             model.undoState
             model.imageCropMode
             model.clipboard
             model.processingState
         , Html.Lazy.lazy4 viewSettingsRight
-            model.filmRoll
+            model.images
             model.draftExpressions
             model.histogram
             model.processingState
-        , Html.Lazy.lazy6 viewFiles
-            model.route
+        , Html.Lazy.lazy5 viewFiles
+            model.filmRoll
             model.previewColumns
             model.minimumRating
             model.previewVersions
-            model.ratings
-            model.filmRoll
+            model.images
         , viewNotifications (model.notifications ++ otherNotifications)
         ]
 
@@ -788,15 +749,16 @@ view model otherNotifications =
 -- NAV
 
 
-viewNav : Route.EditorRoute -> Html Msg
-viewNav route =
+viewNav : FilmRoll -> Images -> Html Msg
+viewNav filmRoll images =
     nav []
         [ a [ href "/" ] [ text "browser" ]
-        , text "/"
-        , text route.dir
+        , text <|
+            Path.toString filmRoll.directoryPath
         , text "/"
         , text <|
-            Image.filenameToString route.filename
+            (Path.toString << .filename) <|
+                Zipper.current images
         ]
 
 
@@ -804,90 +766,85 @@ viewNav route =
 -- FILES
 
 
-viewFiles : Route.EditorRoute -> Int -> Int -> PreviewVersions -> Ratings -> Images -> Html Msg
-viewFiles route columns minimumRating previewVersions ratings filmRoll =
+viewFiles : FilmRoll -> Int -> Int -> PreviewVersions -> Images -> Html Msg
+viewFiles filmRoll columns minimumRating previewVersions images =
     section [ class "files" ]
         [ Input.viewRangeInt 1 ( 2, 13, 5 ) "Columns" columns SetColumnCount
         , Input.viewRangeInt 1 ( 0, 5, 0 ) "Rating" minimumRating SetMinRating
         , Html.Keyed.ul [] <|
-            List.map (\( _, Filename filename, x ) -> ( filename, x )) <|
+            List.map (\( _, imageSettingsId, x ) -> ( Id.toString imageSettingsId, x )) <|
                 List.filter (\( rating, _, _ ) -> rating >= minimumRating) <|
                     List.concat
-                        [ List.map (viewFilesLink False route.dir columns previewVersions ratings) <|
-                            Zipper.before filmRoll
-                        , [ viewFilesLink True route.dir columns previewVersions ratings <|
-                                Zipper.current filmRoll
+                        [ List.map (viewFilesLink False filmRoll columns previewVersions) <|
+                            Zipper.before images
+                        , [ viewFilesLink True filmRoll columns previewVersions <|
+                                Zipper.current images
                           ]
-                        , List.map (viewFilesLink False route.dir columns previewVersions ratings) <|
-                            Zipper.after filmRoll
+                        , List.map (viewFilesLink False filmRoll columns previewVersions) <|
+                            Zipper.after images
                         ]
         ]
 
 
 viewFilesLink :
     Bool
-    -> String
+    -> FilmRoll
     -> Int
     -> PreviewVersions
-    -> Ratings
-    -> Image.Settings
-    -> ( Int, Filename, Html Msg )
-viewFilesLink isCurrent dir columns previewVersions ratings settings =
+    -> ImageSettings
+    -> ( Int, ImageSettingsId, Html Msg )
+viewFilesLink isCurrent filmRoll columns previewVersions settings =
     let
         width =
             style "width" <|
                 interpolate "calc({0}% - 1rem)" [ String.fromInt (100 // columns) ]
 
         rotate deg =
-            fractionalModBy (degrees -360) (settings.iRotate - degrees deg)
+            fractionalModBy (degrees -360) (settings.rotate - degrees deg)
     in
-    ( Maybe.withDefault 0 (Dict.Fun.get settings.iFilename ratings)
-    , settings.iFilename
+    ( settings.rating
+    , settings.id
     , li [ classList [ ( "-current", isCurrent ), ( "-small", columns > 4 ) ], width ]
-        [ a [ href (Route.toUrl (Route.Editor { filename = settings.iFilename, dir = dir })) ]
+        [ a [ href (Route.toUrl (Route.Editor filmRoll.id settings.id)) ]
             [ img
                 [ src <|
-                    Url.Builder.absolute
-                        [ dir, "previews", previewExtension settings.iFilename ]
+                    Url.Builder.crossOrigin (Path.toString filmRoll.directoryPath)
+                        [ "previews", previewExtension settings.filename ]
                         [ Url.Builder.int "v" <|
-                            Maybe.withDefault 0 (Dict.Fun.get settings.iFilename previewVersions)
+                            Maybe.withDefault 0 (Dict.Fun.get settings.id previewVersions)
                         ]
                 ]
                 []
             ]
         , span [ class "files-file-rotate" ]
             [ button
-                [ onClick (RotatePreview settings.iFilename (rotate 270))
+                [ onClick (RotatePreview settings.id (rotate 270))
                 ]
                 [ text "⊤" ]
             , button
-                [ onClick (RotatePreview settings.iFilename (rotate 180))
+                [ onClick (RotatePreview settings.id (rotate 180))
                 ]
                 [ text "⊤" ]
             , button
-                [ onClick (RotatePreview settings.iFilename (rotate 90))
+                [ onClick (RotatePreview settings.id (rotate 90))
                 ]
                 [ text "⊤" ]
             ]
         , span [ class "files-file-footer" ]
             [ text <|
-                Image.filenameToString settings.iFilename
+                Path.toString settings.filename
             , button [ onClick (CopySettings (Just settings)) ] [ Icon.copy ]
-            , viewRating settings.iFilename ratings
+            , viewRating settings
             ]
         ]
     )
 
 
-viewRating : Filename -> Ratings -> Html Msg
-viewRating filename ratings =
+viewRating : ImageSettings -> Html Msg
+viewRating settings =
     let
-        rating =
-            Maybe.withDefault 0 <|
-                Dict.Fun.get filename ratings
-
         gliph n =
-            if n <= rating then
+            if n <= settings.rating then
                 Icon.starred
 
             else
@@ -895,7 +852,7 @@ viewRating filename ratings =
     in
     div [ class "ratings" ] <|
         List.map
-            (\n -> button [ onClick (Rate filename n) ] [ gliph n ])
+            (\n -> button [ onClick (Rate settings.id n) ] [ gliph n ])
             (List.range 1 5)
 
 
@@ -909,44 +866,44 @@ viewSettingsRight :
     -> List Int
     -> ProcessingState
     -> Html Msg
-viewSettingsRight filmRoll draftExpressions histogram processingState =
+viewSettingsRight images draftExpressions histogram processingState =
     let
-        ({ iZones } as settings) =
-            settingsFromState processingState filmRoll
+        ({ zones } as settings) =
+            settingsFromState processingState images
 
         zoneInput f value name =
             Input.viewRange 0.001 ( -0.25, 0.25, 0 ) name value <|
-                \v -> { settings | iZones = f v }
+                \v -> { settings | zones = f v }
     in
     section [ class "image-settings-right" ]
         [ viewSettingsGroup
             [ Html.Lazy.lazy viewHistogram histogram ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
-                [ Input.viewRange 0.1 ( 0, 10, 2.2 ) "Gamma" settings.iGamma <|
-                    \v -> { settings | iGamma = v }
-                , Input.viewRange 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.iBlackpoint <|
-                    \v -> { settings | iBlackpoint = v }
-                , Input.viewRange 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.iWhitepoint <|
-                    \v -> { settings | iWhitepoint = v }
-                , Input.viewRange 0.001 ( -0.25, 0.25, 0 ) "Pop" iZones.z7 <|
+                [ Input.viewRange 0.1 ( 0, 10, 2.2 ) "Gamma" settings.gamma <|
+                    \v -> { settings | gamma = v }
+                , Input.viewRange 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.blackpoint <|
+                    \v -> { settings | blackpoint = v }
+                , Input.viewRange 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.whitepoint <|
+                    \v -> { settings | whitepoint = v }
+                , Input.viewRange 0.001 ( -0.25, 0.25, 0 ) "Pop" zones.z7 <|
                     \v ->
                         { settings
-                            | iZones =
-                                { iZones | z2 = threeDecimalFloat (-v * 1.25), z7 = v }
+                            | zones =
+                                { zones | z2 = threeDecimalFloat (-v * 1.25), z7 = v }
                         }
                 ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange) <|
-                [ zoneInput (\v -> { iZones | z1 = v }) iZones.z1 "I"
-                , zoneInput (\v -> { iZones | z2 = v }) iZones.z2 "II"
-                , zoneInput (\v -> { iZones | z3 = v }) iZones.z3 "III"
-                , zoneInput (\v -> { iZones | z4 = v }) iZones.z4 "IV"
-                , zoneInput (\v -> { iZones | z5 = v }) iZones.z5 "V"
-                , zoneInput (\v -> { iZones | z6 = v }) iZones.z6 "VI"
-                , zoneInput (\v -> { iZones | z7 = v }) iZones.z7 "VII"
-                , zoneInput (\v -> { iZones | z8 = v }) iZones.z8 "VIII"
-                , zoneInput (\v -> { iZones | z9 = v }) iZones.z9 "IX"
+                [ zoneInput (\v -> { zones | z1 = v }) zones.z1 "I"
+                , zoneInput (\v -> { zones | z2 = v }) zones.z2 "II"
+                , zoneInput (\v -> { zones | z3 = v }) zones.z3 "III"
+                , zoneInput (\v -> { zones | z4 = v }) zones.z4 "IV"
+                , zoneInput (\v -> { zones | z5 = v }) zones.z5 "V"
+                , zoneInput (\v -> { zones | z6 = v }) zones.z6 "VI"
+                , zoneInput (\v -> { zones | z7 = v }) zones.z7 "VII"
+                , zoneInput (\v -> { zones | z8 = v }) zones.z8 "VIII"
+                , zoneInput (\v -> { zones | z9 = v }) zones.z9 "IX"
                 ]
         , viewSettingsGroup
             [ Html.Keyed.node "div" [] <|
@@ -962,16 +919,16 @@ viewSettingsLeft :
     Images
     -> UndoHistory
     -> Maybe ImageCrop
-    -> Maybe Image.Settings
+    -> Maybe ImageSettings
     -> ProcessingState
     -> Html Msg
-viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
+viewSettingsLeft images undoState imageCropMode clipboard_ processingState =
     let
         settings =
-            settingsFromState processingState filmRoll
+            settingsFromState processingState images
 
         clipboardTitle x clipboard =
-            interpolate "{0} from {1}" [ x, Image.filenameToString clipboard.iFilename ]
+            interpolate "{0} from {1}" [ x, Path.toString clipboard.filename ]
     in
     div [ class "image-settings-left" ]
         [ viewSettingsGroup
@@ -991,21 +948,21 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
                     div [ class "image-settings-paste" ]
                         [ viewClipboardButton (clipboardTitle "bot" clipboard)
                             Icon.applyBoth
-                            { clipboard | iFilename = settings.iFilename }
+                            { clipboard | filename = settings.filename }
                         , viewClipboardButton (clipboardTitle "tone" clipboard)
                             Icon.applyTone
                             { clipboard
-                                | iFilename = settings.iFilename
-                                , iRotate = settings.iRotate
-                                , iCrop = settings.iCrop
+                                | filename = settings.filename
+                                , rotate = settings.rotate
+                                , crop = settings.crop
                             }
                         , viewClipboardButton (clipboardTitle "crop" clipboard)
                             Icon.applyCrop
-                            { settings | iCrop = clipboard.iCrop }
+                            { settings | crop = clipboard.crop }
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
-                                    Zipper.map (\i -> { clipboard | iFilename = i.iFilename }) filmRoll
+                                    Zipper.map (\i -> { clipboard | filename = i.filename }) images
                             , title (clipboardTitle "apply to all" clipboard)
                             ]
                             [ Icon.applyAll ]
@@ -1015,26 +972,26 @@ viewSettingsLeft filmRoll undoState imageCropMode clipboard_ processingState =
                                     Zipper.map
                                         (\i ->
                                             { clipboard
-                                                | iFilename = i.iFilename
-                                                , iRotate = i.iRotate
-                                                , iCrop = i.iCrop
+                                                | filename = i.filename
+                                                , rotate = i.rotate
+                                                , crop = i.crop
                                             }
                                         )
-                                        filmRoll
+                                        images
                             , title (clipboardTitle "apply tone to all" clipboard)
                             ]
                             [ Icon.applyAllTone ]
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
-                                    Zipper.map (\i -> { i | iCrop = clipboard.iCrop }) filmRoll
+                                    Zipper.map (\i -> { i | crop = clipboard.crop }) images
                             , title (clipboardTitle "apply crop to all" clipboard)
                             ]
                             [ Icon.applyAllCrop ]
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
-                                    Zipper.map (\i -> { i | iRotate = clipboard.iRotate }) filmRoll
+                                    Zipper.map (\i -> { i | rotate = clipboard.rotate }) images
                             , title (clipboardTitle "apply rotate to all" clipboard)
                             ]
                             [ Icon.applyAllRotate ]
@@ -1159,12 +1116,12 @@ viewSettingsGroup =
     div [ class "image-settings-group" ]
 
 
-viewClipboardButton : String -> Html Msg -> Image.Settings -> Html Msg
+viewClipboardButton : String -> Html Msg -> ImageSettings -> Html Msg
 viewClipboardButton desc icon settings =
     button [ onClick (OnImageSettingsChange settings), title desc ] [ icon ]
 
 
-viewImageCropMode : Image.Settings -> Maybe ImageCrop -> Html Msg
+viewImageCropMode : ImageSettings -> Maybe ImageCrop -> Html Msg
 viewImageCropMode current imageCropMode =
     let
         onTopChange imageCrop v =
@@ -1178,7 +1135,7 @@ viewImageCropMode current imageCropMode =
     in
     case imageCropMode of
         Nothing ->
-            button [ onClick (UpdateImageCropMode (Just current.iCrop)), title "crop" ] [ Icon.crop ]
+            button [ onClick (UpdateImageCropMode (Just current.crop)), title "crop" ] [ Icon.crop ]
 
         Just imageCrop ->
             div []
@@ -1202,7 +1159,7 @@ viewImageCropMode current imageCropMode =
 
 viewImage :
     Images
-    -> Route.EditorRoute
+    -> FilmRoll
     -> Maybe ImageCrop
     -> Float
     -> ProcessingState
@@ -1210,14 +1167,14 @@ viewImage :
     -> Dict ( Float, Float ) CoordinateInfo
     -> Element
     -> Html Msg
-viewImage filmRoll route imageCropMode scale_ processingState previewVersions coordinateInfo element =
+viewImage images filmRoll imageCropMode scale_ processingState previewVersions coordinateInfo element =
     let
         current =
-            Zipper.current filmRoll
+            Zipper.current images
 
         ifCropping settings =
             Maybe.withDefault settings <|
-                Maybe.map (\_ -> { settings | iRotate = 0, iCrop = ImageCrop 0 0 100 })
+                Maybe.map (\_ -> { settings | rotate = 0, crop = ImageCrop 0 0 100 })
                     imageCropMode
 
         scale =
@@ -1239,18 +1196,19 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
                         , id "image"
                         , scale
                         , src <|
-                            Url.Builder.absolute
-                                [ route.dir, "previews", previewExtension current.iFilename ]
+                            Url.Builder.crossOrigin
+                                (Path.toString filmRoll.directoryPath)
+                                [ "previews", previewExtension current.filename ]
                                 [ Url.Builder.int "v" <|
                                     Maybe.withDefault 0 <|
-                                        Dict.Fun.get current.iFilename previewVersions
+                                        Dict.Fun.get current.id previewVersions
                                 ]
                         ]
                         []
 
                 _ ->
                     img
-                        [ on "load" (Decode.succeed (OnImageLoad route.dir current))
+                        [ on "load" (Decode.succeed (OnImageLoad current))
                         , onCoordinateClick
                         , id "image"
                         , style "user-select" "none"
@@ -1258,7 +1216,8 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
                         , src <|
                             Url.Builder.absolute [ "image" ]
                                 [ toImageUrlParams (ifCropping current)
-                                , Url.Builder.string "dir" route.dir
+                                , Url.Builder.string "dir" <|
+                                    Path.toString filmRoll.directoryPath
                                 ]
                         ]
                         []
@@ -1287,7 +1246,7 @@ viewImage filmRoll route imageCropMode scale_ processingState previewVersions co
         ]
 
 
-viewCoordinate : Element -> Image.Settings -> Float -> CoordinateInfo -> ( String, Html Msg )
+viewCoordinate : Element -> ImageSettings -> Float -> CoordinateInfo -> ( String, Html Msg )
 viewCoordinate { element } settings scale coordinate =
     let
         xOffset =
@@ -1389,7 +1348,7 @@ viewLoading state =
 -- HELPERS
 
 
-updateZoneByInt : Int -> (Float -> Float) -> Image.Settings -> Image.Settings
+updateZoneByInt : Int -> (Float -> Float) -> ImageSettings -> ImageSettings
 updateZoneByInt n f settings =
     let
         g =
@@ -1430,7 +1389,7 @@ updateZoneByInt n f settings =
                 _ ->
                     { zones | z9 = g zones.z9 }
     in
-    { settings | iZones = set settings.iZones }
+    { settings | zones = set settings.zones }
 
 
 threeDecimalFloat : Float -> Float
@@ -1439,32 +1398,31 @@ threeDecimalFloat x =
 
 
 previewExtension : Filename -> String
-previewExtension (Filename x) =
-    String.dropRight 3 x ++ "jpg"
+previewExtension filename =
+    String.dropRight 3 (Path.toString filename) ++ "jpg"
 
 
-resetAll : Image.Settings -> Image.Settings
+resetAll : ImageSettings -> ImageSettings
 resetAll current =
-    Image.Settings current.iFilename
-        0
-        (ImageCrop 0 0 100)
-        2.2
-        (Zones 0 0 0 0 0 0 0 0 0)
-        0
-        1
-        Array.empty
+    { current
+        | crop = ImageCrop 0 0 100
+        , gamma = 2.2
+        , zones = Zones 0 0 0 0 0 0 0 0 0
+        , blackpoint = 0
+        , whitepoint = 1
+        , expressions = Array.empty
+    }
 
 
-resetTone : Image.Settings -> Image.Settings
+resetTone : ImageSettings -> ImageSettings
 resetTone current =
-    Image.Settings current.iFilename
-        current.iRotate
-        current.iCrop
-        2.2
-        (Zones 0 0 0 0 0 0 0 0 0)
-        0
-        1
-        Array.empty
+    { current
+        | gamma = 2.2
+        , zones = Zones 0 0 0 0 0 0 0 0 0
+        , blackpoint = 0
+        , whitepoint = 1
+        , expressions = Array.empty
+    }
 
 
 emptyExpression : Expression
@@ -1472,12 +1430,12 @@ emptyExpression =
     Expression 0 -1 1 "" ""
 
 
-toImageUrlParams : Image.Settings -> Url.Builder.QueryParameter
+toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
 toImageUrlParams =
     Url.Builder.string "image-settings"
         << Base64.encode
         << Encode.encode 0
-        << Image.encodeSettings
+        << Image.encodeImageSettings
 
 
 fractionalModBy : Float -> Float -> Float
@@ -1485,17 +1443,33 @@ fractionalModBy m v =
     v - m * Basics.toFloat (Basics.floor (v / m))
 
 
-settingsFromState : ProcessingState -> Images -> Image.Settings
-settingsFromState processingState filmRoll =
+settingsFromState : ProcessingState -> Images -> ImageSettings
+settingsFromState processingState images =
     case processingState of
         Queued queuedFilmRoll ->
             Zipper.current (ProcessingState.toData queuedFilmRoll)
 
         _ ->
-            Zipper.current filmRoll
+            Zipper.current images
 
 
 fromArray : Array a -> Reorderable ( Maybe b, a )
 fromArray =
     Array.foldl Reorderable.push Reorderable.empty
         << Array.map (Tuple.pair Nothing)
+
+
+updateZipperById :
+    ImageSettingsId
+    -> (ImageSettings -> ImageSettings)
+    -> Images
+    -> Images
+updateZipperById imageSettingsId f =
+    Zipper.map
+        (\s ->
+            if s.id == imageSettingsId then
+                f s
+
+            else
+                s
+        )

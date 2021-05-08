@@ -7,7 +7,6 @@ import Positive.Prelude
 
 data Mode
   = Init Replace
-  | Previews Replace
   | SingleImage FilePath
   | Server IsDev Port
   deriving (Show, Eq)
@@ -26,7 +25,6 @@ parseArgs =
 parser :: Parser Mode
 parser =
   flag' Init (long "init" <> short 'i' <> help "create image-settings.json and previews") <*> replace
-    <|> flag' Previews (long "previews" <> short 'p' <> help "generate previews") <*> replace
     <|> SingleImage
       <$> strOption
         ( long "single"

@@ -15,17 +15,16 @@
     </noscript>
 
     <script>
-     const app = Elm.Main.init(null);
-     const evtSource = new EventSource("/events");
+        const app = Elm.Main.init(null);
+        const evtSource = new EventSource("/events");
 
-     evtSource.addEventListener("log", e => {
-         app.ports.serverMessage.send(e.data);
-     });
+        evtSource.addEventListener("log", e => {
+            app.ports.serverMessage.send(e.data);
+        });
 
-     evtSource.addEventListener("preview", e => {
-          app.ports.previewReady.send(e.data);
-      });
-
+        evtSource.addEventListener("preview", e => {
+            app.ports.previewReady.send(parseInt(e.data));
+        });
     </script>
 </body>
 

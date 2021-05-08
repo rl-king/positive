@@ -5,7 +5,7 @@ module Main where
 import Criterion.Main
 import qualified Graphics.Image as HIP
 import qualified Positive.Image as Image
-import qualified Positive.Image.Settings as Settings
+import qualified Positive.Data.ImageSettings as Settings
 import Positive.Prelude
 
 main :: IO ()

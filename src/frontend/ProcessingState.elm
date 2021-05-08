@@ -9,7 +9,7 @@ module ProcessingState exposing
     , toReady
     )
 
-import Generated.Data exposing (Settings)
+import Generated.Data exposing (ImageSettings)
 import List.Zipper exposing (Zipper)
 
 
@@ -33,7 +33,7 @@ type alias Allowed =
 
 
 type alias FilmRoll =
-    Zipper Settings
+    Zipper ImageSettings
 
 
 
