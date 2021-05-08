@@ -117,3 +117,16 @@ selectOutdatedPreviews =
     where image.modified > image.preview
     order by film_roll_id, image.modified
   |]
+
+selectImageSettingsByPath :: Statement (Text, Text) _
+selectImageSettingsByPath =
+  [singletonStatement|
+    select directory_path :: text, image.id :: int4, filename :: text,
+      rating :: int2, orientation :: float8, crop :: jsonb, gamma :: float8,
+      zones :: jsonb, blackpoint :: float8, whitepoint :: float8,
+      expressions :: jsonb
+    from positive.film_roll
+      join positive.image
+        on film_roll.id = image.film_roll_id and $2 :: text = image.filename
+    where directory_path = $1 :: text
+  |]

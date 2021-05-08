@@ -14,7 +14,7 @@ import Control.Effect.Labelled
 import Control.Effect.Lift
 import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
-import qualified Hasql.Pool
+import qualified Hasql.Pool as Hasql
 import Network.Wai.EventSource
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Positive.CLI as CLI
@@ -28,12 +28,11 @@ import qualified Positive.Server.Handler as Handler
 import qualified Positive.Static as Static
 import Servant hiding (throwError)
 import Servant.Server.Generic
-import System.Log.FastLogger (TimedFastLogger)
 
 -- SERVER
 
-start :: TimedFastLogger -> CLI.IsDev -> CLI.Port -> IO ()
-start logger isDev port =
+start :: TimedFastLogger -> Hasql.Pool -> CLI.IsDev -> CLI.Port -> IO ()
+start logger pool isDev port =
   let settings =
         Warp.setPort port $
           Warp.setBeforeMainLoop
@@ -46,7 +45,6 @@ start logger isDev port =
         imageMVar <- MVar.newMVar OrdPSQ.empty
         previewMVar <- MVar.newMVar ()
         eventChan <- Chan.newChan
-        pool <- Hasql.Pool.acquire (3, 10, "host=localhost port=5432 dbname=positive")
         let env = Handler.Env imageMVar previewMVar isDev
         _ <-
           forkIO $

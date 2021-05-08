@@ -122,6 +122,14 @@ selectOutdatedPreviews =
       (traverse imageSettingsFromTuple . Vector.toList)
       Statement.selectOutdatedPreviews
 
+selectImageSettingsByPath ::
+  Path.Directory ->
+  Path.Filename ->
+  Session (Path.Directory, ImageSettings)
+selectImageSettingsByPath dir filename =
+  Session.statement (dir, filename) . lmap (bimap Path.unpack Path.unpack) $
+    refineResult imageSettingsFromTuple Statement.selectImageSettingsByPath
+
 -- MAPPING
 
 filmRollFromTuple :: _ -> Either Text FilmRoll

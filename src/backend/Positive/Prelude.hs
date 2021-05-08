@@ -54,6 +54,7 @@ import GHC.Float as X (int2Double)
 import GHC.Generics as X (Generic, Generic1, Rep)
 import GHC.TypeLits as X (KnownSymbol, Symbol, symbolVal)
 import Numeric.Natural as X (Natural)
+import System.Log.FastLogger as X (TimedFastLogger)
 import Text.Read as X (readMaybe)
 import Prelude as X hiding (id, log, undefined)
 

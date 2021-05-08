@@ -17,6 +17,7 @@ module Positive.Data.Path
     toFilePath,
     toByteString,
     fromFilePath,
+    append,
   )
 where
 
@@ -25,6 +26,7 @@ import qualified Data.Text as Text
 import qualified Language.Haskell.To.Elm as Elm
 import Positive.Prelude hiding (pack)
 import Servant
+import System.FilePath.Posix ((</>))
 
 newtype Path (a :: Symbol)
   = Path Text
@@ -76,3 +78,7 @@ toFilePath (Path x) = Text.unpack x
 
 fromFilePath :: FilePath -> Path a
 fromFilePath = Path . Text.pack
+
+append :: Path a -> Path b -> FilePath
+append dir filename =
+  toFilePath dir </> toFilePath filename

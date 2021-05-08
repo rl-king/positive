@@ -82,7 +82,7 @@ putLogStr logger logLevel context msg =
           [ toLogStr t,
             " ",
             toLogStr (Text.justifyLeft 8 ' ' (logLevelToText logLevel)),
-            toLogStr (Text.justifyLeft 10 ' ' ("<" <> context <> ">")),
+            toLogStr ("<" <> context <> ">"),
             toLogStr msg,
             "\n"
           ]
