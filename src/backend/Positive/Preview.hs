@@ -11,7 +11,7 @@ import Control.Effect.Labelled
 import Control.Effect.Lift
 import Control.Effect.Throw
 import qualified Graphics.Image as HIP
-import Positive.Data.Id
+import qualified Positive.Data.Id as Id
 import Positive.Data.ImageSettings as ImageSettings
 import qualified Positive.Data.Path as Path
 import qualified Positive.Database.Session as Session
@@ -45,7 +45,7 @@ loop lock = do
       logInfo @"stdout" "preview" $
         "Found " <> tshow (length outdatedPreviews) <> " outdated previews"
       _ <- timedM "preview" $ generatePreview (dir, imageSettings)
-      logInfo @"sse" "preview" $ Path.unpack imageSettings.filename
+      logInfo @"sse" "preview" . tshow $ Id.unpack imageSettings.id
       _ <- PostgreSQL.runSession $ Session.updatePreviewTimestamp imageSettings.id
       unless (null rest) $ sendIO (void (tryPutMVar lock key))
       logInfo @"stdout" "preview" "Generated preview"
@@ -57,7 +57,7 @@ loop lock = do
 generatePreview ::
   (HasLabelled "stdout" Log sig m, Has (Lift IO) sig m) =>
   (Path.Directory, ImageSettings) ->
-  m (Either Path.Directory ImageSettingsId)
+  m (Either Path.Directory Id.ImageSettingsId)
 generatePreview (Path.toFilePath -> dir, imageSettings) = do
   let input =
         dir </> Path.toFilePath imageSettings.filename

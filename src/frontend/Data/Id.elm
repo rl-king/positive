@@ -2,6 +2,7 @@ module Data.Id exposing
     ( FilmRollId
     , Id
     , ImageSettingsId
+    , fromInt
     , fromJson
     , fromUrl
     , toInt
@@ -33,6 +34,11 @@ type alias ImageSettingsId =
 
 
 -- CONVERSIONS
+
+
+fromInt : Int -> Id a
+fromInt =
+    Id
 
 
 toInt : Id a -> Int

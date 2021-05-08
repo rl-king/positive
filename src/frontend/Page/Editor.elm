@@ -53,7 +53,7 @@ import Util exposing (..)
 -- PORT
 
 
-port previewReady : (String -> msg) -> Sub msg
+port previewReady : (Int -> msg) -> Sub msg
 
 
 
@@ -98,7 +98,7 @@ subscriptions { clipboard, imageCropMode, images } =
                 matchKey "Escape" (CopySettings Nothing)
             )
             clipboard
-        , previewReady (OnPreviewReady << Path.fromString)
+        , previewReady (OnPreviewReady << Id.fromInt)
         , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
 
@@ -137,7 +137,7 @@ type alias Images =
 
 
 type alias PreviewVersions =
-    Dict.Fun.Dict Filename String Int
+    Dict.Fun.Dict ImageSettingsId Int Int
 
 
 type alias DraftExpressions =
@@ -167,7 +167,7 @@ init filmRoll imageSettingsId images =
     , minimumRating = 0
     , previewColumns = 4
     , notifications = []
-    , previewVersions = Dict.Fun.empty Path.toString Path.fromString
+    , previewVersions = Dict.Fun.empty Id.toInt Id.fromInt
     , imageElement =
         { scene = { width = 0, height = 0 }
         , viewport = { x = 0, y = 0, width = 0, height = 0 }
@@ -231,7 +231,7 @@ type Msg
     | SetMinRating Int
     | Rotate
     | RemoveNotification
-    | OnPreviewReady Filename
+    | OnPreviewReady ImageSettingsId
     | LoadOriginal
     | OnImageClick ( Float, Float )
     | RemoveCoordinate CoordinateInfo
@@ -275,18 +275,10 @@ update key msg model =
 
         RotatePreview imageSettingsId rotation ->
             let
-                images =
-                    Zipper.map
-                        (\s ->
-                            if s.id == imageSettingsId then
-                                { s | rotate = rotation }
-
-                            else
-                                s
-                        )
-                        model.images
+                rotate imageSettings =
+                    { imageSettings | rotate = rotation }
             in
-            ( { model | images = images }
+            ( { model | images = updateZipperById imageSettingsId rotate model.images }
             , Cmd.none
             )
 
@@ -451,7 +443,7 @@ update key msg model =
                     , Cmd.none
                     )
 
-        OnPreviewReady filename ->
+        OnPreviewReady imageSettingsId ->
             let
                 f x =
                     case x of
@@ -463,8 +455,8 @@ update key msg model =
             in
             pushNotification Normal
                 RemoveNotification
-                ("Preview ready: " ++ Path.toString filename)
-                { model | previewVersions = Dict.Fun.update filename f model.previewVersions }
+                ("Preview ready: " ++ Id.toString imageSettingsId)
+                { model | previewVersions = Dict.Fun.update imageSettingsId f model.previewVersions }
 
         SaveSettings ->
             ( model
@@ -545,25 +537,21 @@ update key msg model =
         SetColumnCount scale ->
             ( { model | previewColumns = scale }, Cmd.none )
 
-        Rate filename rating ->
-            ( model, Cmd.none )
+        Rate imageSettingsId rating ->
+            let
+                rate imageSettings =
+                    { imageSettings | rating = rating }
 
-        -- let
-        --     check x =
-        --         case x of
-        --             Nothing ->
-        --                 Just rating
-        --             Just y ->
-        --                 if y == rating then
-        --                     Nothing
-        --                 else
-        --                     Just rating
-        --     newModel =
-        --         { model | ratings = Dict.Fun.update filename check model.ratings }
-        -- in
-        -- ( newModel
-        -- , saveSettings newModel
-        -- )
+                newModel =
+                    { model
+                        | images =
+                            updateZipperById imageSettingsId rate model.images
+                    }
+            in
+            ( newModel
+            , saveSettings newModel
+            )
+
         SetMinRating rating ->
             ( { model | minimumRating = rating }, Cmd.none )
 
@@ -577,7 +565,9 @@ update key msg model =
             )
 
         LoadOriginal ->
-            ( { model | processingState = fromPreview model.processingState }, Cmd.none )
+            ( { model | processingState = fromPreview model.processingState }
+            , Cmd.none
+            )
 
         RemoveCoordinate { ciX, ciY } ->
             ( { model | coordinateInfo = Dict.remove ( ciX, ciY ) model.coordinateInfo }
@@ -821,7 +811,7 @@ viewFilesLink isCurrent filmRoll columns previewVersions settings =
                     Url.Builder.crossOrigin (Path.toString filmRoll.directoryPath)
                         [ "previews", previewExtension settings.filename ]
                         [ Url.Builder.int "v" <|
-                            Maybe.withDefault 0 (Dict.Fun.get settings.filename previewVersions)
+                            Maybe.withDefault 0 (Dict.Fun.get settings.id previewVersions)
                         ]
                 ]
                 []
@@ -1211,7 +1201,7 @@ viewImage images filmRoll imageCropMode scale_ processingState previewVersions c
                                 [ "previews", previewExtension current.filename ]
                                 [ Url.Builder.int "v" <|
                                     Maybe.withDefault 0 <|
-                                        Dict.Fun.get current.filename previewVersions
+                                        Dict.Fun.get current.id previewVersions
                                 ]
                         ]
                         []
@@ -1467,3 +1457,19 @@ fromArray : Array a -> Reorderable ( Maybe b, a )
 fromArray =
     Array.foldl Reorderable.push Reorderable.empty
         << Array.map (Tuple.pair Nothing)
+
+
+updateZipperById :
+    ImageSettingsId
+    -> (ImageSettings -> ImageSettings)
+    -> Images
+    -> Images
+updateZipperById imageSettingsId f =
+    Zipper.map
+        (\s ->
+            if s.id == imageSettingsId then
+                f s
+
+            else
+                s
+        )
