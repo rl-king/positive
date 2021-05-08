@@ -9,5 +9,4 @@ Tool for converting linear scanned monochrome film.
 ![](https://raw.githubusercontent.com/rl-king/positive/master/positive.png)
 
 ## Using it
-You probably don't want to use this, although functional, it's also a Haskell and
-Elm playground with a lot of random breaking changes.
+You probably don't want to use this, it's a Haskell and Elm playground with a lot of random breaking changes.
