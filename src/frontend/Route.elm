@@ -5,7 +5,6 @@ module Route exposing
     )
 
 import Data.Id exposing (FilmRollId, ImageSettingsId)
-import String.Interpolate exposing (interpolate)
 import Url exposing (Url)
 import Url.Builder
 import Url.Parser exposing ((</>), (<?>))
@@ -19,7 +18,6 @@ import Url.Parser.Query
 type Route
     = Browser { minimumRating : Maybe Int }
     | Editor FilmRollId ImageSettingsId
-    | DecodeError String
 
 
 fromUrl : Url -> Route
@@ -55,6 +53,3 @@ toUrl route =
                 , Data.Id.toString imageSettingsId
                 ]
                 []
-
-        DecodeError _ ->
-            Url.Builder.absolute [] []

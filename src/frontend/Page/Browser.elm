@@ -9,10 +9,9 @@ module Page.Browser exposing
 
 import Browser.Events
 import Browser.Navigation
-import Data.Id exposing (FilmRollId, ImageSettingsId)
-import Data.Path as Path exposing (Directory, Filename)
-import Dict.Fun
-import Generated.Data as Image exposing (FilmRoll, ImageSettings)
+import Data.Id exposing (FilmRollId)
+import Data.Path as Path
+import Generated.Data exposing (FilmRoll, ImageSettings)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)

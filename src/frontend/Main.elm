@@ -2,11 +2,8 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Navigation as Navigation
-import Data.Id as Id
-import Data.Path as Path exposing (Directory, Filename)
-import Dict exposing (Dict)
-import Dict.Fun
-import Generated.Data as Image exposing (FilmRoll)
+import Data.Path as Path
+import Generated.Data exposing (FilmRoll)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -247,9 +244,6 @@ onNavigation route model =
                                         , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                                         )
 
-                    Route.DecodeError err ->
-                        pushNotification Warning RemoveNotification err model
-
 
 extractUpdates : Model -> Model
 extractUpdates model =
@@ -261,11 +255,6 @@ extractUpdates model =
 
                 x ->
                     x
-
-        fromZipper xs =
-            Dict.Fun.fromList Path.toString Path.fromString <|
-                List.map (\x -> ( x.filename, x )) <|
-                    Zipper.toList xs
     in
     case model.page of
         Loading ->

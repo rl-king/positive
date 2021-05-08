@@ -13,8 +13,8 @@ import Base64
 import Browser.Dom exposing (Element)
 import Browser.Events
 import Browser.Navigation as Navigation
-import Data.Id as Id exposing (FilmRollId, ImageSettingsId)
-import Data.Path as Path exposing (Directory, Filename)
+import Data.Id as Id exposing (ImageSettingsId)
+import Data.Path as Path exposing (Filename)
 import Dict exposing (Dict)
 import Dict.Fun
 import Generated.Data as Image

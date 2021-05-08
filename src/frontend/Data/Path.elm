@@ -2,7 +2,6 @@ module Data.Path exposing
     ( Directory
     , Filename
     , fromJson
-    , fromString
     , toJson
     , toString
     )
@@ -29,11 +28,6 @@ type alias Directory =
 
 
 -- CONVERSIONS
-
-
-fromString : String -> Path a
-fromString =
-    Path
 
 
 toString : Path a -> String
