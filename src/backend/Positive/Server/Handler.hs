@@ -69,24 +69,21 @@ data Env = Env
 
 handleImage :: Handler sig m => Text -> ImageSettings -> m ByteString
 handleImage dir settings = do
-  logInfo @"sse" "log" $ "Requested image " <> Path.unpack settings.filename
   env <- ask @Env
   (image, putMVarBack) <-
     getCachedImage settings.crop $
       Text.pack (Text.unpack dir </> Path.toFilePath settings.filename)
   if env.isDev
     then do
-      processed <- timed "Apply" $ Image.applySettings settings image
-      encoded <- timed "Encode" =<< sendIO (Image.encode "_.png" processed)
+      processed <- timed "apply" $ Image.applySettings settings image
+      encoded <- timed "encode" =<< sendIO (Image.encode "_.png" processed)
       sendIO putMVarBack
       pure encoded
     else do
       logInfo @"stdout" "handler" $
-        "Apply settings and encode: " <> Path.unpack settings.filename
+        "applying settings and encode: " <> Path.unpack settings.filename
       !encoded <- sendIO . Image.encode "_.png" $ Image.applySettings settings image
       sendIO putMVarBack
-      logInfo @"sse" "log" $
-        "Processed image " <> Path.unpack settings.filename
       pure encoded
 
 -- SAVE
@@ -94,7 +91,7 @@ handleImage dir settings = do
 handleSaveFilmRoll :: Handler sig m => FilmRoll -> m FilmRoll
 handleSaveFilmRoll filmRoll = do
   _ <- PostgreSQL.runTransaction $ Session.updateFilmRoll filmRoll
-  logDebug @"stdout" "handler" "Wrote settings"
+  logDebug @"stdout" "handler" "saved filmroll"
   env <- ask @Env
   void . sendIO $
     MVar.tryPutMVar env.previewMVar ()
@@ -138,7 +135,7 @@ handleGenerateWallpaper settings = do
             (Path.toFilePath filmRoll.directoryPath)
           <> " | "
           <> Path.toFilePath settings.filename
-  logInfo @"stdout" "handler" $ "Generating wallpaper version of: " <> Text.pack input
+  logInfo @"stdout" "handler" $ "generating wallpaper version of: " <> Text.pack input
   output <-
     sendIO $
       Util.ensureUniqueFilename . outputBase =<< sendIO Directory.getHomeDirectory
@@ -147,7 +144,7 @@ handleGenerateWallpaper settings = do
       . sendIO
       $ Image.fromDiskPreProcess (Just 2560) settings.crop input
   sendIO . HIP.writeImage output $ Image.applySettings settings image
-  logInfo @"stdout" "handler" ("Wrote wallpaper version of: " <> Text.pack input)
+  logInfo @"stdout" "handler" ("wrote wallpaper version of: " <> Text.pack input)
   pure NoContent
 
 -- OPEN EXTERNALEDITOR
@@ -158,7 +155,7 @@ handleOpenExternalEditor settings = do
     PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
   let input =
         Path.append filmRoll.directoryPath settings.filename
-  logInfo @"stdout" "handler" $ "Opening in external editor: " <> Text.pack input
+  logInfo @"stdout" "handler" $ "ppening in external editor: " <> Text.pack input
   image <-
     handleLeft
       . sendIO
@@ -187,7 +184,7 @@ handleGetSettingsHistogram settings =
             Text.pack (Path.append filmRoll.directoryPath settings.filename)
         sendIO putMVarBack
         logDebug @"stdout" "handler" $
-          "Creating histogram for: " <> Path.unpack settings.filename
+          "creating histogram for: " <> Path.unpack settings.filename
         pure . Massiv.toList . toHistogram . HIP.unImage $
           Image.applySettings settings image
 
@@ -229,7 +226,7 @@ handleGetSettings =
 
 handleLeft :: Handler sig m => m (Either err a) -> m a
 handleLeft m =
-  m >>= either (\(_ :: err) -> logInfo @"stdout" "handler" "Image read error" >> throwError err404) pure
+  m >>= either (\(_ :: err) -> logInfo @"stdout" "handler" "image read error" >> throwError err404) pure
 
 -- | Read image from disk, normalize before crop, keep result in MVar
 getCachedImage :: Handler sig m => ImageCrop -> Text -> m (Image.Monochrome, IO ())
@@ -237,17 +234,17 @@ getCachedImage crop path = do
   env <- ask @Env
   now <- sendIO Time.getCurrentTime
   cache <- sendIO $ MVar.takeMVar env.imageMVar
-  logInfo @"stdout" "handler" $ "Cached images: " <> tshow (OrdPSQ.size cache)
+  logInfo @"stdout" "handler" $ "cached images: " <> tshow (OrdPSQ.size cache)
   case checkCrop crop =<< OrdPSQ.lookup path cache of
     Just (_, cached@(_, loadedImage)) -> do
-      logDebug @"stdout" "handler" "From cache"
+      logDebug @"stdout" "handler" "loaded image from cache"
       pure
         ( loadedImage,
           MVar.putMVar env.imageMVar
             =<< evaluate (DeepSeq.force (insertAndTrim path now cached cache))
         )
     Nothing -> do
-      logDebug @"stdout" "handler" "From disk"
+      logDebug @"stdout" "handler" "loadin image from disk"
       image <-
         handleLeft . sendIO $
           Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)

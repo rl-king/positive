@@ -75,7 +75,7 @@ type alias Model =
     , page : Page
     , key : Navigation.Key
     , scrollTo : ScrollTo.State
-    , notifications : List ( Level, String )
+    , notifications : Notifications
     }
 
 
@@ -92,7 +92,7 @@ init _ url key =
         , page = Loading
         , key = key
         , scrollTo = ScrollTo.init
-        , notifications = []
+        , notifications = emptyNotifications
         }
 
 
@@ -106,7 +106,7 @@ type Msg
     | ScrollToMsg ScrollTo.Msg
     | CancelScroll
     | GotFilmRolls Route (HttpResult (List FilmRoll))
-    | RemoveNotification
+    | RemoveNotification NotificationId
     | OnServerMessage String
     | EditorMsg Page.Editor.Msg
     | BrowserMsg Page.Browser.Msg
@@ -148,10 +148,10 @@ update msg model =
                 "Error gettings filmroll settings"
                 { model | filmRolls = Failure }
 
-        RemoveNotification ->
+        RemoveNotification notificationId ->
             ( { model
                 | notifications =
-                    List.take (List.length model.notifications - 1)
+                    removeNotification notificationId
                         model.notifications
               }
             , Cmd.none

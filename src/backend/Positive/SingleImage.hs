@@ -69,10 +69,10 @@ generate dir imageSettings = do
     sendIO . Util.ensureUniqueFilename $
       Path.toFilePath dir </> "highres" </> Path.toFilePath imageSettings.filename
   logInfo @"stdout" "generate highres" $
-    "Generating highres version: " <> Text.pack outputWithCount
+    "generating highres version: " <> Text.pack outputWithCount
   either
     (logInfo @"stdout" "generate highres" . tshow)
     (sendIO . HIP.writeImage outputWithCount . Image.applySettings imageSettings)
     image
   logInfo @"stdout" "generate highres" $
-    "Successfully generated highres version: " <> Text.pack outputWithCount
+    "successfully generated highres version: " <> Text.pack outputWithCount

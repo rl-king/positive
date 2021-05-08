@@ -1,10 +1,15 @@
 module Util exposing
     ( HttpResult
     , Level(..)
+    , NotificationId
+    , Notifications
     , Status(..)
+    , appendNotifications
     , choice
+    , emptyNotifications
     , matchKey
     , pushNotification
+    , removeNotification
     , viewIf
     , viewMaybe
     , viewNotifications
@@ -36,21 +41,55 @@ type Level
     | Server
 
 
+type Notifications
+    = Notifications (List ( NotificationId, Level, String )) Int
+
+
+type NotificationId
+    = NotificationId Int
+
+
+emptyNotifications : Notifications
+emptyNotifications =
+    Notifications [] 0
+
+
+removeNotification : NotificationId -> Notifications -> Notifications
+removeNotification notificationId (Notifications notifications fresh) =
+    Notifications
+        (List.filter (\( x, _, _ ) -> x /= notificationId) notifications)
+        fresh
+
+
+appendNotifications : Notifications -> Notifications -> Notifications
+appendNotifications (Notifications a x) (Notifications b y) =
+    Notifications (a ++ b) (Basics.max x y)
+
+
 pushNotification :
     Level
-    -> msg
+    -> (NotificationId -> msg)
     -> String
-    -> { a | notifications : List ( Level, String ) }
-    -> ( { a | notifications : List ( Level, String ) }, Cmd msg )
-pushNotification level clearMsg notification model =
-    ( { model | notifications = ( level, notification ) :: model.notifications }
-    , Task.perform (\_ -> clearMsg) <|
+    -> { a | notifications : Notifications }
+    -> ( { a | notifications : Notifications }, Cmd msg )
+pushNotification level clearMsg message model =
+    let
+        (Notifications notifications fresh) =
+            model.notifications
+    in
+    ( { model
+        | notifications =
+            Notifications
+                (notifications ++ [ ( NotificationId fresh, level, message ) ])
+                (fresh + 1)
+      }
+    , Task.perform (\_ -> clearMsg (NotificationId fresh)) <|
         Process.sleep 3500
     )
 
 
-viewNotifications : List ( Level, String ) -> Html msg
-viewNotifications notifications =
+viewNotifications : Notifications -> Html msg
+viewNotifications (Notifications notifications _) =
     let
         levelToClass level =
             case level of
@@ -64,7 +103,8 @@ viewNotifications notifications =
                     "normal"
     in
     div [ class "notifications" ] <|
-        List.map (\( l, x ) -> span [ class (levelToClass l) ] [ text x ]) notifications
+        List.map (\( _, l, x ) -> span [ class (levelToClass l) ] [ text x ])
+            notifications
 
 
 choice : List (Maybe a) -> Maybe a

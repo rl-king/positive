@@ -119,7 +119,7 @@ type alias Model =
     , imageCropMode : Maybe ImageCrop
     , imageElement : Element
     , minimumRating : Int
-    , notifications : List ( Level, String )
+    , notifications : Notifications
     , previewColumns : Int
     , previewVersions : PreviewVersions
     , scale : Float
@@ -166,7 +166,7 @@ init filmRoll imageSettingsId images =
     , scale = 1
     , minimumRating = 0
     , previewColumns = 4
-    , notifications = []
+    , notifications = emptyNotifications
     , previewVersions = Dict.Fun.empty Id.toInt Id.fromInt
     , imageElement =
         { scene = { width = 0, height = 0 }
@@ -230,7 +230,7 @@ type Msg
     | Rate ImageSettingsId Int
     | SetMinRating Int
     | Rotate
-    | RemoveNotification
+    | RemoveNotification NotificationId
     | OnPreviewReady ImageSettingsId
     | LoadOriginal
     | OnImageClick ( Float, Float )
@@ -555,10 +555,10 @@ update key msg model =
         SetMinRating rating ->
             ( { model | minimumRating = rating }, Cmd.none )
 
-        RemoveNotification ->
+        RemoveNotification notificationId ->
             ( { model
                 | notifications =
-                    List.take (List.length model.notifications - 1)
+                    removeNotification notificationId
                         model.notifications
               }
             , Cmd.none
@@ -710,7 +710,7 @@ updateSettings f model =
 -- VIEW
 
 
-view : Model -> List ( Level, String ) -> Html Msg
+view : Model -> Notifications -> Html Msg
 view model otherNotifications =
     main_ [ classList [ ( "fullscreen", model.fullscreen ) ] ]
         [ Html.Lazy.lazy2 viewNav model.filmRoll model.images
@@ -741,7 +741,7 @@ view model otherNotifications =
             model.minimumRating
             model.previewVersions
             model.images
-        , viewNotifications (model.notifications ++ otherNotifications)
+        , viewNotifications (appendNotifications model.notifications otherNotifications)
         ]
 
 

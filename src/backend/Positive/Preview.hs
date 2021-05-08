@@ -39,16 +39,16 @@ loop lock = do
   previews <- PostgreSQL.runSession Session.selectOutdatedPreviews
   case previews of
     [] -> do
-      logInfo @"stdout" "preview" "Found no outdated previews"
+      logInfo @"stdout" "preview" "found no outdated previews"
       loop lock
     outdatedPreviews@((dir, imageSettings) : rest) -> do
       logInfo @"stdout" "preview" $
-        "Found " <> tshow (length outdatedPreviews) <> " outdated previews"
+        "found " <> tshow (length outdatedPreviews) <> " outdated previews"
       _ <- timedM "preview" $ generatePreview (dir, imageSettings)
       logInfo @"sse" "preview" . tshow $ Id.unpack imageSettings.id
       _ <- PostgreSQL.runSession $ Session.updatePreviewTimestamp imageSettings.id
       unless (null rest) $ sendIO (void (tryPutMVar lock key))
-      logInfo @"stdout" "preview" "Generated preview"
+      logInfo @"stdout" "preview" "generated preview"
 
       loop lock
 
@@ -67,7 +67,7 @@ generatePreview (Path.toFilePath -> dir, imageSettings) = do
           </> replaceExtension (Path.toFilePath imageSettings.filename) ".jpg"
   eitherImage <- sendIO (Image.fromDiskPreProcess (Just 750) imageSettings.crop input)
   case eitherImage of
-    Left _ -> pure $ Left "Error generating preview"
+    Left _ -> pure $ Left "error generating preview"
     Right image -> do
       sendIO . HIP.writeImage output $ Image.applySettings imageSettings image
       pure $ Right imageSettings.id
