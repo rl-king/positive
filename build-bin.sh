@@ -1,5 +1,6 @@
 #!/bin/sh
 
+stack runghc -- -isrc src/codegen/CodeGen.hs;
 elm make src/frontend/Main.elm  --output=dist/main.js --optimize;
 cp src/frontend/style.css dist;
 cp -r src/frontend/icons dist;
