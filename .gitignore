@@ -1,4 +1,5 @@
 .stack-work/
+db.bak
 .DS_Store
 dist-newstyle
 elm-stuff
