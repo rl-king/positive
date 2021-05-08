@@ -1,22 +1,14 @@
-name:                positive
-version:             0.1.0.0
-github:              "rl-king/positive"
-license:             BSD3
-author:              "Ruben Lie King"
-maintainer:          "hello@rubenlieking.com"
-copyright:           "BSD-3"
+name: positive
+version: 0.1.0.0
+github: "rl-king/positive"
+license: BSD3
+author: "Ruben Lie King"
+maintainer: "hello@rubenlieking.com"
+copyright: "BSD-3"
 
 extra-source-files:
-- README.md
-
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/rl-king/positive#readme>
+  - README.md
+description: Please see the README on GitHub at <https://github.com/rl-king/positive#readme>
 
 dependencies:
   - base >= 4.7 && < 5
@@ -74,33 +66,48 @@ default-extensions:
 
 executables:
   pos:
-    main:                Main.hs
-    source-dirs:         src/backend/app
+    main: Main.hs
+    source-dirs: src/backend/app
     dependencies:
-    - positive
+      - positive
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -Wall
-    - -Wcompat
-    - -Wincomplete-record-updates
-    - -Wincomplete-uni-patterns
-    - -Wredundant-constraints
-    - -fno-warn-name-shadowing
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -Wall
+      - -Wcompat
+      - -Wincomplete-record-updates
+      - -Wincomplete-uni-patterns
+      - -Wredundant-constraints
+      - -fno-warn-name-shadowing
+  codegen:
+    main: Main.hs
+    source-dirs: src/backend/codegen
+    dependencies:
+      - positive
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -Wall
+      - -Wcompat
+      - -Wincomplete-record-updates
+      - -Wincomplete-uni-patterns
+      - -Wredundant-constraints
+      - -fno-warn-name-shadowing
 
 tests:
   spec:
-    main:                Spec.hs
-    source-dirs:         test
+    main: Spec.hs
+    source-dirs: test
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
-    - positive
-    - hspec
-    - hspec-expectations
+      - positive
+      - hspec
+      - hspec-expectations
 
 benchmarks:
   pos-benchmark:
