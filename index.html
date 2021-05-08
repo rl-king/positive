@@ -23,7 +23,6 @@
         });
 
         evtSource.addEventListener("preview", e => {
-            console.log(e)
             app.ports.previewReady.send(parseInt(e.data));
         });
     </script>

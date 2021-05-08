@@ -64,7 +64,8 @@ updateImageSettings imageSettings =
             Aeson.toJSON s.zones,
             s.blackpoint,
             s.whitepoint,
-            Aeson.toJSON s.expressions
+            Aeson.toJSON s.expressions,
+            s.rating
           )
       )
       Statement.updateImageSettings

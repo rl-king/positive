@@ -41,7 +41,8 @@ updateImageSettings =
       zones = $5 :: jsonb,
       blackpoint = $6 :: float8,
       whitepoint = $7 :: float8,
-      expressions = $8 :: jsonb
+      expressions = $8 :: jsonb,
+      rating = $9 :: int2
     where id = $1 :: int4
       returning id :: int4
   |]

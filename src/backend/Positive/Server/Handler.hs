@@ -70,11 +70,11 @@ data Env = Env
 handleImage :: Handler sig m => Text -> ImageSettings -> m ByteString
 handleImage dir settings = do
   logInfo @"sse" "log" $ "Requested image " <> Path.unpack settings.filename
-  evv <- ask @Env
+  env <- ask @Env
   (image, putMVarBack) <-
     getCachedImage settings.crop $
       Text.pack (Text.unpack dir </> Path.toFilePath settings.filename)
-  if evv.isDev
+  if env.isDev
     then do
       processed <- timed "Apply" $ Image.applySettings settings image
       encoded <- timed "Encode" =<< sendIO (Image.encode "_.png" processed)
@@ -95,8 +95,9 @@ handleSaveFilmRoll :: Handler sig m => FilmRoll -> m FilmRoll
 handleSaveFilmRoll filmRoll = do
   _ <- PostgreSQL.runTransaction $ Session.updateFilmRoll filmRoll
   logDebug @"stdout" "handler" "Wrote settings"
-  evv <- ask @Env
-  void . sendIO $ MVar.tryPutMVar evv.previewMVar ()
+  env <- ask @Env
+  void . sendIO $
+    MVar.tryPutMVar env.previewMVar ()
   pure filmRoll
 
 -- CHECK EXPRESSIONS
@@ -233,16 +234,16 @@ handleLeft m =
 -- | Read image from disk, normalize before crop, keep result in MVar
 getCachedImage :: Handler sig m => ImageCrop -> Text -> m (Image.Monochrome, IO ())
 getCachedImage crop path = do
-  evv <- ask @Env
+  env <- ask @Env
   now <- sendIO Time.getCurrentTime
-  cache <- sendIO $ MVar.takeMVar evv.imageMVar
+  cache <- sendIO $ MVar.takeMVar env.imageMVar
   logInfo @"stdout" "handler" $ "Cached images: " <> tshow (OrdPSQ.size cache)
   case checkCrop crop =<< OrdPSQ.lookup path cache of
     Just (_, cached@(_, loadedImage)) -> do
       logDebug @"stdout" "handler" "From cache"
       pure
         ( loadedImage,
-          MVar.putMVar evv.imageMVar
+          MVar.putMVar env.imageMVar
             =<< evaluate (DeepSeq.force (insertAndTrim path now cached cache))
         )
     Nothing -> do
@@ -252,7 +253,7 @@ getCachedImage crop path = do
           Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
       pure
         ( image,
-          MVar.putMVar evv.imageMVar
+          MVar.putMVar env.imageMVar
             =<< evaluate (DeepSeq.force (insertAndTrim path now (crop, image) cache))
         )
 
