@@ -74,3 +74,5 @@ generate dir imageSettings = do
     (logInfo @"stdout" "generate highres" . tshow)
     (sendIO . HIP.writeImage outputWithCount . Image.applySettings imageSettings)
     image
+  logInfo @"stdout" "generate highres" $
+    "Successfully generated highres version: " <> Text.pack outputWithCount
