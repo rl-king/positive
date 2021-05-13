@@ -26,7 +26,7 @@ data FilmRoll = FilmRoll
     directoryPath :: Directory,
     imageSettings :: [ImageSettings]
   }
-  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
+  deriving (Show, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
     ( Aeson.ToJSON,
       Aeson.FromJSON,
@@ -34,7 +34,7 @@ data FilmRoll = FilmRoll
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
-    via Elm.ElmType FilmRoll
+    via Elm.ElmType "FilmRoll" FilmRoll
 
 empty :: FilmRollId -> FilmRoll
 empty id =

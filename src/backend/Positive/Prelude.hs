@@ -29,6 +29,7 @@ import Data.Foldable as X (fold, for_, sequenceA_, traverse_)
 import Data.Function as X (fix, (&))
 import Data.Functor as X (void, ($>))
 import Data.Functor.Contravariant as X ((>$<))
+import Data.Functor.Identity as X
 import Data.HashMap.Strict as X (HashMap)
 import Data.HashSet as X (HashSet)
 import Data.Hashable as X (Hashable)

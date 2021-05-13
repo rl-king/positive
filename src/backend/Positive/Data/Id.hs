@@ -1,11 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Positive.Data.Id
@@ -32,6 +34,12 @@ newtype Id (a :: Symbol)
       Aeson.FromJSON
     )
     via Int32
+
+deriving via Int instance Elm.HasElmType (Identity (Id a))
+
+deriving via Int instance Elm.HasElmDecoder Aeson.Value (Identity (Id a))
+
+deriving via Int instance Elm.HasElmEncoder Aeson.Value (Identity (Id a))
 
 instance KnownSymbol a => Elm.HasElmType (Id a) where
   elmType =

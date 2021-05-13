@@ -6,7 +6,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -18,16 +20,30 @@ import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
-import Positive.Data.Id (ImageSettingsId)
-import qualified Positive.Data.Id as Id
+import Positive.Data.Id (FilmRollId, ImageSettingsId)
 import Positive.Data.Path
 import Positive.Prelude
 import Servant
 
+-- HKD
+
+data New
+
+data FromDatabase
+
+type family Unwrap t f a where
+  Unwrap FromDatabase f a = a
+  Unwrap New f a = f a
+
+type ImageSettings = ImageSettingsBase FromDatabase Identity
+
+type NewImageSettings = ImageSettingsBase New Maybe
+
 -- SETTINGS
 
-data ImageSettings = ImageSettings
-  { id :: ImageSettingsId,
+data ImageSettingsBase t f = ImageSettingsBase
+  { id :: Unwrap t f ImageSettingsId,
+    filmRollId :: FilmRollId,
     filename :: Filename,
     rating :: Int16,
     rotate :: Double,
@@ -39,15 +55,21 @@ data ImageSettings = ImageSettings
     expressions :: Vector Expression,
     histogram :: Vector Word8
   }
-  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
-  deriving
-    ( Aeson.ToJSON,
-      Aeson.FromJSON,
-      Elm.HasElmType,
-      Elm.HasElmDecoder Aeson.Value,
-      Elm.HasElmEncoder Aeson.Value
-    )
-    via Elm.ElmType ImageSettings
+  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
+
+deriving via Elm.ElmType "ImageSettings" ImageSettings instance Aeson.ToJSON ImageSettings
+
+deriving via Elm.ElmType "ImageSettings" ImageSettings instance Aeson.FromJSON ImageSettings
+
+deriving via Elm.ElmType "ImageSettings" ImageSettings instance Elm.HasElmType ImageSettings
+
+deriving via Elm.ElmType "ImageSettings" ImageSettings instance Elm.HasElmDecoder Aeson.Value ImageSettings
+
+deriving via Elm.ElmType "ImageSettings" ImageSettings instance Elm.HasElmEncoder Aeson.Value ImageSettings
+
+deriving instance Show ImageSettings
+
+deriving instance NFData ImageSettings
 
 instance FromHttpApiData ImageSettings where
   parseUrlPiece piece =
@@ -55,9 +77,22 @@ instance FromHttpApiData ImageSettings where
       Aeson.eitherDecodeStrict =<< Base64.decode (encodeUtf8 piece)
   parseQueryParam = parseUrlPiece
 
-emptyImageSettings :: Filename -> ImageSettings
-emptyImageSettings x =
-  ImageSettings (Id.pack 0) x 0 0 emptyCrop 2.2 emptyZones 0 1 mempty mempty
+emptyImageSettings :: FilmRollId -> Filename -> NewImageSettings
+emptyImageSettings filmRollId filename =
+  ImageSettingsBase
+    { id = Nothing,
+      filmRollId = filmRollId,
+      filename = filename,
+      rating = 0,
+      rotate = 0,
+      crop = emptyCrop,
+      gamma = 2.2,
+      zones = emptyZones,
+      blackpoint = 0,
+      whitepoint = 1,
+      expressions = mempty,
+      histogram = mempty
+    }
 
 -- Zones
 
@@ -80,7 +115,7 @@ data Zones = Zones
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
-    via Elm.ElmType Zones
+    via Elm.ElmType "Zones" Zones
 
 emptyZones :: Zones
 emptyZones =
@@ -103,7 +138,7 @@ data Expression = Expression
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
-    via Elm.ElmType Expression
+    via Elm.ElmType "Expression" Expression
 
 emptyExpression :: Expression
 emptyExpression =
@@ -123,7 +158,7 @@ data ExpressionResult
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
-    via Elm.ElmType ExpressionResult
+    via Elm.ElmType "ExpressionResult" ExpressionResult
 
 -- CROP
 
@@ -140,7 +175,7 @@ data ImageCrop = ImageCrop
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
-    via Elm.ElmType ImageCrop
+    via Elm.ElmType "ImageCrop" ImageCrop
 
 emptyCrop :: ImageCrop
 emptyCrop =
@@ -161,4 +196,4 @@ data CoordinateInfo = CoordinateInfo
       Elm.HasElmDecoder Aeson.Value,
       Elm.HasElmEncoder Aeson.Value
     )
-    via Elm.ElmType CoordinateInfo
+    via Elm.ElmType "CoordinateInfo" CoordinateInfo

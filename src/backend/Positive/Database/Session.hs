@@ -25,9 +25,21 @@ import Positive.Prelude
 
 -- INSERT
 
-insertImageSettings :: FilmRollId -> Path.Filename -> Transaction (ImageSettingsId, Text)
+insertImageSettings :: FilmRollId -> Path.Filename -> Session (ImageSettingsId, Text)
 insertImageSettings filmRollId filename =
-  error "write TH-less"
+  let sql =
+        "insert into positive.image\
+        \ (film_roll_id, filename, rating, orientation, crop, gamma,\
+        \ zones, blackpoint, whitepoint, expressions, histogram)\
+        \ values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\
+        \ returning id :: int4, filename :: text"
+      decoder =
+        Decode.singleRow $
+          (\a b -> (Id.pack a, b))
+            <$> column Decode.int4
+            <*> column Decode.text
+   in Session.statement (emptyImageSettings filmRollId filename) $
+        Statement sql encodeNewImageSettings decoder True
 
 insertFilmRoll :: Text -> Transaction FilmRollId
 insertFilmRoll path =
@@ -93,9 +105,9 @@ selectImageSettingsByPath ::
   Session (Path.Directory, ImageSettings)
 selectImageSettingsByPath dir filename =
   let sql =
-        "select directory_path, image.* from positive.image\
+        "select directory_path, image.* from positive.film_roll\
         \ join positive.image\
-        \ on film_roll.id = image.film_roll_id and $2 :: text = image.filename\
+        \ on film_roll.id = image.film_roll_id and $2 = image.filename\
         \ where directory_path = $1"
       encoder =
         (Path.unpack . fst >$< param Encode.text)
@@ -104,25 +116,6 @@ selectImageSettingsByPath dir filename =
         Decode.singleRow $
           (,) <$> (Path.pack <$> column Decode.text) <*> decodeImageSettings
    in Session.statement (dir, filename) $
-        Statement sql encoder decoder True
-
-insertImageSettings2 :: FilmRollId -> Path.Filename -> Session (ImageSettingsId, Text)
-insertImageSettings2 filmRollId filename =
-  let sql =
-        "insert into positive.image\
-        \ (filename, rating, orientation, crop, gamma,\
-        \ zones, blackpoint, whitepoint, expressions, film_roll_id)\
-        \ values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\
-        \ returning id :: int4, filename :: text"
-      encoder =
-        (Id.unpack . fst >$< param Encode.int4)
-          <> (Path.unpack . snd >$< param Encode.text)
-      decoder =
-        Decode.singleRow $
-          (\a b -> (Id.pack a, b))
-            <$> column Decode.int4
-            <*> column Decode.text
-   in Session.statement (filmRollId, filename) $
         Statement sql encoder decoder True
 
 selectDirectoryPath :: ImageSettingsId -> Session Path.Directory
@@ -192,6 +185,13 @@ encodeImageSettings :: Encode.Params ImageSettings
 encodeImageSettings =
   mconcat
     [ Id.unpack . ImageSettings.id >$< param Encode.int4,
+      encodeNewImageSettings
+    ]
+
+encodeNewImageSettings :: Encode.Params (ImageSettingsBase a b)
+encodeNewImageSettings =
+  mconcat
+    [ Id.unpack . ImageSettings.filmRollId >$< param Encode.int4,
       Path.unpack . filename >$< param Encode.text,
       rating >$< param Encode.int2,
       rotate >$< param Encode.float8,
@@ -215,8 +215,9 @@ decodeFilmRoll =
 
 decodeImageSettings :: Decode.Row ImageSettings
 decodeImageSettings =
-  ImageSettings
+  ImageSettingsBase
     <$> column (Id.pack <$> Decode.int4)
+    <*> column (Id.pack <$> Decode.int4)
     <*> column (Path.pack <$> Decode.text)
     <*> column Decode.int2
     <*> column Decode.float8
