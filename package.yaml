@@ -30,7 +30,6 @@ dependencies:
   - haskell-to-elm
   - hasql
   - hasql-pool
-  - hasql-th
   - hasql-transaction
   - hip
   - http-media

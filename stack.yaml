@@ -46,12 +46,6 @@ extra-deps:
 - servant-multipart-0.11.6@sha256:1863862e507dd6f672b4c9d2c6d87d4faec19686ced3d828d712ada07536cddb,2655
 - fused-effects-1.1.1.1@sha256:c029c5fb0b2154281221a71ff25709d2a11347fe061fa8c2398e7fe52a16008d,4932
 
-- hasql-th-0.4.0.8@sha256:e77af01c354fcebb0fc8358a4bb2f7b361329bce28f783d8d6b17fbd5fa43279,2245
-- postgresql-syntax-0.3.0.3@sha256:b93a73c388811e331327561d85ed268f232be6c7f8f90ff27b2091c64c6aea90,4170
-- fast-builder-0.1.2.1@sha256:6e3148d9ac21e5ec900fa59d1d65322e6b4c0491f19b53bdbe093186a519eb9f,2791
-- headed-megaparsec-0.2@sha256:53e0fca4b30bc568f0dfae5b97abe7967939c8a9ee00f30bc99936d75181dd72,1566
-- megaparsec-9.0.1@sha256:2244ab77521a52a0083966c5405b3151f149e1db50b1a5b104cd9b1e56617203,3248
-
 - git: git@github.com:folq/servant-to-elm.git
   commit: 618214dfbb211ae709fa95bd5b3ef60d85838a35
 - git: git@github.com:folq/haskell-to-elm.git

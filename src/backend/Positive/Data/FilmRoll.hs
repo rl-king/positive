@@ -22,8 +22,8 @@ import Positive.Prelude
 
 data FilmRoll = FilmRoll
   { id :: FilmRollId,
-    directoryPath :: Directory,
     poster :: Maybe ImageSettingsId,
+    directoryPath :: Directory,
     imageSettings :: [ImageSettings]
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
@@ -38,4 +38,4 @@ data FilmRoll = FilmRoll
 
 empty :: FilmRollId -> FilmRoll
 empty id =
-  FilmRoll id "" Nothing mempty
+  FilmRoll id Nothing "" mempty

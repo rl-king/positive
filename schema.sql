@@ -29,11 +29,16 @@ create table if not exists positive.film_roll
   );
 
 alter table positive.image
-add film_roll_id integer references positive.film_roll(id);
+add if not exists film_roll_id integer references positive.film_roll(id);
+
+alter table positive.image
+add if not exists histogram int2[] default array[]::int2[];
 
 alter table positive.film_roll
-add created timestamptz default now(),
-add modified timestamptz default now();
+add if not exists created timestamptz default now(),
+add if not exists modified timestamptz default now();
+
+
 
 -- FUN
 

@@ -36,7 +36,8 @@ data ImageSettings = ImageSettings
     zones :: Zones,
     blackpoint :: Double,
     whitepoint :: Double,
-    expressions :: Vector Expression
+    expressions :: Vector Expression,
+    histogram :: Vector Word8
   }
   deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
   deriving
@@ -56,7 +57,7 @@ instance FromHttpApiData ImageSettings where
 
 emptyImageSettings :: Filename -> ImageSettings
 emptyImageSettings x =
-  ImageSettings (Id.pack 0) x 0 0 emptyCrop 2.2 emptyZones 0 1 mempty
+  ImageSettings (Id.pack 0) x 0 0 emptyCrop 2.2 emptyZones 0 1 mempty mempty
 
 -- Zones
 

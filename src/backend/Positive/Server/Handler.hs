@@ -90,7 +90,9 @@ handleImage dir settings = do
 
 handleSaveFilmRoll :: Handler sig m => FilmRoll -> m FilmRoll
 handleSaveFilmRoll filmRoll = do
-  _ <- PostgreSQL.runTransaction $ Session.updateFilmRoll filmRoll
+  _ <-
+    PostgreSQL.runTransaction $
+      Session.updateImageSettingsList filmRoll.imageSettings
   logDebug @"stdout" "handler" "saved filmroll"
   env <- ask @Env
   void . sendIO $
@@ -115,24 +117,23 @@ handleCheckExpressions exprs =
 
 handleGenerateHighRes :: Handler sig m => ImageSettings -> m NoContent
 handleGenerateHighRes settings = do
-  filmRoll <-
-    PostgreSQL.runSession $
-      Session.selectFilmRollByImageSettings settings.id
-  SingleImage.generate filmRoll.directoryPath settings
+  directoryPath <-
+    PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
+  SingleImage.generate directoryPath settings
   pure NoContent
 
 handleGenerateWallpaper :: Handler sig m => ImageSettings -> m NoContent
 handleGenerateWallpaper settings = do
-  filmRoll <-
-    PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
+  directoryPath <-
+    PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
   let input =
-        Path.append filmRoll.directoryPath settings.filename
+        Path.append directoryPath settings.filename
       outputBase homeDir =
         homeDir
           </> "Documents/wallpapers/positive"
           </> filter
             (\c -> not (isPathSeparator c || c == '.'))
-            (Path.toFilePath filmRoll.directoryPath)
+            (Path.toFilePath directoryPath)
           <> " | "
           <> Path.toFilePath settings.filename
   logInfo @"stdout" "handler" $ "generating wallpaper version of: " <> Text.pack input
@@ -151,10 +152,9 @@ handleGenerateWallpaper settings = do
 
 handleOpenExternalEditor :: Handler sig m => ImageSettings -> m NoContent
 handleOpenExternalEditor settings = do
-  filmRoll <-
-    PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
-  let input =
-        Path.append filmRoll.directoryPath settings.filename
+  directoryPath <-
+    PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
+  let input = Path.append directoryPath settings.filename
   logInfo @"stdout" "handler" $ "ppening in external editor: " <> Text.pack input
   image <-
     handleLeft
@@ -177,11 +177,11 @@ handleGetSettingsHistogram settings =
               \(HIP.PixelY p) ->
                 Massiv.modify marr (pure . (+) 1) (fromIntegral (HIP.toWord8 p))
    in do
-        filmRoll <-
-          PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
+        directoryPath <-
+          PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
         (image, putMVarBack) <-
           getCachedImage settings.crop $
-            Text.pack (Path.append filmRoll.directoryPath settings.filename)
+            Text.pack (Path.append directoryPath settings.filename)
         sendIO putMVarBack
         logDebug @"stdout" "handler" $
           "creating histogram for: " <> Path.unpack settings.filename
@@ -203,16 +203,12 @@ handleGetCoordinateInfo (coordinates, settings) =
             (floor (int2Double (HIP.rows image) * y))
             (floor (int2Double (HIP.cols image) * x))
    in do
-        filmRoll <-
-          PostgreSQL.runSession $ Session.selectFilmRollByImageSettings settings.id
+        directoryPath <-
+          PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
         (image, putMVarBack) <-
           first (Image.applySettings settings)
             <$> getCachedImage settings.crop
-              ( Text.pack
-                  ( Path.toFilePath filmRoll.directoryPath
-                      </> Path.toFilePath settings.filename
-                  )
-              )
+              (Text.pack (Path.append directoryPath settings.filename))
         sendIO putMVarBack
         pure $ fmap (toInfo image) coordinates
 
