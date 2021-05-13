@@ -20,20 +20,13 @@ import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
+import Positive.Data.HKD
 import Positive.Data.Id (FilmRollId, ImageSettingsId)
 import Positive.Data.Path
 import Positive.Prelude
 import Servant
 
--- HKD
-
-data New
-
-data FromDatabase
-
-type family Unwrap t f a where
-  Unwrap FromDatabase f a = a
-  Unwrap New f a = f a
+-- ALIAS
 
 type ImageSettings = ImageSettingsBase FromDatabase Identity
 

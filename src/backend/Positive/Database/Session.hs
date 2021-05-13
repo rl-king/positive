@@ -41,9 +41,17 @@ insertImageSettings filmRollId filename =
    in Session.statement (emptyImageSettings filmRollId filename) $
         Statement sql encodeNewImageSettings decoder True
 
-insertFilmRoll :: Text -> Transaction FilmRollId
-insertFilmRoll path =
-  error "write TH-less"
+insertFilmRoll :: Path.Directory -> Session FilmRollId
+insertFilmRoll directory_path =
+  let sql =
+        "insert into positive.film_roll\
+        \ (poster, directory_path)\
+        \ values ($1, $2)\
+        \ returning id"
+      decoder =
+        Decode.singleRow $ Id.pack <$> column Decode.int4
+   in Session.statement (emptyFilmRoll directory_path) $
+        Statement sql encodeNewFilmRoll decoder True
 
 -- UPDATE
 
@@ -181,6 +189,13 @@ selectFilmRollByImageSettings imageSettingsId =
 
 -- EN-DECODEING
 
+encodeNewFilmRoll :: Encode.Params NewFilmRoll
+encodeNewFilmRoll =
+  mconcat
+    [ fmap Id.unpack . poster >$< nullableParam Encode.int4,
+      Path.unpack . directoryPath >$< param Encode.text
+    ]
+
 encodeImageSettings :: Encode.Params ImageSettings
 encodeImageSettings =
   mconcat
@@ -207,7 +222,7 @@ encodeNewImageSettings =
 
 decodeFilmRoll :: Decode.Row FilmRoll
 decodeFilmRoll =
-  FilmRoll
+  FilmRollBase
     <$> column (Id.pack <$> Decode.int4)
     <*> nullableColumn (Id.pack <$> Decode.int4)
     <*> column (Path.pack <$> Decode.text)
