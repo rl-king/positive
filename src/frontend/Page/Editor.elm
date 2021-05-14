@@ -124,11 +124,16 @@ type alias Model =
     , scale : Float
     , undoState : UndoHistory
     , processingState : ProcessingState
+    , histogram : Maybe Histogram
     }
 
 
 type alias UndoHistory =
     List Images
+
+
+type alias Histogram =
+    Array Int
 
 
 type alias Images =
@@ -173,6 +178,7 @@ init filmRoll imageSettingsId images =
         }
     , coordinateInfo = Dict.empty
     , fullscreen = False
+    , histogram = Nothing
     }
 
 
@@ -187,6 +193,7 @@ continue imageSettingsId images model =
         , draftExpressions = fromArray (.expressions (Zipper.current focussed))
         , images = focussed
         , coordinateInfo = Dict.empty
+        , histogram = Nothing
     }
 
 
@@ -203,7 +210,7 @@ focus imageSettingsId images =
 type Msg
     = GotSaveImageSettings (HttpResult Image.FilmRoll)
     | GotGenerate String (HttpResult ())
-    | GotHistogram Id.ImageSettingsId (HttpResult (Array Int))
+    | GotHistogram (HttpResult (Array Int))
     | RotatePreview ImageSettingsId Float
     | OnImageSettingsChange ImageSettings
     | OnExpressionValueChange EditorIndex Expression
@@ -245,17 +252,8 @@ type Msg
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
 update key msg model =
     case msg of
-        GotHistogram imageSettingsId result ->
-            let
-                insertHistogram settings =
-                    { settings
-                        | histogram = Result.withDefault Array.empty result
-                    }
-            in
-            ( { model
-                | images =
-                    updateZipperById imageSettingsId insertHistogram model.images
-              }
+        GotHistogram result ->
+            ( { model | histogram = Result.toMaybe result }
             , Cmd.none
             )
 
@@ -418,7 +416,7 @@ update key msg model =
         OnImageLoad settings ->
             let
                 getHistogram =
-                    Cmd.map (GotHistogram settings.id) <|
+                    Cmd.map GotHistogram <|
                         Request.postImageSettingsHistogram settings
 
                 updateCoordinateInfo =
@@ -739,8 +737,9 @@ view model otherNotifications =
             model.imageCropMode
             model.clipboard
             model.processingState
-        , Html.Lazy.lazy3 viewSettingsRight
+        , Html.Lazy.lazy4 viewSettingsRight
             model.images
+            model.histogram
             model.draftExpressions
             model.processingState
         , Html.Lazy.lazy5 viewFiles
@@ -870,10 +869,11 @@ viewRating settings =
 
 viewSettingsRight :
     Images
+    -> Maybe Histogram
     -> DraftExpressions
     -> ProcessingState
     -> Html Msg
-viewSettingsRight images draftExpressions processingState =
+viewSettingsRight images maybeHistogram draftExpressions processingState =
     let
         ({ zones } as settings) =
             settingsFromState processingState images
@@ -885,7 +885,8 @@ viewSettingsRight images draftExpressions processingState =
     section [ class "image-settings-right" ]
         [ viewSettingsGroup
             [ Html.Lazy.lazy viewHistogram <|
-                .histogram (Zipper.current images)
+                Maybe.withDefault (.histogram (Zipper.current images))
+                    maybeHistogram
             ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
@@ -1442,11 +1443,12 @@ emptyExpression =
 
 
 toImageUrlParams : ImageSettings -> Url.Builder.QueryParameter
-toImageUrlParams =
-    Url.Builder.string "image-settings"
-        << Base64.encode
-        << Encode.encode 0
-        << Image.encodeImageSettings
+toImageUrlParams settings =
+    -- Empty params that trigger a reload but no visual change
+    Image.encodeImageSettings { settings | histogram = Array.empty }
+        |> Encode.encode 0
+        |> Base64.encode
+        |> Url.Builder.string "image-settings"
 
 
 fractionalModBy : Float -> Float -> Float

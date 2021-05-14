@@ -13,12 +13,18 @@ create table if not exists positive.image
   , expressions jsonb
   , created timestamptz default now()
   , modified timestamptz default now()
-  , preview timestamptz
 
   , unique (id, filename)
   );
 
--- TABLE
+create table if not exists positive.image_metadata
+  ( id serial primary key
+  , image_id integer not null references positive.image(id)
+  , preview_updated timestamptz
+  , histogram int4[] default array[]::int4[]
+
+  , unique (image_id)
+  );
 
 create table if not exists positive.film_roll
   ( id serial primary key
@@ -30,9 +36,6 @@ create table if not exists positive.film_roll
 
 alter table positive.image
 add if not exists film_roll_id integer references positive.film_roll(id);
-
-alter table positive.image
-add if not exists histogram int4[] default array[]::int4[];
 
 alter table positive.film_roll
 add if not exists created timestamptz default now(),

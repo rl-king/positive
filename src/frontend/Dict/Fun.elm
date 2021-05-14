@@ -2,6 +2,7 @@ module Dict.Fun exposing
     ( Dict
     , empty
     , get
+    , insert
     , update
     )
 
@@ -20,6 +21,11 @@ empty f g =
 get : k -> Dict k comparable v -> Maybe v
 get k (Dict f _ dict) =
     Dict.get (f k) dict
+
+
+insert : k -> v -> Dict k comparable v -> Dict k comparable v
+insert k v dict =
+    update k (always (Just v)) dict
 
 
 update : k -> (Maybe v -> Maybe v) -> Dict k comparable v -> Dict k comparable v

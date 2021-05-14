@@ -47,7 +47,6 @@ data ImageSettingsBase t f = ImageSettingsBase
     expressions :: Vector Expression,
     created :: P t f UTCTime,
     modified :: P t f UTCTime,
-    preview :: Maybe UTCTime,
     filmRollId :: FilmRollId,
     histogram :: Vector Int
   }
@@ -89,7 +88,6 @@ emptyImageSettings filmRollId filename =
       expressions = mempty,
       created = Nothing,
       modified = Nothing,
-      preview = Nothing,
       histogram = mempty
     }
 

@@ -19,7 +19,6 @@ import Control.Exception (evaluate)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Massiv.Array as Massiv
 import qualified Data.Massiv.Array.Manifest.Vector as Massiv
-import qualified Data.Massiv.Array.Mutable as Massiv.Mutable
 import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
@@ -41,6 +40,7 @@ import qualified Positive.Effect.PostgreSQL as PostgreSQL
 import qualified Positive.Image as Image
 import qualified Positive.Image.Util as Util
 import qualified Positive.Language as Language
+import qualified Positive.Metadata as Metadata
 import Positive.Prelude hiding (ByteString)
 import qualified Positive.SingleImage as SingleImage
 import Positive.Timed
@@ -169,25 +169,17 @@ handleOpenExternalEditor settings = do
 -- HISTOGRAM
 
 handleGetSettingsHistogram :: Handler sig m => ImageSettings -> m (Vector Int)
-handleGetSettingsHistogram settings =
-  let toHistogram arr =
-        Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
-          (Massiv.Sz1 (1 + fromIntegral (maxBound :: Word8)))
-          $ \marr ->
-            Massiv.forM_ arr $
-              \(HIP.PixelY p) ->
-                Massiv.modify marr (pure . (+) 1) (fromIntegral (HIP.toWord8 p))
-   in do
-        directoryPath <-
-          PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
-        (image, putMVarBack) <-
-          getCachedImage settings.crop $
-            Text.pack (Path.append directoryPath settings.filename)
-        sendIO putMVarBack
-        logDebug @"stdout" "handler" $
-          "creating histogram for: " <> Path.unpack settings.filename
-        pure . Massiv.toVector . toHistogram . HIP.unImage $
-          Image.applySettings settings image
+handleGetSettingsHistogram settings = do
+  directoryPath <-
+    PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
+  (image, putMVarBack) <-
+    getCachedImage settings.crop $
+      Text.pack (Path.append directoryPath settings.filename)
+  sendIO putMVarBack
+  logDebug @"stdout" "handler" $
+    "creating histogram for: " <> Path.unpack settings.filename
+  pure . Massiv.toVector . Metadata.generateHistogram . HIP.unImage $
+    Image.applySettings settings image
 
 -- COORDINATE
 

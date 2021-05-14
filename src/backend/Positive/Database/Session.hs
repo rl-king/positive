@@ -20,6 +20,7 @@ import Positive.Data.FilmRoll as FilmRoll
 import Positive.Data.Id
 import qualified Positive.Data.Id as Id
 import Positive.Data.ImageSettings as ImageSettings
+import Positive.Data.Metadata as Metadata
 import qualified Positive.Data.Path as Path
 import Positive.Prelude
 
@@ -30,8 +31,8 @@ insertImageSettings filmRollId filename =
   let sql =
         "insert into positive.image\
         \ (film_roll_id, filename, rating, orientation, crop, gamma,\
-        \ zones, blackpoint, whitepoint, expressions, histogram)\
-        \ values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\
+        \ zones, blackpoint, whitepoint, expressions)\
+        \ values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\
         \ returning id :: int4, filename :: text"
       decoder =
         Decode.singleRow $
@@ -72,17 +73,21 @@ updateImageSettings imageSettings =
         \ zones = $8,\
         \ blackpoint = $9,\
         \ whitepoint = $10,\
-        \ expressions = $11,\
-        \ histogram = $12\
+        \ expressions = $11\
         \ where id = $1"
    in Transaction.statement imageSettings $
         Statement sql encodeImageSettings Decode.noResult True
 
-updatePreviewTimestamp :: ImageSettingsId -> Session ()
-updatePreviewTimestamp imageSettingsId =
-  let sql = "update positive.image set preview = now() where id = $1"
-   in Session.statement imageSettingsId $
-        Statement sql (Id.unpack >$< param Encode.int4) Decode.noResult True
+updateMetadata :: UpdateMetadata -> Session ()
+updateMetadata newMetadata =
+  let sql =
+        "insert into positive.image_metadata\
+        \ (image_id, histogram, preview_updated)\
+        \ values($1, $2, now())\
+        \ on conflict (image_id)\
+        \ do update set preview_updated = now(), histogram = $2"
+   in Session.statement newMetadata $
+        Statement sql encodeUpdateMetadata Decode.noResult True
 
 updatePoster :: Maybe ImageSettingsId -> FilmRollId -> Session ()
 updatePoster imageSettingsId filmRollId =
@@ -98,9 +103,10 @@ updatePoster imageSettingsId filmRollId =
 selectOutdatedPreviews :: Session [(Path.Directory, ImageSettings)]
 selectOutdatedPreviews =
   let sql =
-        "select directory_path, image.* from positive.image\
+        "select directory_path, image.*, histogram from positive.image\
         \ join positive.film_roll on film_roll.id = image.film_roll_id\
-        \ where image.modified > image.preview\
+        \ left join positive.image_metadata on image_metadata.image_id = image.id\
+        \ where image.modified > preview_updated\
         \ order by film_roll_id, image.modified"
       decoder =
         Decode.rowList $
@@ -114,8 +120,9 @@ selectImageSettingsByPath ::
   Session (Path.Directory, ImageSettings)
 selectImageSettingsByPath dir filename =
   let sql =
-        "select directory_path, image.* from positive.film_roll\
+        "select directory_path, image.*, histogram from positive.film_roll\
         \ join positive.image\
+        \ join positive.image_metadata on image_metadata.image_id = image.id\
         \ on film_roll.id = image.film_roll_id and $2 = image.filename\
         \ where directory_path = $1"
       encoder =
@@ -144,8 +151,9 @@ selectFilmRolls :: Session [FilmRoll]
 selectFilmRolls =
   let sql =
         "select film_roll.id, film_roll.poster, film_roll.directory_path,\
-        \ image.* from positive.film_roll\
-        \ join positive.image on film_roll.id = image.film_roll_id"
+        \ image.*, histogram from positive.film_roll\
+        \ join positive.image on film_roll.id = image.film_roll_id\
+        \ left join positive.image_metadata on image_metadata.image_id = image.id"
       merge newFilmRoll acc =
         HashMap.alter
           ( \case
@@ -165,17 +173,16 @@ selectFilmRolls =
         Statement
           sql
           Encode.noParams
-          ( HashMap.elems
-              <$> Decode.foldrRows merge mempty decodeFilmRoll
-          )
+          (HashMap.elems <$> Decode.foldrRows merge mempty decodeFilmRoll)
           True
 
 selectFilmRollByImageSettings :: ImageSettingsId -> Session FilmRoll
 selectFilmRollByImageSettings imageSettingsId =
   let sql =
         "select film_roll.id, film_roll.poster, film_roll.directory_path,\
-        \ image.* from positive.film_roll\
+        \ image.*, histogram from positive.film_roll\
         \ join positive.image on film_roll.id = image.film_roll_id\
+        \ join positive.image_metadata on image_metadata.image_id = image.id\
         \ where image.id = $1"
    in Session.statement imageSettingsId $
         Statement
@@ -212,8 +219,14 @@ encodeNewImageSettings =
       Aeson.toJSON . zones >$< param Encode.jsonb,
       blackpoint >$< param Encode.float8,
       whitepoint >$< param Encode.float8,
-      Aeson.toJSON . expressions >$< param Encode.jsonb,
-      fmap (toEnum . fromIntegral) . histogram
+      Aeson.toJSON . expressions >$< param Encode.jsonb
+    ]
+
+encodeUpdateMetadata :: Encode.Params UpdateMetadata
+encodeUpdateMetadata =
+  mconcat
+    [ Id.unpack . Metadata.imageId >$< param Encode.int4,
+      fmap (toEnum . fromIntegral) . Metadata.histogram
         >$< param (Encode.foldableArray (Encode.nonNullable Encode.int4))
     ]
 
@@ -240,10 +253,24 @@ decodeImageSettings =
     <*> column jsonb
     <*> column Decode.timestamptz
     <*> column Decode.timestamptz
-    <*> nullableColumn Decode.timestamptz
     <*> column (Id.pack <$> Decode.int4)
+    <*> ( fromMaybe mempty
+            <$> nullableColumn
+              ( fmap fromIntegral
+                  <$> Decode.vectorArray (Decode.nonNullable Decode.int4)
+              )
+        )
+
+decodeMetadata :: Decode.Row Metadata
+decodeMetadata =
+  MetadataBase
+    <$> column (Id.pack <$> Decode.int4)
+    <*> column (Id.pack <$> Decode.int4)
+    <*> nullableColumn Decode.timestamptz
     <*> column
-      (fmap fromIntegral <$> Decode.vectorArray (Decode.nonNullable Decode.int4))
+      ( fmap fromIntegral
+          <$> Decode.vectorArray (Decode.nonNullable Decode.int4)
+      )
 
 param :: Encode.Value a -> Encode.Params a
 param =

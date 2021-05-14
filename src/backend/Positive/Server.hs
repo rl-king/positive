@@ -21,8 +21,8 @@ import qualified Positive.CLI as CLI
 import Positive.Effect.Log
 import Positive.Effect.PostgreSQL
 import qualified Positive.Effect.PostgreSQL as PostgreSQL
+import qualified Positive.Metadata as Metadata
 import Positive.Prelude
-import qualified Positive.Preview as Preview
 import Positive.Server.Api
 import qualified Positive.Server.Handler as Handler
 import qualified Positive.Static as Static
@@ -48,7 +48,7 @@ start logger pool isDev port =
         let env = Handler.Env imageMVar previewMVar isDev
         _ <-
           forkIO $
-            Preview.loop previewMVar
+            Metadata.loop previewMVar
               & runLabelled @"sse"
               & runLogServerEvent eventChan
               & runPostgreSQL pool
