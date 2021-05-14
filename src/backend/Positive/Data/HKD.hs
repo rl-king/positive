@@ -8,6 +8,6 @@ data New
 
 data FromDatabase
 
-type family Unwrap t f a where
-  Unwrap FromDatabase f a = a
-  Unwrap New f a = f a
+type family P t f a where
+  P FromDatabase f a = a
+  P New f a = f a

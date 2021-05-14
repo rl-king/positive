@@ -115,7 +115,6 @@ type alias Model =
     , draftExpressions : DraftExpressions
     , images : Images
     , fullscreen : Bool
-    , histogram : List Int
     , imageCropMode : Maybe ImageCrop
     , imageElement : Element
     , minimumRating : Int
@@ -161,7 +160,6 @@ init filmRoll imageSettingsId images =
     , checkExpressionsKey = Key 0
     , imageCropMode = Nothing
     , clipboard = Nothing
-    , histogram = List.repeat 255 0
     , undoState = []
     , scale = 1
     , minimumRating = 0
@@ -205,7 +203,7 @@ focus imageSettingsId images =
 type Msg
     = GotSaveImageSettings (HttpResult Image.FilmRoll)
     | GotGenerate String (HttpResult ())
-    | GotHistogram (HttpResult (List Int))
+    | GotHistogram Id.ImageSettingsId (HttpResult (Array Int))
     | RotatePreview ImageSettingsId Float
     | OnImageSettingsChange ImageSettings
     | OnExpressionValueChange EditorIndex Expression
@@ -247,8 +245,19 @@ type Msg
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
 update key msg model =
     case msg of
-        GotHistogram result ->
-            ( { model | histogram = Result.withDefault [] result }, Cmd.none )
+        GotHistogram imageSettingsId result ->
+            let
+                insertHistogram settings =
+                    { settings
+                        | histogram = Result.withDefault Array.empty result
+                    }
+            in
+            ( { model
+                | images =
+                    updateZipperById imageSettingsId insertHistogram model.images
+              }
+            , Cmd.none
+            )
 
         GotSaveImageSettings (Ok _) ->
             pushNotification Normal RemoveNotification "Saved settings" model
@@ -409,7 +418,7 @@ update key msg model =
         OnImageLoad settings ->
             let
                 getHistogram =
-                    Cmd.map GotHistogram <|
+                    Cmd.map (GotHistogram settings.id) <|
                         Request.postImageSettingsHistogram settings
 
                 updateCoordinateInfo =
@@ -730,10 +739,9 @@ view model otherNotifications =
             model.imageCropMode
             model.clipboard
             model.processingState
-        , Html.Lazy.lazy4 viewSettingsRight
+        , Html.Lazy.lazy3 viewSettingsRight
             model.images
             model.draftExpressions
-            model.histogram
             model.processingState
         , Html.Lazy.lazy5 viewFiles
             model.filmRoll
@@ -863,10 +871,9 @@ viewRating settings =
 viewSettingsRight :
     Images
     -> DraftExpressions
-    -> List Int
     -> ProcessingState
     -> Html Msg
-viewSettingsRight images draftExpressions histogram processingState =
+viewSettingsRight images draftExpressions processingState =
     let
         ({ zones } as settings) =
             settingsFromState processingState images
@@ -877,7 +884,9 @@ viewSettingsRight images draftExpressions histogram processingState =
     in
     section [ class "image-settings-right" ]
         [ viewSettingsGroup
-            [ Html.Lazy.lazy viewHistogram histogram ]
+            [ Html.Lazy.lazy viewHistogram <|
+                .histogram (Zipper.current images)
+            ]
         , viewSettingsGroup <|
             List.map (Html.map OnImageSettingsChange)
                 [ Input.viewRange 0.1 ( 0, 10, 2.2 ) "Gamma" settings.gamma <|
@@ -1306,9 +1315,11 @@ onCoordinateClick =
             (Decode.field "y" Decode.float)
 
 
-viewHistogram : List Int -> Html msg
+viewHistogram : Array Int -> Html msg
 viewHistogram =
-    Html.Keyed.node "div" [ class "histogram" ] << List.indexedMap viewHistogramBar
+    Html.Keyed.node "div" [ class "histogram" ]
+        << List.indexedMap viewHistogramBar
+        << Array.toList
 
 
 viewHistogramBar : Int -> Int -> ( String, Html msg )

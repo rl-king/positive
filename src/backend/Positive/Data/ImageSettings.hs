@@ -35,8 +35,7 @@ type NewImageSettings = ImageSettingsBase New Maybe
 -- SETTINGS
 
 data ImageSettingsBase t f = ImageSettingsBase
-  { id :: Unwrap t f ImageSettingsId,
-    filmRollId :: FilmRollId,
+  { id :: P t f ImageSettingsId,
     filename :: Filename,
     rating :: Int16,
     rotate :: Double,
@@ -46,7 +45,11 @@ data ImageSettingsBase t f = ImageSettingsBase
     blackpoint :: Double,
     whitepoint :: Double,
     expressions :: Vector Expression,
-    histogram :: Vector Word8
+    created :: P t f UTCTime,
+    modified :: P t f UTCTime,
+    preview :: Maybe UTCTime,
+    filmRollId :: FilmRollId,
+    histogram :: Vector Int
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
 
@@ -84,6 +87,9 @@ emptyImageSettings filmRollId filename =
       blackpoint = 0,
       whitepoint = 1,
       expressions = mempty,
+      created = Nothing,
+      modified = Nothing,
+      preview = Nothing,
       histogram = mempty
     }
 

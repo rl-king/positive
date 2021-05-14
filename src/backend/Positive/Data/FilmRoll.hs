@@ -29,7 +29,7 @@ type NewFilmRoll = FilmRollBase New Maybe
 -- FILMROLL
 
 data FilmRollBase t f = FilmRollBase
-  { id :: Unwrap t f FilmRollId,
+  { id :: P t f FilmRollId,
     poster :: Maybe ImageSettingsId,
     directoryPath :: Directory,
     imageSettings :: [ImageSettings]

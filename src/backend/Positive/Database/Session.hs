@@ -63,16 +63,17 @@ updateImageSettings :: ImageSettings -> Transaction ()
 updateImageSettings imageSettings =
   let sql =
         "update positive.image set\
-        \ filename = $2,\
-        \ rating = $3,\
-        \ orientation = $4,\
-        \ crop = $5,\
-        \ gamma = $6,\
-        \ zones = $7,\
-        \ blackpoint = $8,\
-        \ whitepoint = $9,\
-        \ expressions = $10,\
-        \ histogram = $11\
+        \ film_roll_id = $2,\
+        \ filename = $3,\
+        \ rating = $4,\
+        \ orientation = $5,\
+        \ crop = $6,\
+        \ gamma = $7,\
+        \ zones = $8,\
+        \ blackpoint = $9,\
+        \ whitepoint = $10,\
+        \ expressions = $11,\
+        \ histogram = $12\
         \ where id = $1"
    in Transaction.statement imageSettings $
         Statement sql encodeImageSettings Decode.noResult True
@@ -143,9 +144,7 @@ selectFilmRolls :: Session [FilmRoll]
 selectFilmRolls =
   let sql =
         "select film_roll.id, film_roll.poster, film_roll.directory_path,\
-        \ image.id, filename, rating, orientation, crop, gamma,\
-        \ zones, blackpoint, whitepoint, expressions, histogram\
-        \ from positive.film_roll\
+        \ image.* from positive.film_roll\
         \ join positive.image on film_roll.id = image.film_roll_id"
       merge newFilmRoll acc =
         HashMap.alter
@@ -175,9 +174,7 @@ selectFilmRollByImageSettings :: ImageSettingsId -> Session FilmRoll
 selectFilmRollByImageSettings imageSettingsId =
   let sql =
         "select film_roll.id, film_roll.poster, film_roll.directory_path,\
-        \ image.id, filename, rating, orientation, crop, gamma,\
-        \ zones, blackpoint, whitepoint, expressions, histogram\
-        \ from positive.film_roll\
+        \ image.* from positive.film_roll\
         \ join positive.image on film_roll.id = image.film_roll_id\
         \ where image.id = $1"
    in Session.statement imageSettingsId $
@@ -217,7 +214,7 @@ encodeNewImageSettings =
       whitepoint >$< param Encode.float8,
       Aeson.toJSON . expressions >$< param Encode.jsonb,
       fmap (toEnum . fromIntegral) . histogram
-        >$< param (Encode.foldableArray (Encode.nonNullable Encode.int2))
+        >$< param (Encode.foldableArray (Encode.nonNullable Encode.int4))
     ]
 
 decodeFilmRoll :: Decode.Row FilmRoll
@@ -232,7 +229,6 @@ decodeImageSettings :: Decode.Row ImageSettings
 decodeImageSettings =
   ImageSettingsBase
     <$> column (Id.pack <$> Decode.int4)
-    <*> column (Id.pack <$> Decode.int4)
     <*> column (Path.pack <$> Decode.text)
     <*> column Decode.int2
     <*> column Decode.float8
@@ -242,8 +238,12 @@ decodeImageSettings =
     <*> column Decode.float8
     <*> column Decode.float8
     <*> column jsonb
+    <*> column Decode.timestamptz
+    <*> column Decode.timestamptz
+    <*> nullableColumn Decode.timestamptz
+    <*> column (Id.pack <$> Decode.int4)
     <*> column
-      (fmap fromIntegral <$> Decode.vectorArray (Decode.nonNullable Decode.int2))
+      (fmap fromIntegral <$> Decode.vectorArray (Decode.nonNullable Decode.int4))
 
 param :: Encode.Value a -> Encode.Params a
 param =

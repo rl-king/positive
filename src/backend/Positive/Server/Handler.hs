@@ -18,6 +18,7 @@ import Control.Effect.Throw
 import Control.Exception (evaluate)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Massiv.Array as Massiv
+import qualified Data.Massiv.Array.Manifest.Vector as Massiv
 import qualified Data.Massiv.Array.Mutable as Massiv.Mutable
 import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
@@ -30,7 +31,7 @@ import Positive.Data.ImageSettings
     Expression (..),
     ExpressionResult (..),
     ImageCrop (..),
-    ImageSettings (..),
+    ImageSettings,
   )
 import qualified Positive.Data.Path as Path
 import qualified Positive.Database.Session as Session
@@ -167,7 +168,7 @@ handleOpenExternalEditor settings = do
 
 -- HISTOGRAM
 
-handleGetSettingsHistogram :: Handler sig m => ImageSettings -> m [Int]
+handleGetSettingsHistogram :: Handler sig m => ImageSettings -> m (Vector Int)
 handleGetSettingsHistogram settings =
   let toHistogram arr =
         Massiv.Mutable.createArrayST_ @Massiv.P @_ @Int
@@ -185,7 +186,7 @@ handleGetSettingsHistogram settings =
         sendIO putMVarBack
         logDebug @"stdout" "handler" $
           "creating histogram for: " <> Path.unpack settings.filename
-        pure . Massiv.toList . toHistogram . HIP.unImage $
+        pure . Massiv.toVector . toHistogram . HIP.unImage $
           Image.applySettings settings image
 
 -- COORDINATE

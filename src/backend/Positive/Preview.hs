@@ -5,7 +5,6 @@
 
 module Positive.Preview where
 
-import Control.Concurrent.Chan
 import Control.Concurrent.MVar
 import Control.Effect.Labelled
 import Control.Effect.Lift

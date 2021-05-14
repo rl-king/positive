@@ -47,7 +47,7 @@ data SettingsApi route = SettingsApi
     getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> ReqBody '[JSON] ImageSettings
-        :> Post '[JSON] [Int],
+        :> Post '[JSON] (Vector Int),
     generateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
