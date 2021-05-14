@@ -28,7 +28,7 @@ run logger pool filepath =
   withLookup filepath
     & PostgreSQL.runPostgreSQL pool
     & Error.Church.runError @PostgreSQL.Error
-      (logError @"stdout" "preview" . tshow)
+      (logError @"stdout" "generate-highres" . tshow)
       pure
     & runLabelled @"stdout"
     & runLogStdout logger

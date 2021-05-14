@@ -13,7 +13,7 @@ import Positive.Prelude
 
 type Metadata = MetadataBase FromDatabase Identity
 
-type UpdateMetadata = MetadataBase New Maybe
+type UpsertMetadata = MetadataBase New Maybe
 
 -- METADATA
 

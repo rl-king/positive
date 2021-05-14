@@ -6,12 +6,10 @@ import Positive.Prelude
 -- CLI
 
 data Mode
-  = Init Replace
+  = Init
   | SingleImage FilePath
   | Server IsDev Port
   deriving (Show, Eq)
-
-type Replace = Bool
 
 type IsDev = Bool
 
@@ -24,19 +22,22 @@ parseArgs =
 
 parser :: Parser Mode
 parser =
-  flag' Init (long "init" <> short 'i' <> help "create image-settings.json and previews") <*> replace
-    <|> SingleImage
-      <$> strOption
-        ( long "single"
-            <> short 's'
-            <> metavar "FILENAME"
-            <> help "process fullsize image to ./highres"
-        )
-    <|> Server <$> isDev <*> port
-
-replace :: Parser Replace
-replace =
-  flag False True (long "replace" <> help "replace existing")
+  asum
+    [ flag'
+        Init
+        ( long "init"
+            <> short 'i'
+            <> help "add directory to database and generate previews"
+        ),
+      SingleImage
+        <$> strOption
+          ( long "single"
+              <> short 's'
+              <> metavar "FILENAME"
+              <> help "process fullsize image to ./highres"
+          ),
+      Server <$> isDev <*> port
+    ]
 
 isDev :: Parser IsDev
 isDev =

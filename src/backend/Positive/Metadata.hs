@@ -47,15 +47,15 @@ loop lock = do
     outdatedPreviews@((dir, imageSettings) : rest) -> do
       logInfo @"stdout" "metadata" $
         "found " <> tshow (length outdatedPreviews) <> " outdated previews"
-      timedM "metadata" $ updateMetadata dir imageSettings
+      timedM "metadata" $ upsertMetadata dir imageSettings
+      logInfo @"sse" "preview" . tshow $ Id.unpack imageSettings.id
       unless (null rest) $ sendIO (void (tryPutMVar lock key))
       loop lock
 
 -- WRITE
 
-updateMetadata ::
+upsertMetadata ::
   ( HasLabelled "stdout" Log sig m,
-    HasLabelled "sse" Log sig m,
     Has PostgreSQL sig m,
     Has (Lift IO) sig m,
     Has (Throw PostgreSQL.Error) sig m
@@ -63,7 +63,7 @@ updateMetadata ::
   Path.Directory ->
   ImageSettings ->
   m ()
-updateMetadata (Path.toFilePath -> dir) imageSettings =
+upsertMetadata (Path.toFilePath -> dir) imageSettings =
   let input = dir </> Path.toFilePath imageSettings.filename
       output =
         dir </> "previews"
@@ -79,8 +79,7 @@ updateMetadata (Path.toFilePath -> dir) imageSettings =
           Right image -> do
             sendIO . HIP.writeImage output $
               Image.applySettings imageSettings image
-            logInfo @"sse" "preview" . tshow $ Id.unpack imageSettings.id
-            PostgreSQL.runSession . Session.updateMetadata $
+            PostgreSQL.runSession . Session.upsertMetadata $
               MetadataBase
                 { id = Nothing,
                   imageId = imageSettings.id,
@@ -88,7 +87,8 @@ updateMetadata (Path.toFilePath -> dir) imageSettings =
                   histogram =
                     Massiv.toVector . generateHistogram $ HIP.unImage image
                 }
-            logInfo @"stdout" "metadata" "generated preview"
+            logInfo @"stdout" "metadata" $
+              "generated preview for image id: " <> tshow (Id.unpack imageSettings.id)
 
 generateHistogram ::
   ( HIP.Source r ix (HIP.Pixel HIP.Y e),
