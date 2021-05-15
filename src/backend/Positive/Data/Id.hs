@@ -17,6 +17,7 @@ module Positive.Data.Id
     ImageSettingsId,
     FilmRollId,
     MetadataId,
+    CollectionId,
   )
 where
 
@@ -66,6 +67,9 @@ type ImageSettingsId =
 
 type MetadataId =
   Id "MetadataId"
+
+type CollectionId =
+  Id "CollectionId"
 
 unpack :: Id a -> Int32
 unpack (Id id) = id

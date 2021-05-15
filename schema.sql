@@ -34,6 +34,23 @@ create table if not exists positive.film_roll
   , unique (directory_path)
   );
 
+create table if not exists positive.collection
+  ( id serial primary key
+  , title text not null check (title <> '')
+  , created timestamptz default now()
+  , modified timestamptz default now()
+
+  , unique (title)
+  );
+
+create table if not exists positive.image_collection
+  ( image_id integer null references positive.image(id)
+  , collection_id integer null references positive.collection(id)
+  , created timestamptz default now()
+
+  , unique (image_id, collection_id)
+  );
+
 alter table positive.image
 add if not exists film_roll_id integer references positive.film_roll(id);
 
@@ -69,4 +86,11 @@ create trigger on_film_roll_modified
   before update
   on positive.film_roll
   for each row
-  execute procedure film_roll.update_modified_timestamp();
+  execute procedure positive.update_modified_timestamp();
+
+drop trigger if exists on_collection_modified on positive.collection;
+create trigger on_collection_modified
+  before update
+  on positive.collection
+  for each row
+  execute procedure positive.update_modified_timestamp();

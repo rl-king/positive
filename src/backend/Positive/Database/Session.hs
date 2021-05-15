@@ -16,6 +16,7 @@ import qualified Hasql.Session as Session
 import Hasql.Statement (Statement (..))
 import Hasql.Transaction (Transaction)
 import qualified Hasql.Transaction as Transaction
+import Positive.Data.Collection as Collection
 import Positive.Data.FilmRoll as FilmRoll
 import Positive.Data.Id
 import qualified Positive.Data.Id as Id
@@ -39,7 +40,7 @@ insertImageSettings filmRollId filename =
         Statement sql encodeNewImageSettings decoder True
 
 insertFilmRoll :: Path.Directory -> Transaction FilmRollId
-insertFilmRoll directory_path =
+insertFilmRoll directoryPath =
   let sql =
         "insert into positive.film_roll\
         \ (poster, directory_path)\
@@ -47,8 +48,33 @@ insertFilmRoll directory_path =
         \ returning id"
       decoder =
         Decode.singleRow $ Id.pack <$> column Decode.int4
-   in Transaction.statement (emptyFilmRoll directory_path) $
+   in Transaction.statement (emptyFilmRoll directoryPath) $
         Statement sql encodeNewFilmRoll decoder True
+
+insertImageToCollection :: ImageSettingsId -> CollectionId -> Session ()
+insertImageToCollection imageSettingsId collectionId =
+  let sql =
+        "insert into positive.image_collection\
+        \ (image_id, collection_id)\
+        \ values ($1, $2)"
+      encode =
+        (Id.unpack . fst >$< param Encode.int4)
+          <> (Id.unpack . snd >$< param Encode.int4)
+   in Session.statement (imageSettingsId, collectionId) $
+        Statement sql encode Decode.noResult True
+
+-- DELETE
+
+deleteImageToCollection :: ImageSettingsId -> CollectionId -> Session ()
+deleteImageToCollection imageSettingsId collectionId =
+  let sql =
+        "delete from positive.image_collection\
+        \ where image_id = $1 and collection_id = $2"
+      encode =
+        (Id.unpack . fst >$< param Encode.int4)
+          <> (Id.unpack . snd >$< param Encode.int4)
+   in Session.statement (imageSettingsId, collectionId) $
+        Statement sql encode Decode.noResult True
 
 -- UPDATE
 
@@ -185,6 +211,17 @@ selectImageSettings imageSettingsId =
           (Decode.singleRow decodeImageSettings)
           True
 
+selectCollections :: Session (Vector Collection)
+selectCollections =
+  let sql =
+        "select collection.*, array_agg(image_collection.image_id)\
+        \ from positive.collection\
+        \ left join positive.image_collection\
+        \ on image_collection.collection_id = collection.id\
+        \ group by collection.id"
+   in Session.statement () $
+        Statement sql Encode.noParams (Decode.rowVector decodeCollection) True
+
 -- EN-DECODEING
 
 encodeNewFilmRoll :: Encode.Params NewFilmRoll
@@ -228,9 +265,21 @@ decodeFilmRoll :: Decode.Row FilmRoll
 decodeFilmRoll =
   FilmRollBase
     <$> column (Id.pack <$> Decode.int4)
+    <*> column Decode.timestamptz
+    <*> column Decode.timestamptz
     <*> nullableColumn (Id.pack <$> Decode.int4)
     <*> column (Path.pack <$> Decode.text)
     <*> fmap pure decodeImageSettings
+
+decodeCollection :: Decode.Row Collection
+decodeCollection =
+  CollectionBase
+    <$> column (Id.pack <$> Decode.int4)
+    <*> column Decode.timestamptz
+    <*> column Decode.timestamptz
+    <*> column Decode.text
+    <*> column
+      (fmap Id.pack <$> Decode.vectorArray (Decode.nonNullable Decode.int4))
 
 decodeImageSettings :: Decode.Row ImageSettings
 decodeImageSettings =

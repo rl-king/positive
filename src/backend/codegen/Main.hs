@@ -13,6 +13,7 @@ import qualified Language.Elm.Expression as Expression
 import qualified Language.Elm.Pretty as Pretty
 import qualified Language.Elm.Simplification as Simplification
 import qualified Language.Haskell.To.Elm as Elm
+import Positive.Data.Collection
 import Positive.Data.FilmRoll
 import Positive.Data.ImageSettings
 import Positive.Prelude
@@ -40,6 +41,7 @@ main = do
           <> Elm.jsonDefinitions @CoordinateInfo
           <> Elm.jsonDefinitions @Expression
           <> Elm.jsonDefinitions @ExpressionResult
+          <> Elm.jsonDefinitions @Collection
       modules =
         -- FIXME: spaceleak in both elm-syntax functions
         Pretty.modules $
