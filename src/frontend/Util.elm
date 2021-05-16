@@ -8,6 +8,7 @@ module Util exposing
     , choice
     , emptyNotifications
     , matchKey
+    , mergeStatus
     , pushNotification
     , removeNotification
     , viewIf
@@ -29,6 +30,16 @@ type Status a
     | Failure
     | Requested
     | Unknown
+
+
+mergeStatus : Status a -> Status b -> Maybe ( a, b )
+mergeStatus aStatus bStatus =
+    case ( aStatus, bStatus ) of
+        ( Success a, Success b ) ->
+            Just ( a, b )
+
+        _ ->
+            Nothing
 
 
 type alias HttpResult a =

@@ -24,6 +24,7 @@ import qualified Data.Text as Text
 import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import qualified Positive.CLI as CLI
+import Positive.Data.Collection (Collection)
 import Positive.Data.FilmRoll (FilmRoll)
 import Positive.Data.ImageSettings
   ( CoordinateInfo (..),
@@ -208,8 +209,14 @@ handleGetCoordinateInfo (coordinates, settings) =
 -- LIST DIRECTORIES
 
 handleGetSettings :: Handler sig m => m [FilmRoll]
-handleGetSettings =
+handleGetSettings = do
+  logInfo @"stdout" "handler" "get filmrolls"
   PostgreSQL.runSession Session.selectFilmRolls
+
+handleGetCollections :: Handler sig m => m [Collection]
+handleGetCollections = do
+  logInfo @"stdout" "handler" "get collections"
+  PostgreSQL.runSession Session.selectCollections
 
 -- HANDLER HELPERS
 

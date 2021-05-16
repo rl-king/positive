@@ -3,7 +3,7 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation as Navigation
 import Data.Path as Path
-import Generated.Data exposing (FilmRoll)
+import Generated.Data exposing (Collection, FilmRoll)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -72,6 +72,8 @@ subscriptions model =
 
 type alias Model =
     { filmRolls : Status (List FilmRoll)
+    , collections : Status (List Collection)
+    , route : Route
     , page : Page
     , key : Navigation.Key
     , scrollTo : ScrollTo.State
@@ -87,13 +89,19 @@ type Page
 
 init : () -> Url.Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
-    onNavigation (Route.fromUrl url)
-        { filmRolls = Unknown
-        , page = Loading
-        , key = key
-        , scrollTo = ScrollTo.init
-        , notifications = emptyNotifications
-        }
+    ( { filmRolls = Unknown
+      , collections = Unknown
+      , route = Route.fromUrl url
+      , page = Loading
+      , key = key
+      , scrollTo = ScrollTo.init
+      , notifications = emptyNotifications
+      }
+    , Cmd.batch
+        [ Cmd.map GotFilmRolls Request.getImageSettings
+        , Cmd.map GotCollections Request.getCollection
+        ]
+    )
 
 
 
@@ -105,7 +113,8 @@ type Msg
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | CancelScroll
-    | GotFilmRolls Route (HttpResult (List FilmRoll))
+    | GotFilmRolls (HttpResult (List FilmRoll))
+    | GotCollections (HttpResult (List Collection))
     | RemoveNotification NotificationId
     | OnServerMessage String
     | EditorMsg Page.Editor.Msg
@@ -122,7 +131,8 @@ update msg model =
             ( model, Navigation.load href )
 
         UrlChanged url ->
-            onNavigation (Route.fromUrl url) model
+            onNavigation <|
+                extractUpdates { model | route = Route.fromUrl url }
 
         ScrollToMsg scrollToMsg ->
             let
@@ -138,15 +148,25 @@ update msg model =
             , Cmd.none
             )
 
-        GotFilmRolls route (Ok filmRolls) ->
-            onNavigation route <|
+        GotFilmRolls (Ok filmRolls) ->
+            onNavigation <|
                 { model | filmRolls = Success filmRolls }
 
-        GotFilmRolls _ (Err _) ->
+        GotFilmRolls (Err _) ->
             pushNotification Warning
                 RemoveNotification
-                "Error gettings filmroll settings"
+                "Error gettings filmrolls"
                 { model | filmRolls = Failure }
+
+        GotCollections (Ok collections) ->
+            onNavigation <|
+                { model | collections = Success collections }
+
+        GotCollections (Err _) ->
+            pushNotification Warning
+                RemoveNotification
+                "Error gettings collections"
+                { model | collections = Failure }
 
         RemoveNotification notificationId ->
             ( { model
@@ -186,8 +206,19 @@ mapPage model toPage toMsg ( page, cmds ) =
     )
 
 
-onNavigation : Route -> Model -> ( Model, Cmd Msg )
-onNavigation route model =
+onNavigation : Model -> ( Model, Cmd Msg )
+onNavigation model =
+    checkScrollPosition model.page <|
+        case mergeStatus model.filmRolls model.collections of
+            Nothing ->
+                ( model, Cmd.none )
+
+            Just ( filmRolls, collections ) ->
+                routeToPage filmRolls collections model
+
+
+routeToPage : List FilmRoll -> List Collection -> Model -> ( Model, Cmd Msg )
+routeToPage filmRolls collections model =
     let
         sortFun =
             Path.toString << .filename
@@ -196,53 +227,42 @@ onNavigation route model =
             Zipper.fromList (List.sortBy sortFun filmRoll.imageSettings)
                 |> Maybe.map (Tuple.pair filmRoll)
 
-        toFilmRoll filmRollId filmRolls =
+        toFilmRoll filmRollId =
             List.filter ((==) filmRollId << .id) filmRolls
                 |> List.head
                 |> Maybe.andThen toSortedZipper
     in
-    checkScrollPosition model.page <|
-        case .filmRolls (extractUpdates model) of
-            Requested ->
-                ( model, Cmd.none )
+    case model.route of
+        Route.Browser data ->
+            ( { model | page = Browser (Page.Browser.init data filmRolls) }
+            , Cmd.none
+            )
 
-            Failure ->
-                pushNotification Warning RemoveNotification "Error loading filmrolls" model
+        Route.Editor filmRollId imageSettingsId ->
+            case ( toFilmRoll filmRollId, model.page ) of
+                ( Nothing, _ ) ->
+                    pushNotification Warning
+                        RemoveNotification
+                        "Error loading filmroll"
+                        model
 
-            Unknown ->
-                ( { model | filmRolls = Requested }
-                , Cmd.map (GotFilmRolls route) Request.getImageSettings
-                )
+                ( Just ( filmRoll, images ), Editor m ) ->
+                    ( { model
+                        | page =
+                            Editor <|
+                                Page.Editor.continue imageSettingsId images m
+                      }
+                    , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                    )
 
-            Success filmRolls ->
-                case route of
-                    Route.Browser data ->
-                        ( { model | page = Browser (Page.Browser.init data filmRolls) }
-                        , Cmd.none
-                        )
-
-                    Route.Editor filmRollId imageSettingsId ->
-                        case toFilmRoll filmRollId filmRolls of
-                            Nothing ->
-                                pushNotification Warning RemoveNotification "Error loading filmroll" model
-
-                            Just ( filmRoll, images ) ->
-                                case model.page of
-                                    Editor m ->
-                                        ( { model
-                                            | page =
-                                                Editor (Page.Editor.continue imageSettingsId images m)
-                                          }
-                                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                                        )
-
-                                    _ ->
-                                        ( { model
-                                            | page =
-                                                Editor (Page.Editor.init filmRoll imageSettingsId images)
-                                          }
-                                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                                        )
+                ( Just ( filmRoll, images ), _ ) ->
+                    ( { model
+                        | page =
+                            Editor <|
+                                Page.Editor.init filmRoll imageSettingsId images
+                      }
+                    , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                    )
 
 
 extractUpdates : Model -> Model

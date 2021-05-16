@@ -172,8 +172,7 @@ selectDirectoryPath imageSettingsId =
 selectFilmRolls :: Session [FilmRoll]
 selectFilmRolls =
   let sql =
-        "select film_roll.id, film_roll.poster, film_roll.directory_path,\
-        \ image.*, histogram from positive.film_roll\
+        "select film_roll.*, image.*, histogram from positive.film_roll\
         \ join positive.image on film_roll.id = image.film_roll_id\
         \ left join positive.image_metadata on image_metadata.image_id = image.id"
       merge newFilmRoll acc =
@@ -211,16 +210,16 @@ selectImageSettings imageSettingsId =
           (Decode.singleRow decodeImageSettings)
           True
 
-selectCollections :: Session (Vector Collection)
+selectCollections :: Session [Collection]
 selectCollections =
   let sql =
-        "select collection.*, array_agg(image_collection.image_id)\
+        "select collection.*, array_remove(array_agg(image_collection.image_id), null)\
         \ from positive.collection\
         \ left join positive.image_collection\
         \ on image_collection.collection_id = collection.id\
         \ group by collection.id"
    in Session.statement () $
-        Statement sql Encode.noParams (Decode.rowVector decodeCollection) True
+        Statement sql Encode.noParams (Decode.rowList decodeCollection) True
 
 -- EN-DECODEING
 
@@ -265,19 +264,19 @@ decodeFilmRoll :: Decode.Row FilmRoll
 decodeFilmRoll =
   FilmRollBase
     <$> column (Id.pack <$> Decode.int4)
-    <*> column Decode.timestamptz
-    <*> column Decode.timestamptz
     <*> nullableColumn (Id.pack <$> Decode.int4)
     <*> column (Path.pack <$> Decode.text)
+    <*> column Decode.timestamptz
+    <*> column Decode.timestamptz
     <*> fmap pure decodeImageSettings
 
 decodeCollection :: Decode.Row Collection
 decodeCollection =
   CollectionBase
     <$> column (Id.pack <$> Decode.int4)
-    <*> column Decode.timestamptz
-    <*> column Decode.timestamptz
     <*> column Decode.text
+    <*> column Decode.timestamptz
+    <*> column Decode.timestamptz
     <*> column
       (fmap Id.pack <$> Decode.vectorArray (Decode.nonNullable Decode.int4))
 

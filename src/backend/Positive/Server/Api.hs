@@ -7,6 +7,7 @@ module Positive.Server.Api where
 
 import Data.ByteString.Lazy (ByteString)
 import Network.HTTP.Media ((//))
+import Positive.Data.Collection
 import Positive.Data.FilmRoll
 import Positive.Data.ImageSettings
 import Positive.Prelude hiding (ByteString)
@@ -33,6 +34,7 @@ data ImageApi route = ImageApi
   deriving (Generic)
 
 data SettingsApi route = SettingsApi
+  -- FIXME: rename paths
   { saveFilmRoll ::
       route :- "film-roll"
         :> ReqBody '[JSON] FilmRoll
@@ -42,8 +44,12 @@ data SettingsApi route = SettingsApi
         :> ReqBody '[JSON] [Expression]
         :> Post '[JSON] [ExpressionResult],
     getSettings ::
-      route :- "image" :> "settings"
+      route :- "image"
+        :> "settings"
         :> Get '[JSON] [FilmRoll],
+    getCollections ::
+      route :- "collection"
+        :> Get '[JSON] [Collection],
     getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> ReqBody '[JSON] ImageSettings

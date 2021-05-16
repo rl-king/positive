@@ -30,10 +30,10 @@ type NewFilmRoll = FilmRollBase New Maybe
 
 data FilmRollBase t f = FilmRollBase
   { id :: P t f FilmRollId,
-    created :: P t f UTCTime,
-    modified :: P t f UTCTime,
     poster :: Maybe ImageSettingsId,
     directoryPath :: Directory,
+    created :: P t f UTCTime,
+    modified :: P t f UTCTime,
     imageSettings :: [ImageSettings]
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)

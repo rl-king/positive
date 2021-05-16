@@ -103,6 +103,7 @@ handlers isDev chan =
             { saveFilmRoll = Handler.handleSaveFilmRoll,
               checkExpressions = Handler.handleCheckExpressions,
               getSettings = Handler.handleGetSettings,
+              getCollections = Handler.handleGetCollections,
               getSettingsHistogram = Handler.handleGetSettingsHistogram,
               generateHighRes = Handler.handleGenerateHighRes,
               openExternalEditor = Handler.handleOpenExternalEditor,

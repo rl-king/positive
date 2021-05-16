@@ -1,5 +1,6 @@
 module Data.Id exposing
-    ( FilmRollId
+    ( CollectionId
+    , FilmRollId
     , Id
     , ImageSettingsId
     , fromInt
@@ -29,6 +30,10 @@ type alias FilmRollId =
 
 type alias ImageSettingsId =
     Id { imageSettingsId : () }
+
+
+type alias CollectionId =
+    Id { collectionId : () }
 
 
 

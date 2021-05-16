@@ -28,9 +28,9 @@ type NewCollection = CollectionBase New Maybe
 
 data CollectionBase t f = CollectionBase
   { id :: P t f CollectionId,
+    title :: Text,
     created :: P t f UTCTime,
     modified :: P t f UTCTime,
-    title :: Text,
     imageIds :: Vector ImageSettingsId
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
