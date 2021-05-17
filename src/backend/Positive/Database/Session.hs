@@ -221,7 +221,7 @@ selectCollections =
    in Session.statement () $
         Statement sql Encode.noParams (Decode.rowList decodeCollection) True
 
--- EN-DECODEING
+-- EN-DECODING
 
 encodeNewFilmRoll :: Encode.Params NewFilmRoll
 encodeNewFilmRoll =
@@ -278,7 +278,7 @@ decodeCollection =
     <*> column Decode.timestamptz
     <*> column Decode.timestamptz
     <*> column
-      (fmap Id.pack <$> Decode.vectorArray (Decode.nonNullable Decode.int4))
+      (fmap Id.pack <$> Decode.listArray (Decode.nonNullable Decode.int4))
 
 decodeImageSettings :: Decode.Row ImageSettings
 decodeImageSettings =

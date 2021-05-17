@@ -5,6 +5,7 @@ module Data.Id exposing
     , ImageSettingsId
     , fromInt
     , fromJson
+    , fromString
     , fromUrl
     , toInt
     , toJson
@@ -53,6 +54,11 @@ toInt (Id id) =
 toString : Id a -> String
 toString =
     String.fromInt << toInt
+
+
+fromString : String -> Maybe (Id a)
+fromString =
+    Maybe.map Id << String.toInt
 
 
 fromUrl : Parser.Parser (Id b -> a) a

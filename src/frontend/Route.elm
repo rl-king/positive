@@ -1,10 +1,19 @@
 module Route exposing
-    ( Route(..)
+    ( BrowserParams
+    , Route(..)
     , fromUrl
+    , link
     , toUrl
     )
 
-import Data.Id exposing (FilmRollId, ImageSettingsId)
+import Data.Id as Id
+    exposing
+        ( CollectionId
+        , FilmRollId
+        , ImageSettingsId
+        )
+import Html exposing (..)
+import Html.Attributes exposing (..)
 import Url exposing (Url)
 import Url.Builder
 import Url.Parser exposing ((</>), (<?>))
@@ -16,8 +25,14 @@ import Url.Parser.Query
 
 
 type Route
-    = Browser { minimumRating : Maybe Int }
+    = Browser BrowserParams
     | Editor FilmRollId ImageSettingsId
+
+
+type alias BrowserParams =
+    { selectedCollections : List CollectionId
+    , minimumRating : Int
+    }
 
 
 fromUrl : Url -> Route
@@ -27,29 +42,50 @@ fromUrl url =
             Url.Parser.oneOf
                 [ Url.Parser.map Editor <|
                     Url.Parser.s "editor"
-                        </> Data.Id.fromUrl
-                        </> Data.Id.fromUrl
-                , Url.Parser.map (\x -> Browser { minimumRating = x }) <|
+                        </> Id.fromUrl
+                        </> Id.fromUrl
+                , Url.Parser.map Browser <|
                     Url.Parser.top
-                        <?> Url.Parser.Query.int "rating"
+                        <?> Url.Parser.Query.map2 BrowserParams
+                                collectionIdParams
+                                ratingParam
                 ]
     in
-    Maybe.withDefault (Browser { minimumRating = Nothing }) <|
+    Maybe.withDefault (Browser (BrowserParams [] 0)) <|
         Url.Parser.parse parser url
+
+
+collectionIdParams : Url.Parser.Query.Parser (List CollectionId)
+collectionIdParams =
+    Url.Parser.Query.custom "collection" (List.filterMap Id.fromString)
+
+
+ratingParam : Url.Parser.Query.Parser Int
+ratingParam =
+    Url.Parser.Query.map (Maybe.withDefault 0) <|
+        Url.Parser.Query.int "rating"
 
 
 toUrl : Route -> String
 toUrl route =
     case route of
-        Browser { minimumRating } ->
+        Browser { minimumRating, selectedCollections } ->
             Url.Builder.absolute [] <|
-                Maybe.withDefault [] <|
-                    Maybe.map (List.singleton << Url.Builder.int "rating") minimumRating
+                List.concat
+                    [ List.map (Url.Builder.int "collection" << Id.toInt)
+                        selectedCollections
+                    , [ Url.Builder.int "rating" minimumRating ]
+                    ]
 
         Editor filmRollId imageSettingsId ->
             Url.Builder.absolute
                 [ "editor"
-                , Data.Id.toString filmRollId
-                , Data.Id.toString imageSettingsId
+                , Id.toString filmRollId
+                , Id.toString imageSettingsId
                 ]
                 []
+
+
+link : Route -> List (Attribute msg) -> List (Html msg) -> Html msg
+link route attributes content =
+    a (href (toUrl route) :: attributes) content

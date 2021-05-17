@@ -31,7 +31,7 @@ data CollectionBase t f = CollectionBase
     title :: Text,
     created :: P t f UTCTime,
     modified :: P t f UTCTime,
-    imageIds :: Vector ImageSettingsId
+    imageIds :: [ImageSettingsId]
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
 

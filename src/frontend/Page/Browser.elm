@@ -9,9 +9,10 @@ module Page.Browser exposing
 
 import Browser.Events
 import Browser.Navigation
-import Data.Id exposing (FilmRollId)
+import Data.Id as Id exposing (CollectionId, FilmRollId, ImageSettingsId)
 import Data.Path as Path
-import Generated.Data exposing (FilmRoll, ImageSettings)
+import Dict.Fun
+import Generated.Data exposing (Collection, FilmRoll, ImageSettings)
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -47,17 +48,21 @@ subscriptions model =
 type alias Model =
     { filmRolls : List FilmRoll
     , filmRollHover : Maybe ( FilmRoll, Float )
-    , minimumRating : Maybe Int
+    , minimumRating : Int
     , columns : Int
+    , collections : List Collection
+    , selectedCollections : List CollectionId
     }
 
 
-init : { minimumRating : Maybe Int } -> List FilmRoll -> Model
-init { minimumRating } filmRolls =
+init : Route.BrowserParams -> List Collection -> List FilmRoll -> Model
+init { minimumRating, selectedCollections } collections filmRolls =
     { filmRolls = filmRolls
     , filmRollHover = Nothing
     , minimumRating = minimumRating
     , columns = 4
+    , collections = collections
+    , selectedCollections = selectedCollections
     }
 
 
@@ -113,16 +118,14 @@ update key msg model =
                     { filmRoll | poster = Just imageSettings.id }
             )
 
-        SetMinRating 0 ->
-            ( model
-            , Browser.Navigation.pushUrl key <|
-                Route.toUrl (Route.Browser { minimumRating = Nothing })
-            )
-
         SetMinRating val ->
             ( model
             , Browser.Navigation.pushUrl key <|
-                Route.toUrl (Route.Browser { minimumRating = Just val })
+                Route.toUrl <|
+                    Route.Browser
+                        { minimumRating = val
+                        , selectedCollections = model.selectedCollections
+                        }
             )
 
         SetColumnCount scale ->
@@ -171,24 +174,41 @@ view model =
             [ header []
                 [ h1 [] [ text "Browser" ]
                 , div [ class "browser-controls" ]
-                    [ Input.viewRangeInt 1 ( 2, 13, 5 ) "Columns" model.columns SetColumnCount
-                    , Input.viewRangeInt 1
-                        ( 0, 5, 0 )
-                        "Minimum rating"
-                        (Maybe.withDefault 0 model.minimumRating)
-                        SetMinRating
+                    [ div [ class "browser-controls-sliders" ]
+                        [ Input.viewRangeInt 1
+                            ( 2, 13, 5 )
+                            "Columns"
+                            model.columns
+                            SetColumnCount
+                        , Input.viewRangeInt 1
+                            ( 0, 5, 0 )
+                            "Minimum rating"
+                            model.minimumRating
+                            SetMinRating
+                        ]
+                    , viewCollectionButtons model.minimumRating
+                        model.selectedCollections
+                        model.collections
                     ]
                 ]
-            , case model.minimumRating of
-                Nothing ->
+            , case ( model.minimumRating, model.selectedCollections ) of
+                ( 0, [] ) ->
                     div [ class "browser-filmrolls" ] <|
                         List.map (viewFilmRollBrowserRoll model.columns model.filmRollHover) <|
                             List.sortWith sorter model.filmRolls
 
-                Just n ->
+                ( n, [] ) ->
                     div [ class "browser-rated" ] <|
-                        List.map (viewFilmRollBrowserRated n) <|
+                        List.map (viewFiltered n) <|
                             List.sortWith sorter model.filmRolls
+
+                ( n, selectedCollections ) ->
+                    viewCollections n
+                        (List.filter
+                            (\{ id } -> List.member id selectedCollections)
+                            model.collections
+                        )
+                        (List.sortWith sorter model.filmRolls)
             , footer []
                 [ text "Total photos: "
                 , text <|
@@ -203,11 +223,93 @@ view model =
 
 
 
+-- COLLECTION
+
+
+viewCollections : Int -> List Collection -> List FilmRoll -> Html Msg
+viewCollections minimumRating collections filmRolls =
+    let
+        images =
+            Dict.Fun.fromList Id.toInt Id.fromInt <|
+                List.concatMap
+                    (\filmRoll ->
+                        List.map
+                            (\imageSettings ->
+                                ( imageSettings.id
+                                , ( filmRoll.directoryPath
+                                  , filmRoll.id
+                                  , imageSettings
+                                  )
+                                )
+                            )
+                            filmRoll.imageSettings
+                    )
+                    filmRolls
+    in
+    div [] <|
+        List.map (viewCollection images) collections
+
+
+viewCollection :
+    Dict.Fun.Dict ImageSettingsId Int ( Path.Directory, FilmRollId, ImageSettings )
+    -> Collection
+    -> Html Msg
+viewCollection images collection =
+    div [ class "browser-collection-images" ] <|
+        (::) (h2 [] [ text collection.title ]) <|
+            List.map viewCollectionImage <|
+                List.filterMap (\id -> Dict.Fun.get id images)
+                    collection.imageIds
+
+
+viewCollectionImage : ( Path.Directory, FilmRollId, ImageSettings ) -> Html Msg
+viewCollectionImage ( directoryPath, filmRollId, imageSettings ) =
+    a [ href (Route.toUrl (Route.Editor filmRollId imageSettings.id)) ]
+        [ img [ src (toPreviewUrl directoryPath imageSettings) ] []
+        , text <|
+            Path.toString imageSettings.filename
+        ]
+
+
+viewCollectionButtons : Int -> List CollectionId -> List Collection -> Html Msg
+viewCollectionButtons minimumRating selectedCollections collections =
+    div [ class "browser-controls-collections" ] <|
+        List.map (viewCollectionSelect minimumRating selectedCollections) collections
+
+
+viewCollectionSelect : Int -> List CollectionId -> Collection -> Html Msg
+viewCollectionSelect minimumRating selectedCollections collection =
+    let
+        route =
+            if List.member collection.id selectedCollections then
+                Route.Browser
+                    { minimumRating = minimumRating
+                    , selectedCollections =
+                        List.filter ((/=) collection.id) selectedCollections
+                    }
+
+            else
+                Route.Browser
+                    { minimumRating = minimumRating
+                    , selectedCollections =
+                        collection.id :: selectedCollections
+                    }
+    in
+    Route.link route
+        [ classList
+            [ ( "-selected", List.member collection.id selectedCollections )
+            ]
+        , class "browser-controls-collection"
+        ]
+        [ text collection.title ]
+
+
+
 -- RATED
 
 
-viewFilmRollBrowserRated : Int -> FilmRoll -> Html Msg
-viewFilmRollBrowserRated minimumRating filmRoll =
+viewFiltered : Int -> FilmRoll -> Html Msg
+viewFiltered minimumRating filmRoll =
     case List.filter ((<=) minimumRating << .rating) filmRoll.imageSettings of
         [] ->
             div [] []
@@ -231,7 +333,7 @@ viewRatedImage filmRoll imageSettings =
                 Icon.unstarred
     in
     a [ href (Route.toUrl (Route.Editor filmRoll.id imageSettings.id)) ]
-        [ img [ src (toPreviewUrl filmRoll imageSettings) ] []
+        [ img [ src (toPreviewUrl filmRoll.directoryPath imageSettings) ] []
         , text <|
             Path.toString imageSettings.filename
         , div [ class "browser-rated-rating" ] <|
@@ -314,20 +416,20 @@ viewFilmRollBrowserImage filmRoll imageSettings =
         [ span
             [ style "background-image" <|
                 interpolate "url(\"{0}\")" <|
-                    [ toPreviewUrl filmRoll imageSettings ]
+                    [ toPreviewUrl filmRoll.directoryPath imageSettings ]
             ]
             []
         ]
 
 
-toPreviewUrl : FilmRoll -> ImageSettings -> String
-toPreviewUrl filmRoll imageSettings =
+toPreviewUrl : Path.Directory -> ImageSettings -> String
+toPreviewUrl directoryPath imageSettings =
     let
         previewExtension filename =
             String.dropRight 3 (Path.toString filename) ++ "jpg"
     in
     Url.Builder.crossOrigin
-        (Path.toString filmRoll.directoryPath)
+        (Path.toString directoryPath)
         [ "previews", previewExtension imageSettings.filename ]
         []
 

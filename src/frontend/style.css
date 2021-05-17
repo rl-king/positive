@@ -135,13 +135,14 @@ nav {
 }
 
 .browser h1 {
+    margin-top: 0;
     margin-bottom: 1.5rem;
 }
 
 .browser header {
     margin-bottom: 1rem;
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: space-between;
 }
 
@@ -154,10 +155,6 @@ nav {
 .browser .range-slider {
     width: 18rem;
     margin-left: 1rem;
-}
-
-.browser-controls {
-    display: flex;
 }
 
 .browser-filmrolls {
@@ -195,6 +192,7 @@ nav {
     flex-wrap: wrap;
 }
 
+.browser-collection-images a,
 .browser-rated-images a {
     width: 10rem;
     margin-right: 1rem;
@@ -202,6 +200,7 @@ nav {
     display: inline-block;
 }
 
+.browser-collection-images,
 .browser-rated-roll {
     padding: .25rem 1.5rem;
     margin-bottom: 1rem;
@@ -212,12 +211,43 @@ nav {
     border-radius: 2px;
 }
 
+.browser-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.browser-controls-sliders {
+    display: flex;
+}
+
 .browser-rated-rating {
     display: flex;
 }
 
 .browser-rated-rating span {
     margin-right: .25rem;
+}
+
+.browser-controls-collections {
+    margin: 1rem 0;
+}
+
+.browser-controls-collection {
+    padding: .5rem 1rem;
+    margin-left: 1rem;
+    border-radius: 2px;
+    color: #888;
+    background-color: #333;
+}
+
+.browser-controls-collection:hover {
+    background-color: #444;
+}
+
+.browser-controls-collection.-selected {
+    color: white;
+    background-color: #444;
 }
 
 .files {
