@@ -229,20 +229,16 @@ view model =
 viewCollections : Int -> List Collection -> List FilmRoll -> Html Msg
 viewCollections minimumRating collections filmRolls =
     let
+        toTuple filmRoll imageSettings =
+            ( imageSettings.id
+            , ( filmRoll.directoryPath, filmRoll.id, imageSettings )
+            )
+
         images =
             Dict.Fun.fromList Id.toInt Id.fromInt <|
                 List.concatMap
                     (\filmRoll ->
-                        List.map
-                            (\imageSettings ->
-                                ( imageSettings.id
-                                , ( filmRoll.directoryPath
-                                  , filmRoll.id
-                                  , imageSettings
-                                  )
-                                )
-                            )
-                            filmRoll.imageSettings
+                        List.map (toTuple filmRoll) filmRoll.imageSettings
                     )
                     filmRolls
     in
