@@ -13,13 +13,14 @@ import Base64
 import Browser.Dom exposing (Element)
 import Browser.Events
 import Browser.Navigation as Navigation
-import Data.Id as Id exposing (ImageSettingsId)
+import Data.Id as Id exposing (CollectionId, ImageSettingsId)
 import Data.Path as Path exposing (Filename)
 import Dict exposing (Dict)
 import Dict.Fun
 import Generated.Data as Image
     exposing
-        ( CoordinateInfo
+        ( Collection
+        , CoordinateInfo
         , Expression
         , ExpressionResult(..)
         , FilmRoll
@@ -125,6 +126,7 @@ type alias Model =
     , undoState : UndoHistory
     , processingState : ProcessingState
     , histogram : Maybe Histogram
+    , collections : List Collection
     }
 
 
@@ -152,8 +154,8 @@ type alias EditorIndex =
     Index { editor : () }
 
 
-init : FilmRoll -> ImageSettingsId -> Images -> Model
-init filmRoll imageSettingsId images =
+init : FilmRoll -> List Collection -> ImageSettingsId -> Images -> Model
+init filmRoll collections imageSettingsId images =
     let
         focussed =
             focus imageSettingsId images
@@ -179,6 +181,7 @@ init filmRoll imageSettingsId images =
     , coordinateInfo = Dict.empty
     , fullscreen = False
     , histogram = Nothing
+    , collections = collections
     }
 
 
@@ -211,6 +214,7 @@ type Msg
     = GotSaveImageSettings (HttpResult Image.FilmRoll)
     | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (Array Int))
+    | GotToggleCollection (HttpResult (List Collection))
     | RotatePreview ImageSettingsId Float
     | OnImageSettingsChange ImageSettings
     | OnExpressionValueChange EditorIndex Expression
@@ -247,6 +251,8 @@ type Msg
     | OpenExternalEditor
     | GotOpenExternalEditor (HttpResult ())
     | ToggleFullscreen
+    | AddToCollection CollectionId ImageSettingsId
+    | RemoveFromCollection CollectionId ImageSettingsId
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -268,6 +274,15 @@ update key msg model =
 
         GotGenerate type_ (Err _) ->
             pushNotification Warning RemoveNotification ("Error generating " ++ type_) model
+
+        GotToggleCollection (Ok collections) ->
+            pushNotification Normal
+                RemoveNotification
+                "Updated collection"
+                { model | collections = collections }
+
+        GotToggleCollection (Err _) ->
+            pushNotification Warning RemoveNotification "Error updating collection" model
 
         Rotate ->
             ( updateSettings
@@ -644,6 +659,22 @@ update key msg model =
         ToggleFullscreen ->
             ( { model | fullscreen = not model.fullscreen }, Cmd.none )
 
+        AddToCollection collectionId imageSettingsId ->
+            ( model
+            , Cmd.map GotToggleCollection <|
+                Request.postCollectionByCollectionIdByImageSettingsId
+                    collectionId
+                    imageSettingsId
+            )
+
+        RemoveFromCollection collectionId imageSettingsId ->
+            ( model
+            , Cmd.map GotToggleCollection <|
+                Request.deleteCollectionByCollectionIdByImageSettingsId
+                    collectionId
+                    imageSettingsId
+            )
+
 
 type Key a
     = Key Int
@@ -737,8 +768,9 @@ view model otherNotifications =
             model.imageCropMode
             model.clipboard
             model.processingState
-        , Html.Lazy.lazy4 viewSettingsRight
+        , Html.Lazy.lazy5 viewSettingsRight
             model.images
+            model.collections
             model.histogram
             model.draftExpressions
             model.processingState
@@ -869,11 +901,12 @@ viewRating settings =
 
 viewSettingsRight :
     Images
+    -> List Collection
     -> Maybe Histogram
     -> DraftExpressions
     -> ProcessingState
     -> Html Msg
-viewSettingsRight images maybeHistogram draftExpressions processingState =
+viewSettingsRight images collections maybeHistogram draftExpressions processingState =
     let
         ({ zones } as settings) =
             settingsFromState processingState images
@@ -922,7 +955,28 @@ viewSettingsRight images maybeHistogram draftExpressions processingState =
                     (Tuple.mapSecond << viewExpressionEditor draftExpressions)
                     (Reorderable.toKeyedList draftExpressions)
             ]
+        , viewSettingsGroup <|
+            [ div [ class "image-settings-collections" ] <|
+                List.map (viewToggleCollection (Zipper.current images)) collections
+            ]
         ]
+
+
+viewToggleCollection : ImageSettings -> Collection -> Html Msg
+viewToggleCollection { id } collection =
+    let
+        ( isMember, msg ) =
+            if List.member id collection.imageIds then
+                ( True, RemoveFromCollection collection.id id )
+
+            else
+                ( False, AddToCollection collection.id id )
+    in
+    button
+        [ classList [ ( "-selected", isMember ) ]
+        , onClick msg
+        ]
+        [ text collection.title ]
 
 
 viewSettingsLeft :

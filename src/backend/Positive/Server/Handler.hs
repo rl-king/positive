@@ -26,6 +26,7 @@ import qualified Graphics.Image as HIP
 import qualified Positive.CLI as CLI
 import Positive.Data.Collection (Collection)
 import Positive.Data.FilmRoll (FilmRoll)
+import Positive.Data.Id
 import Positive.Data.ImageSettings
   ( CoordinateInfo (..),
     Expression (..),
@@ -217,6 +218,22 @@ handleGetCollections :: Handler sig m => m [Collection]
 handleGetCollections = do
   logInfo @"stdout" "handler" "get collections"
   PostgreSQL.runSession Session.selectCollections
+
+handleAddToCollection ::
+  Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
+handleAddToCollection collectionId imageSettingsId = do
+  logInfo @"stdout" "handler" "add to collection"
+  PostgreSQL.runSession $ do
+    Session.insertImageToCollection collectionId imageSettingsId
+    Session.selectCollections
+
+handleRemoveFromCollection ::
+  Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
+handleRemoveFromCollection collectionId imageSettingsId = do
+  logInfo @"stdout" "handler" "remove from collection"
+  PostgreSQL.runSession $ do
+    Session.deleteImageFromCollection collectionId imageSettingsId
+    Session.selectCollections
 
 -- HANDLER HELPERS
 

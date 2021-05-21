@@ -372,6 +372,26 @@ li.-small span {
     animation: appear 1s;
 }
 
+.image-settings-collections button {
+    padding: .5rem 1rem;
+    border-radius: 2px;
+    color: #888;
+    background-color: #333;
+}
+
+.image-settings-collections button:hover {
+    background-color: #444;
+}
+
+.image-settings-collections button.-selected {
+    color: white;
+    background-color: #444;
+}
+
+.image-settings-collections button.-selected:hover {
+    background-color: #555;
+}
+
 .image-settings-left {
     position: absolute;
     top: 4rem;

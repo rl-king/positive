@@ -9,6 +9,7 @@ import Data.ByteString.Lazy (ByteString)
 import Network.HTTP.Media ((//))
 import Positive.Data.Collection
 import Positive.Data.FilmRoll
+import Positive.Data.Id
 import Positive.Data.ImageSettings
 import Positive.Prelude hiding (ByteString)
 import Servant
@@ -50,6 +51,16 @@ data SettingsApi route = SettingsApi
     getCollections ::
       route :- "collection"
         :> Get '[JSON] [Collection],
+    addToCollection ::
+      route :- "collection"
+        :> Capture "collectionId" CollectionId
+        :> Capture "imageSettingsId" ImageSettingsId
+        :> Post '[JSON] [Collection],
+    removeFromCollection ::
+      route :- "collection"
+        :> Capture "collectionId" CollectionId
+        :> Capture "imageSettingsId" ImageSettingsId
+        :> Delete '[JSON] [Collection],
     getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> ReqBody '[JSON] ImageSettings

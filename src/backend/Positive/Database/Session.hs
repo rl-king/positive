@@ -51,8 +51,8 @@ insertFilmRoll directoryPath =
    in Transaction.statement (emptyFilmRoll directoryPath) $
         Statement sql encodeNewFilmRoll decoder True
 
-insertImageToCollection :: ImageSettingsId -> CollectionId -> Session ()
-insertImageToCollection imageSettingsId collectionId =
+insertImageToCollection :: CollectionId -> ImageSettingsId -> Session ()
+insertImageToCollection collectionId imageSettingsId =
   let sql =
         "insert into positive.image_collection\
         \ (image_id, collection_id)\
@@ -65,8 +65,8 @@ insertImageToCollection imageSettingsId collectionId =
 
 -- DELETE
 
-deleteImageToCollection :: ImageSettingsId -> CollectionId -> Session ()
-deleteImageToCollection imageSettingsId collectionId =
+deleteImageFromCollection :: CollectionId -> ImageSettingsId -> Session ()
+deleteImageFromCollection collectionId imageSettingsId =
   let sql =
         "delete from positive.image_collection\
         \ where image_id = $1 and collection_id = $2"
