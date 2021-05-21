@@ -238,7 +238,9 @@ viewCollections minimumRating collections filmRolls =
             Dict.Fun.fromList Id.toInt Id.fromInt <|
                 List.concatMap
                     (\filmRoll ->
-                        List.map (toTuple filmRoll) filmRoll.imageSettings
+                        List.map (toTuple filmRoll) <|
+                            List.filter ((<=) minimumRating << .rating)
+                                filmRoll.imageSettings
                     )
                     filmRolls
     in
