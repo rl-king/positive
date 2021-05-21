@@ -76,8 +76,10 @@ type Msg
     | OnFilmRollHoverEnd
     | SetPoster (Maybe ( FilmRoll, ImageSettings ))
     | GotSaveImageSettings FilmRollId (HttpResult FilmRoll)
+    | GotToggleCollection (HttpResult (List Collection))
     | SetMinRating Int
     | SetColumnCount Int
+    | RemoveFromCollection CollectionId ImageSettingsId
 
 
 update : Browser.Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -108,6 +110,12 @@ update key msg model =
         GotSaveImageSettings _ (Err _) ->
             ( model, Cmd.none )
 
+        GotToggleCollection (Ok collections) ->
+            ( { model | collections = collections }, Cmd.none )
+
+        GotToggleCollection (Err _) ->
+            ( model, Cmd.none )
+
         SetPoster Nothing ->
             ( model, Cmd.none )
 
@@ -130,6 +138,14 @@ update key msg model =
 
         SetColumnCount scale ->
             ( { model | columns = scale }, Cmd.none )
+
+        RemoveFromCollection collectionId imageSettingsId ->
+            ( model
+            , Cmd.map GotToggleCollection <|
+                Request.deleteCollectionByCollectionIdByImageSettingsId
+                    collectionId
+                    imageSettingsId
+            )
 
 
 
@@ -255,17 +271,28 @@ viewCollection :
 viewCollection images collection =
     div [ class "browser-collection-images" ] <|
         (::) (h2 [] [ text collection.title ]) <|
-            List.map viewCollectionImage <|
+            List.map (viewCollectionImage collection.id) <|
                 List.filterMap (\id -> Dict.Fun.get id images)
                     collection.imageIds
 
 
-viewCollectionImage : ( Path.Directory, FilmRollId, ImageSettings ) -> Html Msg
-viewCollectionImage ( directoryPath, filmRollId, imageSettings ) =
-    a [ href (Route.toUrl (Route.Editor filmRollId imageSettings.id)) ]
-        [ img [ src (toPreviewUrl directoryPath imageSettings) ] []
-        , text <|
-            Path.toString imageSettings.filename
+viewCollectionImage :
+    CollectionId
+    -> ( Path.Directory, FilmRollId, ImageSettings )
+    -> Html Msg
+viewCollectionImage collectionId ( directoryPath, filmRollId, imageSettings ) =
+    div [ class "browser-collection-image" ]
+        [ a [ href (Route.toUrl (Route.Editor filmRollId imageSettings.id)) ]
+            [ img [ src (toPreviewUrl directoryPath imageSettings) ] [] ]
+        , div [ class "browser-collection-image-footer" ]
+            [ text <|
+                Path.toString imageSettings.filename
+            , button
+                [ onClick <|
+                    RemoveFromCollection collectionId imageSettings.id
+                ]
+                [ text "+" ]
+            ]
         ]
 
 

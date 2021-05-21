@@ -284,7 +284,10 @@ extractUpdates model =
             model
 
         Browser m ->
-            { model | filmRolls = mapStatus (always m.filmRolls) model.filmRolls }
+            { model
+                | filmRolls = mapStatus (always m.filmRolls) model.filmRolls
+                , collections = mapStatus (always m.collections) model.collections
+            }
 
         Editor m ->
             { model
@@ -292,6 +295,7 @@ extractUpdates model =
                     mapStatus
                         ((::) m.filmRoll << List.filter ((/=) m.filmRoll.id << .id))
                         model.filmRolls
+                , collections = mapStatus (always m.collections) model.collections
             }
 
 
