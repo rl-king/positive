@@ -762,13 +762,13 @@ view model otherNotifications =
             model.previewVersions
             model.coordinateInfo
             model.imageElement
-        , Html.Lazy.lazy5 viewSettingsLeft
+        , viewSettingsLeft
             model.images
             model.undoState
             model.imageCropMode
             model.clipboard
             model.processingState
-        , Html.Lazy.lazy5 viewSettingsRight
+        , viewSettingsRight
             model.images
             model.collections
             model.histogram
