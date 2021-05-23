@@ -4,6 +4,7 @@ module Dict.Fun exposing
     , fromList
     , get
     , insert
+    , union
     , update
     )
 
@@ -33,6 +34,11 @@ update : k -> (Maybe v -> Maybe v) -> Dict k comparable v -> Dict k comparable v
 update k h (Dict f g dict) =
     Dict f g <|
         Dict.update (f k) h dict
+
+
+union : Dict k comparable v -> Dict k comparable v -> Dict k comparable v
+union (Dict f g a) (Dict _ _ b) =
+    Dict f g (Dict.union a b)
 
 
 fromList :

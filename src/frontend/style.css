@@ -153,7 +153,7 @@ nav {
 }
 
 .browser .range-slider {
-    width: 18rem;
+    width: 15rem;
     margin-left: 1rem;
 }
 
@@ -202,9 +202,15 @@ nav {
 
 .browser-collection-images,
 .browser-rated-roll {
+    /* background-color: #333; */
     padding: .25rem 1.5rem;
     margin-bottom: 1rem;
-    background-color: #333;
+}
+
+.browser-collection-images h2,
+.browser-rated-roll h2 {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #444;
 }
 
 .browser-collection-image-footer {
@@ -235,7 +241,7 @@ nav {
 }
 
 .browser-collection-image button:hover {
-    color: red;
+    color: #ccc;
 }
 
 .browser-rated-images img {

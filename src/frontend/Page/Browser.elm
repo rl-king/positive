@@ -184,6 +184,9 @@ view model =
 
                 LT ->
                     GT
+
+        images =
+            imageLookupTable model.minimumRating model.filmRolls
     in
     main_ []
         [ section [ class "browser" ] <|
@@ -205,6 +208,7 @@ view model =
                     , viewCollectionButtons model.minimumRating
                         model.selectedCollections
                         model.collections
+                        images
                     ]
                 ]
             , case ( model.minimumRating, model.selectedCollections ) of
@@ -219,12 +223,10 @@ view model =
                             List.sortWith sorter model.filmRolls
 
                 ( n, selectedCollections ) ->
-                    viewCollections n
-                        (List.filter
+                    viewCollections n images <|
+                        List.filter
                             (\{ id } -> List.member id selectedCollections)
                             model.collections
-                        )
-                        (List.sortWith sorter model.filmRolls)
             , footer []
                 [ text "Total photos: "
                 , text <|
@@ -242,32 +244,40 @@ view model =
 -- COLLECTION
 
 
-viewCollections : Int -> List Collection -> List FilmRoll -> Html Msg
-viewCollections minimumRating collections filmRolls =
-    let
-        toTuple filmRoll imageSettings =
-            ( imageSettings.id
-            , ( filmRoll.directoryPath, filmRoll.id, imageSettings )
-            )
+type alias Images =
+    Dict.Fun.Dict ImageSettingsId Int ( Path.Directory, FilmRollId, ImageSettings )
 
-        images =
-            Dict.Fun.fromList Id.toInt Id.fromInt <|
-                List.concatMap
-                    (\filmRoll ->
-                        List.map (toTuple filmRoll) <|
-                            List.filter ((<=) minimumRating << .rating)
-                                filmRoll.imageSettings
-                    )
-                    filmRolls
+
+imageLookupTable : Int -> List FilmRoll -> Images
+imageLookupTable minimumRating =
+    let
+        empty =
+            Dict.Fun.empty Id.toInt Id.fromInt
+
+        insert filmRoll imageSettings acc =
+            if imageSettings.rating >= minimumRating then
+                Dict.Fun.insert imageSettings.id
+                    ( filmRoll.directoryPath, filmRoll.id, imageSettings )
+                    acc
+
+            else
+                acc
     in
+    List.foldr
+        (\filmRoll ->
+            Dict.Fun.union <|
+                List.foldr (insert filmRoll) empty filmRoll.imageSettings
+        )
+        empty
+
+
+viewCollections : Int -> Images -> List Collection -> Html Msg
+viewCollections minimumRating images collections =
     div [] <|
         List.map (viewCollection images) collections
 
 
-viewCollection :
-    Dict.Fun.Dict ImageSettingsId Int ( Path.Directory, FilmRollId, ImageSettings )
-    -> Collection
-    -> Html Msg
+viewCollection : Images -> Collection -> Html Msg
 viewCollection images collection =
     div [ class "browser-collection-images" ] <|
         (::) (h2 [] [ text collection.title ]) <|
@@ -296,14 +306,25 @@ viewCollectionImage collectionId ( directoryPath, filmRollId, imageSettings ) =
         ]
 
 
-viewCollectionButtons : Int -> List CollectionId -> List Collection -> Html Msg
-viewCollectionButtons minimumRating selectedCollections collections =
+viewCollectionButtons :
+    Int
+    -> List CollectionId
+    -> List Collection
+    -> Images
+    -> Html Msg
+viewCollectionButtons minimumRating selectedCollections collections images =
     div [ class "browser-controls-collections" ] <|
-        List.map (viewCollectionSelect minimumRating selectedCollections) collections
+        List.map
+            (viewCollectionSelect
+                minimumRating
+                selectedCollections
+                images
+            )
+            collections
 
 
-viewCollectionSelect : Int -> List CollectionId -> Collection -> Html Msg
-viewCollectionSelect minimumRating selectedCollections collection =
+viewCollectionSelect : Int -> List CollectionId -> Images -> Collection -> Html Msg
+viewCollectionSelect minimumRating selectedCollections images collection =
     let
         route =
             if List.member collection.id selectedCollections then
@@ -326,7 +347,15 @@ viewCollectionSelect minimumRating selectedCollections collection =
             ]
         , class "browser-controls-collection"
         ]
-        [ text collection.title ]
+        [ text <|
+            interpolate "{0} ({1})"
+                [ collection.title
+                , String.fromInt <|
+                    List.length <|
+                        List.filterMap (\id -> Dict.Fun.get id images)
+                            collection.imageIds
+                ]
+        ]
 
 
 
