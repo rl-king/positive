@@ -1,5 +1,7 @@
 module Route exposing
     ( BrowserParams
+    , Columns(..)
+    , Rating(..)
     , Route(..)
     , fromUrl
     , link
@@ -31,8 +33,17 @@ type Route
 
 type alias BrowserParams =
     { selectedCollections : List CollectionId
-    , minimumRating : Int
+    , columns : Columns
+    , minimumRating : Rating
     }
+
+
+type Columns
+    = Columns Int
+
+
+type Rating
+    = Rating Int
 
 
 fromUrl : Url -> Route
@@ -46,12 +57,13 @@ fromUrl url =
                         </> Id.fromUrl
                 , Url.Parser.map Browser <|
                     Url.Parser.top
-                        <?> Url.Parser.Query.map2 BrowserParams
+                        <?> Url.Parser.Query.map3 BrowserParams
                                 collectionIdParams
+                                columnsParam
                                 ratingParam
                 ]
     in
-    Maybe.withDefault (Browser (BrowserParams [] 0)) <|
+    Maybe.withDefault (Browser (BrowserParams [] (Columns 4) (Rating 0))) <|
         Url.Parser.parse parser url
 
 
@@ -60,21 +72,33 @@ collectionIdParams =
     Url.Parser.Query.custom "collection" (List.filterMap Id.fromString)
 
 
-ratingParam : Url.Parser.Query.Parser Int
+ratingParam : Url.Parser.Query.Parser Rating
 ratingParam =
-    Url.Parser.Query.map (Maybe.withDefault 0) <|
+    Url.Parser.Query.map (Rating << Maybe.withDefault 0) <|
         Url.Parser.Query.int "rating"
+
+
+columnsParam : Url.Parser.Query.Parser Columns
+columnsParam =
+    Url.Parser.Query.map (Columns << Maybe.withDefault 4) <|
+        Url.Parser.Query.int "columns"
 
 
 toUrl : Route -> String
 toUrl route =
     case route of
-        Browser { minimumRating, selectedCollections } ->
+        Browser { minimumRating, selectedCollections, columns } ->
+            let
+                ( Rating minimumRating_, Columns columns_ ) =
+                    ( minimumRating, columns )
+            in
             Url.Builder.absolute [] <|
                 List.concat
                     [ List.map (Url.Builder.int "collection" << Id.toInt)
                         selectedCollections
-                    , [ Url.Builder.int "rating" minimumRating ]
+                    , [ Url.Builder.int "rating" minimumRating_
+                      , Url.Builder.int "columns" columns_
+                      ]
                     ]
 
         Editor filmRollId imageSettingsId ->

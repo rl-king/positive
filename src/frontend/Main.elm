@@ -234,7 +234,10 @@ routeToPage filmRolls collections model =
     in
     case model.route of
         Route.Browser data ->
-            ( { model | page = Browser (Page.Browser.init data collections filmRolls) }
+            ( { model
+                | page =
+                    Browser (Page.Browser.init data collections filmRolls)
+              }
             , Cmd.none
             )
 
