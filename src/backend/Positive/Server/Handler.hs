@@ -158,7 +158,7 @@ handleOpenExternalEditor settings = do
   directoryPath <-
     PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
   let input = Path.append directoryPath settings.filename
-  logInfo @"stdout" "handler" $ "ppening in external editor: " <> Text.pack input
+  logInfo @"stdout" "handler" $ "opening in external editor: " <> Text.pack input
   image <-
     handleLeft
       . sendIO

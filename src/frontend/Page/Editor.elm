@@ -1010,7 +1010,7 @@ viewSettingsLeft images undoState imageCropMode clipboard_ processingState =
             , viewMaybe clipboard_ <|
                 \clipboard ->
                     div [ class "image-settings-paste" ]
-                        [ viewClipboardButton (clipboardTitle "bot" clipboard)
+                        [ viewClipboardButton (clipboardTitle "tone+crop" clipboard)
                             Icon.applyBoth
                             { clipboard | filename = settings.filename }
                         , viewClipboardButton (clipboardTitle "tone" clipboard)
@@ -1153,26 +1153,27 @@ viewExpressionEditor draftExpressions index ( expressionResult, expression ) =
 viewSampleEval : List Float -> Html Msg
 viewSampleEval offset =
     div [ class "expression-editor-sample" ] <|
-        List.map
-            (\v ->
-                span [ class "expression-editor-sample-part" ]
-                    [ span
-                        [ style "height" <|
-                            interpolate "{0}rem"
-                                [ String.fromFloat (abs (v * 2)) ]
-                        , class "expression-editor-sample-bar"
-                        ]
-                        [ span
-                            [ class "expression-editor-sample-value"
-                            , style "transform" <|
-                                interpolate "translateY(calc({0}rem + .25rem)) rotate(90deg)"
-                                    [ String.fromFloat (abs (v * 2)) ]
-                            ]
-                            [ text (String.fromFloat (threeDecimalFloat v)) ]
-                        ]
-                    ]
-            )
-            offset
+        List.map viewSampleEvalPart offset
+
+
+viewSampleEvalPart : Float -> Html Msg
+viewSampleEvalPart v =
+    span [ class "expression-editor-sample-part" ]
+        [ span
+            [ style "height" <|
+                interpolate "{0}rem"
+                    [ String.fromFloat (abs (v * 2)) ]
+            , class "expression-editor-sample-bar"
+            ]
+            [ span
+                [ class "expression-editor-sample-value"
+                , style "transform" <|
+                    interpolate "translateY(calc({0}rem + .25rem)) rotate(90deg)"
+                        [ String.fromFloat (abs (v * 2)) ]
+                ]
+                [ text (String.fromFloat (threeDecimalFloat v)) ]
+            ]
+        ]
 
 
 viewSettingsGroup : List (Html Msg) -> Html Msg
@@ -1310,7 +1311,12 @@ viewImage images filmRoll imageCropMode scale_ processingState previewVersions c
         ]
 
 
-viewCoordinate : Element -> ImageSettings -> Float -> CoordinateInfo -> ( String, Html Msg )
+viewCoordinate :
+    Element
+    -> ImageSettings
+    -> Float
+    -> CoordinateInfo
+    -> ( String, Html Msg )
 viewCoordinate { element } settings scale coordinate =
     let
         xOffset =

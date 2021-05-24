@@ -94,7 +94,11 @@ init _ url key =
       , route = Route.fromUrl url
       , page = Loading
       , key = key
-      , scrollTo = ScrollTo.init
+      , scrollTo =
+            ScrollTo.initWithSettings
+                { strength = 200
+                , dampness = 5
+                }
       , notifications = emptyNotifications
       }
     , Cmd.batch
