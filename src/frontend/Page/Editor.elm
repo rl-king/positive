@@ -62,7 +62,7 @@ port previewReady : (Int -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
-subscriptions { clipboard, imageCropMode, images } =
+subscriptions { clipboard, imageCropMode, images, collections } =
     let
         current =
             Zipper.current images
@@ -89,6 +89,8 @@ subscriptions { clipboard, imageCropMode, images } =
                     , matchKey "0" (UpdateScale 1)
                     , matchKey "f" ToggleFullscreen
                     ]
+        , ifJust (matchKey "a" << collectionSubscription current.id) <|
+            List.head (List.filter .target collections)
         , ifJust
             (always <|
                 matchKey "Escape" (UpdateImageCropMode Nothing)
@@ -102,6 +104,15 @@ subscriptions { clipboard, imageCropMode, images } =
         , previewReady (OnPreviewReady << Id.fromInt)
         , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
+
+
+collectionSubscription : ImageSettingsId -> Collection -> Msg
+collectionSubscription imageSettingsId collection =
+    if List.member imageSettingsId collection.imageIds then
+        RemoveFromCollection collection.id imageSettingsId
+
+    else
+        AddToCollection collection.id imageSettingsId
 
 
 
@@ -214,7 +225,7 @@ type Msg
     = GotSaveImageSettings (HttpResult Image.FilmRoll)
     | GotGenerate String (HttpResult ())
     | GotHistogram (HttpResult (Array Int))
-    | GotToggleCollection (HttpResult (List Collection))
+    | GotUpdateCollection (HttpResult (List Collection))
     | RotatePreview ImageSettingsId Float
     | OnImageSettingsChange ImageSettings
     | OnExpressionValueChange EditorIndex Expression
@@ -253,6 +264,7 @@ type Msg
     | ToggleFullscreen
     | AddToCollection CollectionId ImageSettingsId
     | RemoveFromCollection CollectionId ImageSettingsId
+    | SetTargetCollection CollectionId
 
 
 update : Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -275,13 +287,13 @@ update key msg model =
         GotGenerate type_ (Err _) ->
             pushNotification Warning RemoveNotification ("Error generating " ++ type_) model
 
-        GotToggleCollection (Ok collections) ->
+        GotUpdateCollection (Ok collections) ->
             pushNotification Normal
                 RemoveNotification
                 "Updated collection"
                 { model | collections = collections }
 
-        GotToggleCollection (Err _) ->
+        GotUpdateCollection (Err _) ->
             pushNotification Warning RemoveNotification "Error updating collection" model
 
         Rotate ->
@@ -661,7 +673,7 @@ update key msg model =
 
         AddToCollection collectionId imageSettingsId ->
             ( model
-            , Cmd.map GotToggleCollection <|
+            , Cmd.map GotUpdateCollection <|
                 Request.postCollectionByCollectionIdByImageSettingsId
                     collectionId
                     imageSettingsId
@@ -669,10 +681,16 @@ update key msg model =
 
         RemoveFromCollection collectionId imageSettingsId ->
             ( model
-            , Cmd.map GotToggleCollection <|
+            , Cmd.map GotUpdateCollection <|
                 Request.deleteCollectionByCollectionIdByImageSettingsId
                     collectionId
                     imageSettingsId
+            )
+
+        SetTargetCollection collectionId ->
+            ( model
+            , Cmd.map GotUpdateCollection <|
+                Request.postCollectionByCollectionId collectionId
             )
 
 
@@ -971,12 +989,25 @@ viewToggleCollection { id } collection =
 
             else
                 ( False, AddToCollection collection.id id )
+
+        title =
+            if collection.target then
+                collection.title ++ "*"
+
+            else
+                collection.title
     in
     button
         [ classList [ ( "-selected", isMember ) ]
-        , onClick msg
+        , on "click" <|
+            Decode.oneOf
+                [ withAlt <|
+                    Decode.succeed <|
+                        SetTargetCollection collection.id
+                , Decode.succeed msg
+                ]
         ]
-        [ text collection.title ]
+        [ text title ]
 
 
 viewSettingsLeft :

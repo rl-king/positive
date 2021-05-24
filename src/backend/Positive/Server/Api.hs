@@ -61,6 +61,10 @@ data SettingsApi route = SettingsApi
         :> Capture "collectionId" CollectionId
         :> Capture "imageSettingsId" ImageSettingsId
         :> Delete '[JSON] [Collection],
+    setCollectionTarget ::
+      route :- "collection"
+        :> Capture "collectionId" CollectionId
+        :> Post '[JSON] [Collection],
     getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> ReqBody '[JSON] ImageSettings

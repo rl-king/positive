@@ -58,6 +58,12 @@ alter table positive.film_roll
 add if not exists created timestamptz default now(),
 add if not exists modified timestamptz default now();
 
+alter table positive.collection
+add if not exists target boolean not null default false;
+
+create unique index on positive.collection (target)
+where target = true;
+
 -- FUN
 
 create or replace function positive.update_modified_timestamp()

@@ -78,6 +78,16 @@ deleteImageFromCollection collectionId imageSettingsId =
 
 -- UPDATE
 
+updateCollectionTarget :: CollectionId -> Transaction ()
+updateCollectionTarget collectionId =
+  let sql1 = "update positive.collection set target = false where target = true"
+      sql2 = "update positive.collection set target = true where id = $1"
+   in do
+        Transaction.statement () $
+          Statement sql1 Encode.noParams Decode.noResult True
+        Transaction.statement collectionId $
+          Statement sql2 (Id.unpack >$< param Encode.int4) Decode.noResult True
+
 updateImageSettingsList :: [ImageSettings] -> Transaction ()
 updateImageSettingsList =
   traverse_ updateImageSettings
@@ -277,6 +287,7 @@ decodeCollection =
     <*> column Decode.text
     <*> column Decode.timestamptz
     <*> column Decode.timestamptz
+    <*> column Decode.bool
     <*> column
       (fmap Id.pack <$> Decode.listArray (Decode.nonNullable Decode.int4))
 

@@ -106,6 +106,7 @@ handlers isDev chan =
               getCollections = Handler.handleGetCollections,
               addToCollection = Handler.handleAddToCollection,
               removeFromCollection = Handler.handleRemoveFromCollection,
+              setCollectionTarget = Handler.handleSetCollectionTarget,
               getSettingsHistogram = Handler.handleGetSettingsHistogram,
               generateHighRes = Handler.handleGenerateHighRes,
               openExternalEditor = Handler.handleOpenExternalEditor,

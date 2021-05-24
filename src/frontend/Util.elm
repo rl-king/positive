@@ -14,6 +14,7 @@ module Util exposing
     , viewIf
     , viewMaybe
     , viewNotifications
+    , withAlt
     , withCtrl
     )
 
@@ -156,13 +157,23 @@ matchKey key msg =
 
 
 withCtrl : Decode.Decoder a -> Decode.Decoder a
-withCtrl decoder =
-    Decode.field "ctrlKey" Decode.bool
+withCtrl =
+    withKey "ctrlKey"
+
+
+withAlt : Decode.Decoder a -> Decode.Decoder a
+withAlt =
+    withKey "altKey"
+
+
+withKey : String -> Decode.Decoder a -> Decode.Decoder a
+withKey key decoder =
+    Decode.field key Decode.bool
         |> Decode.andThen
-            (\ctrlPressed ->
-                if ctrlPressed then
+            (\keyPressed ->
+                if keyPressed then
                     decoder
 
                 else
-                    Decode.fail "No ctrl pressed"
+                    Decode.fail ("No " ++ key ++ " pressed")
             )

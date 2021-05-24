@@ -31,6 +31,7 @@ data CollectionBase t f = CollectionBase
     title :: Text,
     created :: P t f UTCTime,
     modified :: P t f UTCTime,
+    target :: Bool,
     imageIds :: [ImageSettingsId]
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
@@ -55,6 +56,7 @@ emptyCollection title =
     { id = Nothing,
       created = Nothing,
       modified = Nothing,
+      target = False,
       title = title,
       imageIds = mempty
     }

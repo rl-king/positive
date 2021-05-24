@@ -178,7 +178,7 @@ gamma x =
 zone :: Double -> Double -> MonochromePixelDouble -> MonochromePixelDouble
 zone t i =
   let m v = curve (1 - v - t)
-   in fmap (\v -> v + (m v * i))
+   in fmap (\v -> v + m v * i)
 {-# INLINE zone #-}
 
 curve :: Double -> Double
@@ -200,4 +200,4 @@ draw t i =
 zone_ :: Double -> Double -> Double -> Double
 zone_ t i v =
   let m = curve (1 - v - t)
-   in (v + (m * i))
+   in (v + m * i)

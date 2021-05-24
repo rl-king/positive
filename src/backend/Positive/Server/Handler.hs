@@ -235,6 +235,13 @@ handleRemoveFromCollection collectionId imageSettingsId = do
     Session.deleteImageFromCollection collectionId imageSettingsId
     Session.selectCollections
 
+handleSetCollectionTarget :: Handler sig m => CollectionId -> m [Collection]
+handleSetCollectionTarget collectionId = do
+  logInfo @"stdout" "handler" "set collection target"
+  PostgreSQL.runTransaction $
+    Session.updateCollectionTarget collectionId
+  PostgreSQL.runSession Session.selectCollections
+
 -- HANDLER HELPERS
 
 handleLeft :: Handler sig m => m (Either err a) -> m a
