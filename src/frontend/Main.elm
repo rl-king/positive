@@ -257,7 +257,7 @@ routeToPage filmRolls collections model =
                     ( { model
                         | page =
                             Editor <|
-                                Page.Editor.continue imageSettingsId images m
+                                Page.Editor.continue imageSettingsId m
                       }
                     , Cmd.map ScrollToMsg ScrollTo.scrollToTop
                     )

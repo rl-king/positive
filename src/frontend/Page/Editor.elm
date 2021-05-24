@@ -196,11 +196,11 @@ init filmRoll collections imageSettingsId images =
     }
 
 
-continue : ImageSettingsId -> Images -> Model -> Model
-continue imageSettingsId images model =
+continue : ImageSettingsId -> Model -> Model
+continue imageSettingsId model =
     let
         focussed =
-            focus imageSettingsId images
+            focus imageSettingsId model.images
     in
     { model
         | processingState = ProcessingState.preview
