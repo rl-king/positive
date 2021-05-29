@@ -6,7 +6,9 @@ module Util exposing
     , Status(..)
     , appendNotifications
     , choice
+    , decodeDate
     , emptyNotifications
+    , encodeDate
     , matchKey
     , mergeStatus
     , pushNotification
@@ -18,10 +20,12 @@ module Util exposing
     , withCtrl
     )
 
+import Date exposing (Date)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
 import Json.Decode as Decode
+import Json.Encode as Encode
 import Process
 import Task
 
@@ -177,3 +181,22 @@ withKey key decoder =
                 else
                     Decode.fail ("No " ++ key ++ " pressed")
             )
+
+
+decodeDate : Decode.Decoder Date
+decodeDate =
+    let
+        toDate s =
+            case Date.fromIsoString s of
+                Ok date ->
+                    Decode.succeed date
+
+                Err err ->
+                    Decode.fail err
+    in
+    Decode.andThen toDate Decode.string
+
+
+encodeDate : Date -> Encode.Value
+encodeDate =
+    Encode.string << Date.toIsoString

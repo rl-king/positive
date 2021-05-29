@@ -45,6 +45,7 @@ import Data.Proxy as X (Proxy (..))
 import Data.String as X (IsString, fromString)
 import Data.Text as X (Text, pack)
 import Data.Text.Encoding as X (decodeUtf8, encodeUtf8)
+import Data.Time.Calendar as X (Day)
 import Data.Time.Clock as X (UTCTime)
 import Data.Traversable as X (for)
 import Data.Vector as X (Vector)
@@ -57,7 +58,7 @@ import GHC.TypeLits as X (KnownSymbol, Symbol, symbolVal)
 import Numeric.Natural as X (Natural)
 import System.Log.FastLogger as X (TimedFastLogger)
 import Text.Read as X (readMaybe)
-import Prelude as X hiding (id, log, undefined)
+import Prelude as X hiding (id, log)
 
 identity :: a -> a
 identity x = x

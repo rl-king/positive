@@ -63,7 +63,7 @@ fromUrl url =
                                 ratingParam
                 ]
     in
-    Maybe.withDefault (Browser (BrowserParams [] (Columns 4) (Rating 0))) <|
+    Maybe.withDefault (Browser (BrowserParams [] (Columns 6) (Rating 0))) <|
         Url.Parser.parse parser url
 
 
@@ -80,7 +80,7 @@ ratingParam =
 
 columnsParam : Url.Parser.Query.Parser Columns
 columnsParam =
-    Url.Parser.Query.map (Columns << Maybe.withDefault 4) <|
+    Url.Parser.Query.map (Columns << Maybe.withDefault 6) <|
         Url.Parser.Query.int "columns"
 
 

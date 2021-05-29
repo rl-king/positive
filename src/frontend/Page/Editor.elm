@@ -72,6 +72,11 @@ subscriptions { clipboard, imageCropMode, images, collections } =
     in
     Sub.batch
         [ Browser.Events.onKeyDown <|
+            Decode.oneOf
+                [ matchKey "ArrowLeft" PreviousImage
+                , matchKey "ArrowRight" NextImage
+                ]
+        , Browser.Events.onKeyDown <|
             withCtrl <|
                 Decode.oneOf
                     [ matchKey "s" SaveSettings
@@ -990,7 +995,7 @@ viewToggleCollection { id } collection =
             else
                 ( False, AddToCollection collection.id id )
 
-        title =
+        content =
             if collection.target then
                 collection.title ++ "*"
 
@@ -999,6 +1004,7 @@ viewToggleCollection { id } collection =
     in
     button
         [ classList [ ( "-selected", isMember ) ]
+        , title "Alt click to select, 'ctrl + a' to add"
         , on "click" <|
             Decode.oneOf
                 [ withAlt <|
@@ -1007,7 +1013,7 @@ viewToggleCollection { id } collection =
                 , Decode.succeed msg
                 ]
         ]
-        [ text title ]
+        [ text content ]
 
 
 viewSettingsLeft :

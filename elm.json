@@ -14,6 +14,7 @@
             "elm/json": "1.1.3",
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
+            "justinmimbs/date": "3.2.1",
             "lukewestby/elm-string-interpolate": "1.0.4",
             "rl-king/elm-index": "1.0.0",
             "rl-king/elm-scroll-to": "1.1.1",

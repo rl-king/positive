@@ -8,6 +8,7 @@ module Positive.Database.Session where
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
+import Data.Time.Calendar
 import qualified Hasql.Connection
 import qualified Hasql.Decoders as Decode
 import qualified Hasql.Encoders as Encode
@@ -128,6 +129,15 @@ updatePoster imageSettingsId filmRollId =
         (fmap Id.unpack . fst >$< nullableParam Encode.int4)
           <> (Id.unpack . snd >$< param Encode.int4)
    in Session.statement (imageSettingsId, filmRollId) $
+        Statement sql encoder Decode.noResult True
+
+updateDevelopedOn :: DevelopedOn -> FilmRollId -> Session ()
+updateDevelopedOn developedOn filmRollId =
+  let sql = "update positive.film_roll set developed_on = $1 where id = $2"
+      encoder =
+        (unDevelopedOn . fst >$< param Encode.date)
+          <> (Id.unpack . snd >$< param Encode.int4)
+   in Session.statement (developedOn, filmRollId) $
         Statement sql encoder Decode.noResult True
 
 -- SELECT
@@ -278,6 +288,7 @@ decodeFilmRoll =
     <*> column (Path.pack <$> Decode.text)
     <*> column Decode.timestamptz
     <*> column Decode.timestamptz
+    <*> fmap DevelopedOn (column Decode.date)
     <*> fmap pure decodeImageSettings
 
 decodeCollection :: Decode.Row Collection
@@ -347,10 +358,29 @@ jsonb =
     (first Text.pack . Aeson.parseEither Aeson.parseJSON)
     Decode.jsonb
 
--- HELPER
+-- HELPERS
 
 rundb :: Session a -> IO (Either Session.QueryError a)
 rundb session = do
   Right conn <-
     Hasql.Connection.acquire "host=localhost port=5432 dbname=positive"
   Session.run session conn
+
+addDates :: IO ()
+addDates = do
+  result <- rundb $ do
+    all <- selectFilmRolls
+    for_ all $ \filmRoll -> do
+      case extractDayFromDir $ Path.toFilePath filmRoll.directoryPath of
+        Nothing -> pure ()
+        Just day -> updateDevelopedOn (DevelopedOn day) filmRoll.id
+  print result
+
+extractDayFromDir :: String -> Maybe Day
+extractDayFromDir (y1 : y2 : y3 : y4 : '-' : m1 : m2 : '-' : d1 : d2 : _) = do
+  y <- readMaybe [y1, y2, y3, y4]
+  m <- readMaybe [m1, m2]
+  d <- readMaybe [d1, d2]
+  pure $ fromGregorian y m d
+extractDayFromDir (_ : xs) = extractDayFromDir xs
+extractDayFromDir _ = Nothing

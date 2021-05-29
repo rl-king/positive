@@ -11,6 +11,7 @@ import Browser.Events
 import Browser.Navigation
 import Data.Id as Id exposing (CollectionId, FilmRollId, ImageSettingsId)
 import Data.Path as Path
+import Date
 import Dict.Fun
 import Generated.Data exposing (Collection, FilmRoll, ImageSettings)
 import Generated.Request as Request
@@ -164,27 +165,11 @@ update key msg model =
 view : Model -> Html Msg
 view model =
     let
-        firstNumber =
-            List.head
-                << List.filterMap String.toInt
-                << String.words
-                << String.concat
-                << List.take 1
-                << List.reverse
-                << String.split "/"
-                << Path.toString
-
         sorter a b =
-            case Maybe.map2 Tuple.pair (firstNumber a.directoryPath) (firstNumber b.directoryPath) of
-                Just ( x, y ) ->
-                    down x y
+            desc (Date.compare a.developedOn b.developedOn)
 
-                Nothing ->
-                    down (Path.toString a.directoryPath)
-                        (Path.toString b.directoryPath)
-
-        down a b =
-            case compare a b of
+        desc x =
+            case x of
                 GT ->
                     LT
 
@@ -341,7 +326,13 @@ viewCollectionButtons minimumRating columns selectedCollections collections imag
             collections
 
 
-viewCollectionSelect : Rating -> Columns -> List CollectionId -> Images -> Collection -> Html Msg
+viewCollectionSelect :
+    Rating
+    -> Columns
+    -> List CollectionId
+    -> Images
+    -> Collection
+    -> Html Msg
 viewCollectionSelect minimumRating columns selectedCollections images collection =
     let
         route =

@@ -56,7 +56,8 @@ add if not exists film_roll_id integer references positive.film_roll(id);
 
 alter table positive.film_roll
 add if not exists created timestamptz default now(),
-add if not exists modified timestamptz default now();
+add if not exists modified timestamptz default now(),
+add if not exists developed_on date default current_date;
 
 alter table positive.collection
 add if not exists target boolean not null default false;
