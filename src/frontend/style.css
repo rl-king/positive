@@ -157,14 +157,21 @@ nav {
     margin-left: 1rem;
 }
 
+.browser-filmrolls-year > h2 {
+    border-bottom: 1px solid #444;
+}
+
 .browser-filmrolls {
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
 }
 
 .browser-filmroll-small h2 {
     font-size: .875rem;
+}
+
+.browser-filmroll {
+    margin-right: 1rem;
 }
 
 .browser-filmroll a {

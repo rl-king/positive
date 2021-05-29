@@ -12,6 +12,7 @@ import Browser.Navigation
 import Data.Id as Id exposing (CollectionId, FilmRollId, ImageSettingsId)
 import Data.Path as Path
 import Date
+import Dict
 import Dict.Fun
 import Generated.Data exposing (Collection, FilmRoll, ImageSettings)
 import Generated.Request as Request
@@ -165,20 +166,6 @@ update key msg model =
 view : Model -> Html Msg
 view model =
     let
-        sorter a b =
-            desc (Date.compare a.developedOn b.developedOn)
-
-        desc x =
-            case x of
-                GT ->
-                    LT
-
-                EQ ->
-                    EQ
-
-                LT ->
-                    GT
-
         images =
             imageLookupTable model.minimumRating model.filmRolls
 
@@ -211,14 +198,15 @@ view model =
                 ]
             , case ( model.minimumRating, model.selectedCollections ) of
                 ( Rating 0, [] ) ->
-                    div [ class "browser-filmrolls" ] <|
-                        List.map (viewFilmRollBrowserRoll model.columns model.filmRollHover) <|
-                            List.sortWith sorter model.filmRolls
+                    div [] <|
+                        List.map (viewFilmRollBrowserYear model.columns model.filmRollHover) <|
+                            groupByYear
+                                model.filmRolls
 
                 ( n, [] ) ->
                     div [ class "browser-rated" ] <|
                         List.map (viewFiltered n model.columns) <|
-                            List.sortWith sorter model.filmRolls
+                            sortByDateDesc model.filmRolls
 
                 ( n, selectedCollections ) ->
                     viewCollections model.columns images <|
@@ -413,6 +401,19 @@ viewRatedImage columns filmRoll imageSettings =
 -- ROLLS
 
 
+viewFilmRollBrowserYear :
+    Columns
+    -> Maybe ( FilmRoll, Float )
+    -> ( Int, List FilmRoll )
+    -> Html Msg
+viewFilmRollBrowserYear columns filmRollHover ( year, filmRolls ) =
+    div [ class "browser-filmrolls-year" ]
+        [ h2 [] [ text (String.fromInt year) ]
+        , div [ class "browser-filmrolls" ] <|
+            List.map (viewFilmRollBrowserRoll columns filmRollHover) filmRolls
+        ]
+
+
 viewFilmRollBrowserRoll :
     Columns
     -> Maybe ( FilmRoll, Float )
@@ -528,3 +529,28 @@ focusWithOffset offset filmRoll =
         filmRoll.imageSettings
         |> List.head
         |> Maybe.map (\imageSettings -> ( filmRoll, imageSettings ))
+
+
+groupByYear : List FilmRoll -> List ( Int, List FilmRoll )
+groupByYear filmRolls =
+    let
+        insert filmRoll =
+            Dict.update (Date.year filmRoll.developedOn)
+                (\maybeFilmRolls ->
+                    case maybeFilmRolls of
+                        Nothing ->
+                            Just [ filmRoll ]
+
+                        Just filmRolls_ ->
+                            Just (sortByDateDesc (filmRoll :: filmRolls_))
+                )
+    in
+    List.reverse <|
+        List.sortBy Tuple.first <|
+            Dict.toList <|
+                List.foldl insert Dict.empty filmRolls
+
+
+sortByDateDesc : List FilmRoll -> List FilmRoll
+sortByDateDesc =
+    List.reverse << List.sortWith (\a b -> Date.compare a.developedOn b.developedOn)
