@@ -11,7 +11,7 @@ import Browser.Events
 import Browser.Navigation
 import Data.Id as Id exposing (CollectionId, FilmRollId, ImageSettingsId)
 import Data.Path as Path
-import Date
+import Date exposing (Date)
 import Dict
 import Dict.Fun
 import Generated.Data exposing (Collection, FilmRoll, ImageSettings)
@@ -200,13 +200,14 @@ view model =
                 ( Rating 0, [] ) ->
                     div [] <|
                         List.map (viewFilmRollBrowserYear model.columns model.filmRollHover) <|
-                            groupByYear
-                                model.filmRolls
+                            List.reverse <|
+                                List.sortBy Tuple.first <|
+                                    groupBy (Date.year << .developedOn) model.filmRolls
 
                 ( n, [] ) ->
                     div [ class "browser-rated" ] <|
                         List.map (viewFiltered n model.columns) <|
-                            sortByDateDesc model.filmRolls
+                            sortByDesc .developedOn model.filmRolls
 
                 ( n, selectedCollections ) ->
                     viewCollections model.columns images <|
@@ -531,26 +532,25 @@ focusWithOffset offset filmRoll =
         |> Maybe.map (\imageSettings -> ( filmRoll, imageSettings ))
 
 
-groupByYear : List FilmRoll -> List ( Int, List FilmRoll )
-groupByYear filmRolls =
+groupBy : (a -> comparable) -> List a -> List ( comparable, List a )
+groupBy f xs =
     let
-        insert filmRoll =
-            Dict.update (Date.year filmRoll.developedOn)
-                (\maybeFilmRolls ->
-                    case maybeFilmRolls of
+        insert x =
+            Dict.update (f x)
+                (\ys ->
+                    case ys of
                         Nothing ->
-                            Just [ filmRoll ]
+                            Just [ x ]
 
-                        Just filmRolls_ ->
-                            Just (sortByDateDesc (filmRoll :: filmRolls_))
+                        Just y ->
+                            Just (x :: y)
                 )
     in
-    List.reverse <|
-        List.sortBy Tuple.first <|
-            Dict.toList <|
-                List.foldl insert Dict.empty filmRolls
+    Dict.toList <|
+        List.foldl insert Dict.empty xs
 
 
-sortByDateDesc : List FilmRoll -> List FilmRoll
-sortByDateDesc =
-    List.reverse << List.sortWith (\a b -> Date.compare a.developedOn b.developedOn)
+sortByDesc : (a -> Date) -> List a -> List a
+sortByDesc f =
+    List.reverse
+        << List.sortWith (\a b -> Date.compare (f a) (f b))
