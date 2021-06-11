@@ -530,27 +530,3 @@ focusWithOffset offset filmRoll =
         filmRoll.imageSettings
         |> List.head
         |> Maybe.map (\imageSettings -> ( filmRoll, imageSettings ))
-
-
-groupBy : (a -> comparable) -> List a -> List ( comparable, List a )
-groupBy f xs =
-    let
-        insert x =
-            Dict.update (f x)
-                (\ys ->
-                    case ys of
-                        Nothing ->
-                            Just [ x ]
-
-                        Just y ->
-                            Just (x :: y)
-                )
-    in
-    Dict.toList <|
-        List.foldl insert Dict.empty xs
-
-
-sortByDesc : (a -> Date) -> List a -> List a
-sortByDesc f =
-    List.reverse
-        << List.sortWith (\a b -> Date.compare (f a) (f b))

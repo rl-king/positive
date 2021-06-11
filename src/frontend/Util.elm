@@ -9,10 +9,12 @@ module Util exposing
     , decodeDate
     , emptyNotifications
     , encodeDate
+    , groupBy
     , matchKey
     , mergeStatus
     , pushNotification
     , removeNotification
+    , sortByDesc
     , viewIf
     , viewMaybe
     , viewNotifications
@@ -21,6 +23,7 @@ module Util exposing
     )
 
 import Date exposing (Date)
+import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
@@ -200,3 +203,27 @@ decodeDate =
 encodeDate : Date -> Encode.Value
 encodeDate =
     Encode.string << Date.toIsoString
+
+
+groupBy : (a -> comparable) -> List a -> List ( comparable, List a )
+groupBy f xs =
+    let
+        insert x =
+            Dict.update (f x)
+                (\ys ->
+                    case ys of
+                        Nothing ->
+                            Just [ x ]
+
+                        Just y ->
+                            Just (x :: y)
+                )
+    in
+    Dict.toList <|
+        List.foldl insert Dict.empty xs
+
+
+sortByDesc : (a -> Date) -> List a -> List a
+sortByDesc f =
+    List.reverse
+        << List.sortWith (\a b -> Date.compare (f a) (f b))
