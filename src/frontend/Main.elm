@@ -1,7 +1,9 @@
 port module Main exposing (main)
 
 import Browser
+import Browser.Events
 import Browser.Navigation as Navigation
+import Data.Id as Id exposing (FilmRollId)
 import Data.Path as Path
 import Generated.Data exposing (Collection, FilmRoll)
 import Generated.Request as Request
@@ -9,7 +11,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Decode
-import List.Zipper as Zipper
+import List.Zipper as Zipper exposing (Zipper)
 import Page.Browser
 import Page.Editor
 import Route exposing (Route)
@@ -50,6 +52,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ serverMessage OnServerMessage
+        , globalNavSubscription model.filmRolls model.route
         , Sub.map ScrollToMsg <|
             ScrollTo.subscriptions model.scrollTo
         , case model.page of
@@ -64,6 +67,23 @@ subscriptions model =
             Loading ->
                 Sub.none
         ]
+
+
+globalNavSubscription : Status (List FilmRoll) -> Route -> Sub Msg
+globalNavSubscription status route =
+    case ( status, route ) of
+        ( Success filmRolls, Route.Editor filmRollId _ ) ->
+            Browser.Events.onKeyDown <|
+                withCtrl <|
+                    Decode.oneOf
+                        [ matchKey "p" <|
+                            PreviousFilmRoll filmRollId filmRolls
+                        , matchKey "n" <|
+                            NextFilmRoll filmRollId filmRolls
+                        ]
+
+        _ ->
+            Sub.none
 
 
 
@@ -123,6 +143,8 @@ type Msg
     | OnServerMessage String
     | EditorMsg Page.Editor.Msg
     | BrowserMsg Page.Browser.Msg
+    | PreviousFilmRoll FilmRollId (List FilmRoll)
+    | NextFilmRoll FilmRollId (List FilmRoll)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -202,6 +224,58 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        PreviousFilmRoll currentFilmRollId filmRolls ->
+            ( model
+            , moveAndSelect model.key Zipper.previous currentFilmRollId filmRolls
+            )
+
+        NextFilmRoll currentFilmRollId filmRolls ->
+            ( model
+            , moveAndSelect model.key Zipper.next currentFilmRollId filmRolls
+            )
+
+
+
+-- GLOBAL NAV
+
+
+moveAndSelect :
+    Navigation.Key
+    -> (Zipper FilmRoll -> Maybe (Zipper FilmRoll))
+    -> FilmRollId
+    -> List FilmRoll
+    -> Cmd Msg
+moveAndSelect key f currentFilmRollId filmRolls =
+    let
+        withFirstImageId filmRoll =
+            List.head (List.sortBy (Path.toString << .filename) filmRoll.imageSettings)
+                |> Maybe.map (Tuple.pair filmRoll.id << .id)
+
+        selected =
+            sortByDesc .developedOn filmRolls
+                |> move f ((==) currentFilmRollId << .id)
+                |> Maybe.andThen withFirstImageId
+    in
+    case selected of
+        Nothing ->
+            Cmd.none
+
+        Just ( filmRollId, imageSettingsId ) ->
+            Navigation.pushUrl key <|
+                Route.toUrl (Route.Editor filmRollId imageSettingsId)
+
+
+move : (Zipper a -> Maybe (Zipper a)) -> (a -> Bool) -> List a -> Maybe a
+move f pred xs =
+    Zipper.fromList xs
+        |> Maybe.andThen (Zipper.findFirst pred)
+        |> Maybe.andThen f
+        |> Maybe.map Zipper.current
+
+
+
+-- NAV
+
 
 mapPage : Model -> (a -> Page) -> (msg -> Msg) -> ( a, Cmd msg ) -> ( Model, Cmd Msg )
 mapPage model toPage toMsg ( page, cmds ) =
@@ -254,13 +328,26 @@ routeToPage filmRolls collections model =
                         model
 
                 ( Just ( filmRoll, images ), Editor m ) ->
-                    ( { model
-                        | page =
-                            Editor <|
-                                Page.Editor.continue imageSettingsId m
-                      }
-                    , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                    )
+                    if filmRoll.id == m.filmRoll.id then
+                        ( { model
+                            | page =
+                                Editor <|
+                                    Page.Editor.continue imageSettingsId m
+                          }
+                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                        )
+
+                    else
+                        ( { model
+                            | page =
+                                Editor <|
+                                    Page.Editor.init filmRoll
+                                        collections
+                                        imageSettingsId
+                                        images
+                          }
+                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+                        )
 
                 ( Just ( filmRoll, images ), _ ) ->
                     ( { model
@@ -297,11 +384,16 @@ extractUpdates model =
             }
 
         Editor m ->
+            let
+                replace oldFilmRoll =
+                    if oldFilmRoll.id == m.filmRoll.id then
+                        m.filmRoll
+
+                    else
+                        oldFilmRoll
+            in
             { model
-                | filmRolls =
-                    mapStatus
-                        ((::) m.filmRoll << List.filter ((/=) m.filmRoll.id << .id))
-                        model.filmRolls
+                | filmRolls = mapStatus (List.map replace) model.filmRolls
                 , collections = mapStatus (always m.collections) model.collections
             }
 
