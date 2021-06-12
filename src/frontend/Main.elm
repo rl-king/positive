@@ -441,6 +441,7 @@ view model =
                     Page.Browser.view m
                 , viewCancelScroll model.scrollTo
                 , viewNotifications model.notifications
+                , viewShortcuts
                 ]
             }
 
@@ -452,6 +453,7 @@ view model =
                 [ Html.map EditorMsg <|
                     Page.Editor.view m model.notifications
                 , viewCancelScroll model.scrollTo
+                , viewShortcuts
                 ]
             }
 
@@ -471,3 +473,43 @@ viewCancelScroll scrollTo =
                 , class "scroll-cancel-overlay"
                 ]
                 []
+
+
+viewShortcuts : Html msg
+viewShortcuts =
+    let
+        ctrl =
+            (++) "ctrl + "
+    in
+    div [ class "shortcuts" ] <|
+        [ h4 [] [ text "Browser" ]
+        , dl [] <|
+            List.map viewDef
+                [ ( "p", "set poster on hover" ) ]
+        , h4 [] [ text "Editor" ]
+        , dl [] <|
+            List.map viewDef
+                [ ( "←", "previous image" )
+                , ( "→", "next image" )
+                , ( ctrl "p", "previous filmroll" )
+                , ( ctrl "n", "next filmroll" )
+                , ( ctrl "s", "save settings" )
+                , ( ctrl "u", "undo" )
+                , ( ctrl "c", "copy settings" )
+                , ( ctrl "r", "rotate" )
+                , ( ctrl "f", "toggle fullscreen" )
+                , ( ctrl "0", "reset zoom" )
+                , ( ctrl "8", "zoom to 80%" )
+                , ( ctrl "7", "zoom to 70%" )
+                , ( ctrl "6", "zoom to 60%" )
+                , ( ctrl "5", "zoom to 50%" )
+                , ( ctrl "4", "zoom to 40%" )
+                , ( ctrl "3", "zoom to 30%" )
+                ]
+        ]
+
+
+viewDef : ( String, String ) -> Html msg
+viewDef ( title, content ) =
+    div [ class "shortcuts-def" ]
+        [ dt [] [ text title ], dd [] [ text content ] ]

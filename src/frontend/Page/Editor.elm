@@ -83,8 +83,6 @@ subscriptions { clipboard, imageCropMode, images, collections } =
                     , matchKey "u" Undo
                     , matchKey "c" (CopySettings (Just current))
                     , matchKey "r" Rotate
-                    , matchKey "h" PreviousImage
-                    , matchKey "l" NextImage
                     , matchKey "3" (UpdateScale 0.3)
                     , matchKey "4" (UpdateScale 0.4)
                     , matchKey "5" (UpdateScale 0.5)
