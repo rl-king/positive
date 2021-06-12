@@ -480,6 +480,9 @@ viewShortcuts =
     let
         ctrl =
             (++) "ctrl + "
+
+        alt =
+            (++) "ctrl + "
     in
     div [ class "shortcuts" ] <|
         [ h4 [] [ text "Browser" ]
@@ -489,8 +492,8 @@ viewShortcuts =
         , h4 [] [ text "Editor" ]
         , dl [] <|
             List.map viewDef
-                [ ( "←", "previous image" )
-                , ( "→", "next image" )
+                [ ( alt "←", "previous image" )
+                , ( alt "→", "next image" )
                 , ( "a", "add to target collection" )
                 , ( "r", "remove from target collection" )
                 , ( ctrl "p", "previous filmroll" )

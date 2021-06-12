@@ -11,6 +11,7 @@ module Util exposing
     , encodeDate
     , groupBy
     , matchKey
+    , matchKeyNoModifiers
     , mergeStatus
     , pushNotification
     , removeNotification
@@ -153,17 +154,43 @@ viewMaybe maybe html =
             text ""
 
 
+
+-- KEYS
+
+
 matchKey : String -> msg -> Decode.Decoder msg
 matchKey key msg =
-    Decode.field "key" Decode.string
+    decodeKey key
         |> Decode.andThen
-            (\s ->
-                if key == s then
+            (\k ->
+                if key == k.key then
                     Decode.succeed msg
 
                 else
                     Decode.fail "Not an match"
             )
+
+
+matchKeyNoModifiers : String -> msg -> Decode.Decoder msg
+matchKeyNoModifiers key msg =
+    decodeKey key
+        |> Decode.andThen
+            (\k ->
+                if key == k.key && not k.ctrl && not k.alt then
+                    Decode.succeed msg
+
+                else
+                    Decode.fail "Not an match"
+            )
+
+
+decodeKey : String -> Decode.Decoder { alt : Bool, ctrl : Bool, key : String }
+decodeKey key =
+    Decode.map3
+        (\a b c -> { key = a, ctrl = b, alt = c })
+        (Decode.field "key" Decode.string)
+        (Decode.field "ctrlKey" Decode.bool)
+        (Decode.field "altKey" Decode.bool)
 
 
 withCtrl : Decode.Decoder a -> Decode.Decoder a

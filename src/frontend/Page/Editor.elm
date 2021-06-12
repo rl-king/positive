@@ -94,9 +94,9 @@ subscriptions { clipboard, imageCropMode, images, collections } =
                     , matchKey "0" (UpdateScale 1)
                     , matchKey "f" ToggleFullscreen
                     ]
-        , ifJust (matchKey "a" << AddToCollection current.id << .id) <|
+        , ifJust (matchKeyNoModifiers "a" << AddToCollection current.id << .id) <|
             List.head (List.filter .target collections)
-        , ifJust (matchKey "r" << RemoveFromCollection current.id << .id) <|
+        , ifJust (matchKeyNoModifiers "r" << RemoveFromCollection current.id << .id) <|
             List.head (List.filter .target collections)
         , ifJust
             (always <|

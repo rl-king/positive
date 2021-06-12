@@ -912,12 +912,11 @@ img {
 .notifications span {
     padding: .25rem 1rem .25rem 1.5rem;
     margin: .25rem 0;
-    opacity: .5;
     display: block;
     position: relative;
     border-radius: 2px;
     font-size: .875rem;
-    background-color: #333;
+    background-color: rgba(24,24,24,0.25);
     animation: slideup .35s;
 }
 
