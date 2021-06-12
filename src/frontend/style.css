@@ -461,6 +461,13 @@ li.-small span {
     background-color: #555;
 }
 
+.image-settings-info {
+    padding-top: .5rem;
+    padding-left: .25rem;
+    border-top: 1px solid #444;
+    color: #999;
+}
+
 .image-settings-left {
     position: absolute;
     top: 4rem;

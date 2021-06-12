@@ -1,6 +1,8 @@
 module Data.Path exposing
     ( Directory
     , Filename
+    , Path
+    , compare
     , fromJson
     , toJson
     , toString
@@ -33,6 +35,11 @@ type alias Directory =
 toString : Path a -> String
 toString (Path a) =
     a
+
+
+compare : Path a -> Path b -> Order
+compare (Path a) (Path b) =
+    Basics.compare a b
 
 
 fromJson : Decode.Decoder (Path a)

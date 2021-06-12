@@ -202,12 +202,13 @@ view model =
                         List.map (viewFilmRollBrowserYear model.columns model.filmRollHover) <|
                             List.reverse <|
                                 List.sortBy Tuple.first <|
-                                    groupBy (Date.year << .developedOn) model.filmRolls
+                                    List.map (Tuple.mapSecond (sortByPathDesc .directoryPath)) <|
+                                        groupBy (Date.year << .developedOn) model.filmRolls
 
                 ( n, [] ) ->
                     div [ class "browser-rated" ] <|
                         List.map (viewFiltered n model.columns) <|
-                            sortByDesc .developedOn model.filmRolls
+                            sortByDateDesc .developedOn model.filmRolls
 
                 ( n, selectedCollections ) ->
                     viewCollections model.columns images <|

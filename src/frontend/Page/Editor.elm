@@ -15,6 +15,7 @@ import Browser.Events
 import Browser.Navigation as Navigation
 import Data.Id as Id exposing (CollectionId, ImageSettingsId)
 import Data.Path as Path exposing (Filename)
+import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Fun
 import Generated.Data as Image
@@ -795,6 +796,7 @@ view model otherNotifications =
             model.histogram
             model.draftExpressions
             model.processingState
+            model.filmRoll.developedOn
         , Html.Lazy.lazy5 viewFiles
             model.filmRoll
             model.previewColumns
@@ -815,10 +817,6 @@ viewNav filmRoll images =
         [ a [ href "/" ] [ text "browser" ]
         , text <|
             Path.toString filmRoll.directoryPath
-        , text "/"
-        , text <|
-            (Path.toString << .filename) <|
-                Zipper.current images
         ]
 
 
@@ -926,8 +924,9 @@ viewSettingsRight :
     -> Maybe Histogram
     -> DraftExpressions
     -> ProcessingState
+    -> Date
     -> Html Msg
-viewSettingsRight images collections maybeHistogram draftExpressions processingState =
+viewSettingsRight images collections maybeHistogram draftExpressions processingState developedOn =
     let
         ({ zones } as settings) =
             settingsFromState processingState images
@@ -980,6 +979,20 @@ viewSettingsRight images collections maybeHistogram draftExpressions processingS
             [ div [ class "image-settings-collections" ] <|
                 List.map (viewToggleCollection (Zipper.current images)) collections
             ]
+        , viewSettingsGroup
+            [ div [ class "image-settings-info" ]
+                [ text "Filename : "
+                , text <|
+                    Path.toString <|
+                        .filename (Zipper.current images)
+                , br [] []
+                , text "Developed on: "
+                , time []
+                    [ text <|
+                        Date.format "y-MM-dd" developedOn
+                    ]
+                ]
+            ]
         ]
 
 
@@ -1002,7 +1015,7 @@ viewToggleCollection { id } collection =
     in
     button
         [ classList [ ( "-selected", isMember ) ]
-        , title "Alt click to select, 'ctrl + a' to add"
+        , title "'alt + click' to set as target, 'ctrl + a' to add"
         , on "click" <|
             Decode.oneOf
                 [ withAlt <|

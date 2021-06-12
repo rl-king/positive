@@ -14,7 +14,8 @@ module Util exposing
     , mergeStatus
     , pushNotification
     , removeNotification
-    , sortByDesc
+    , sortByDateDesc
+    , sortByPathDesc
     , viewIf
     , viewMaybe
     , viewNotifications
@@ -22,6 +23,7 @@ module Util exposing
     , withCtrl
     )
 
+import Data.Path as Path exposing (Path)
 import Date exposing (Date)
 import Dict
 import Html exposing (..)
@@ -223,7 +225,13 @@ groupBy f xs =
         List.foldl insert Dict.empty xs
 
 
-sortByDesc : (a -> Date) -> List a -> List a
-sortByDesc f =
+sortByDateDesc : (a -> Date) -> List a -> List a
+sortByDateDesc f =
     List.reverse
         << List.sortWith (\a b -> Date.compare (f a) (f b))
+
+
+sortByPathDesc : (a -> Path b) -> List a -> List a
+sortByPathDesc f =
+    List.reverse
+        << List.sortWith (\a b -> Path.compare (f a) (f b))

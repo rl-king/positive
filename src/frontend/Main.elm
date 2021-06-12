@@ -252,7 +252,7 @@ moveAndSelect key f currentFilmRollId filmRolls =
                 |> Maybe.map (Tuple.pair filmRoll.id << .id)
 
         selected =
-            sortByDesc .developedOn filmRolls
+            sortByDateDesc .developedOn filmRolls
                 |> move f ((==) currentFilmRollId << .id)
                 |> Maybe.andThen withFirstImageId
     in
