@@ -73,10 +73,11 @@ subscriptions { clipboard, imageCropMode, images, collections } =
     in
     Sub.batch
         [ Browser.Events.onKeyDown <|
-            Decode.oneOf
-                [ matchKey "ArrowLeft" PreviousImage
-                , matchKey "ArrowRight" NextImage
-                ]
+            withAlt <|
+                Decode.oneOf
+                    [ matchKey "ArrowLeft" PreviousImage
+                    , matchKey "ArrowRight" NextImage
+                    ]
         , Browser.Events.onKeyDown <|
             withCtrl <|
                 Decode.oneOf
@@ -93,7 +94,9 @@ subscriptions { clipboard, imageCropMode, images, collections } =
                     , matchKey "0" (UpdateScale 1)
                     , matchKey "f" ToggleFullscreen
                     ]
-        , ifJust (matchKey "a" << collectionSubscription current.id) <|
+        , ifJust (matchKey "a" << AddToCollection current.id << .id) <|
+            List.head (List.filter .target collections)
+        , ifJust (matchKey "r" << RemoveFromCollection current.id << .id) <|
             List.head (List.filter .target collections)
         , ifJust
             (always <|
@@ -108,15 +111,6 @@ subscriptions { clipboard, imageCropMode, images, collections } =
         , previewReady (OnPreviewReady << Id.fromInt)
         , Browser.Events.onResize (\_ _ -> OnBrowserResize)
         ]
-
-
-collectionSubscription : ImageSettingsId -> Collection -> Msg
-collectionSubscription imageSettingsId collection =
-    if List.member imageSettingsId collection.imageIds then
-        RemoveFromCollection collection.id imageSettingsId
-
-    else
-        AddToCollection collection.id imageSettingsId
 
 
 
@@ -266,8 +260,8 @@ type Msg
     | OpenExternalEditor
     | GotOpenExternalEditor (HttpResult ())
     | ToggleFullscreen
-    | AddToCollection CollectionId ImageSettingsId
-    | RemoveFromCollection CollectionId ImageSettingsId
+    | AddToCollection ImageSettingsId CollectionId
+    | RemoveFromCollection ImageSettingsId CollectionId
     | SetTargetCollection CollectionId
 
 
@@ -675,7 +669,7 @@ update key msg model =
         ToggleFullscreen ->
             ( { model | fullscreen = not model.fullscreen }, Cmd.none )
 
-        AddToCollection collectionId imageSettingsId ->
+        AddToCollection imageSettingsId collectionId ->
             ( model
             , Cmd.map GotUpdateCollection <|
                 Request.postCollectionByCollectionIdByImageSettingsId
@@ -683,7 +677,7 @@ update key msg model =
                     imageSettingsId
             )
 
-        RemoveFromCollection collectionId imageSettingsId ->
+        RemoveFromCollection imageSettingsId collectionId ->
             ( model
             , Cmd.map GotUpdateCollection <|
                 Request.deleteCollectionByCollectionIdByImageSettingsId
@@ -1001,10 +995,10 @@ viewToggleCollection { id } collection =
     let
         ( isMember, msg ) =
             if List.member id collection.imageIds then
-                ( True, RemoveFromCollection collection.id id )
+                ( True, RemoveFromCollection id collection.id )
 
             else
-                ( False, AddToCollection collection.id id )
+                ( False, AddToCollection id collection.id )
 
         content =
             if collection.target then

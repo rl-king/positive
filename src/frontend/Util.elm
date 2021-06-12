@@ -14,6 +14,7 @@ module Util exposing
     , mergeStatus
     , pushNotification
     , removeNotification
+    , sortByDateAsc
     , sortByDateDesc
     , sortByPathDesc
     , viewIf
@@ -225,10 +226,14 @@ groupBy f xs =
         List.foldl insert Dict.empty xs
 
 
+sortByDateAsc : (a -> Date) -> List a -> List a
+sortByDateAsc f =
+    List.sortWith (\a b -> Date.compare (f a) (f b))
+
+
 sortByDateDesc : (a -> Date) -> List a -> List a
 sortByDateDesc f =
-    List.reverse
-        << List.sortWith (\a b -> Date.compare (f a) (f b))
+    List.reverse << sortByDateAsc f
 
 
 sortByPathDesc : (a -> Path b) -> List a -> List a
