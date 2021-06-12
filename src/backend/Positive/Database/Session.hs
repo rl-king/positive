@@ -57,7 +57,8 @@ insertImageToCollection collectionId imageSettingsId =
   let sql =
         "insert into positive.image_collection\
         \ (image_id, collection_id)\
-        \ values ($1, $2)"
+        \ values ($1, $2)\
+        \ on conflict (image_id, collection_id) do nothing"
       encode =
         (Id.unpack . fst >$< param Encode.int4)
           <> (Id.unpack . snd >$< param Encode.int4)
