@@ -252,7 +252,7 @@ moveAndSelect key f currentFilmRollId filmRolls =
                 |> Maybe.map (Tuple.pair filmRoll.id << .id)
 
         selected =
-            sortByDateDesc .developedOn filmRolls
+            sortByDateAsc .developedOn filmRolls
                 |> move f ((==) currentFilmRollId << .id)
                 |> Maybe.andThen withFirstImageId
     in
@@ -491,6 +491,8 @@ viewShortcuts =
             List.map viewDef
                 [ ( "←", "previous image" )
                 , ( "→", "next image" )
+                , ( "a", "add to target collection" )
+                , ( "r", "remove from target collection" )
                 , ( ctrl "p", "previous filmroll" )
                 , ( ctrl "n", "next filmroll" )
                 , ( ctrl "s", "save settings" )
