@@ -14,7 +14,13 @@ import Data.Path as Path
 import Date exposing (Date)
 import Dict
 import Dict.Fun
-import Generated.Data exposing (Collection, FilmRoll, ImageSettings)
+import Generated.Data
+    exposing
+        ( Collection
+        , FilmRoll
+        , ImageSettings
+        , RollNumber(..)
+        )
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -232,11 +238,11 @@ view model =
 -- COLLECTION
 
 
-type alias Images =
+type alias ImageLookupTable =
     Dict.Fun.Dict ImageSettingsId Int ( Path.Directory, FilmRollId, ImageSettings )
 
 
-imageLookupTable : Rating -> List FilmRoll -> Images
+imageLookupTable : Rating -> List FilmRoll -> ImageLookupTable
 imageLookupTable (Rating minimumRating) =
     let
         empty =
@@ -259,13 +265,13 @@ imageLookupTable (Rating minimumRating) =
         empty
 
 
-viewCollections : Columns -> Images -> List Collection -> Html Msg
+viewCollections : Columns -> ImageLookupTable -> List Collection -> Html Msg
 viewCollections columns images collections =
     div [] <|
         List.map (viewCollection columns images) collections
 
 
-viewCollection : Columns -> Images -> Collection -> Html Msg
+viewCollection : Columns -> ImageLookupTable -> Collection -> Html Msg
 viewCollection columns images collection =
     div [ class "browser-collection-images" ] <|
         (::) (h2 [] [ text collection.title ]) <|
@@ -303,7 +309,7 @@ viewCollectionButtons :
     -> Columns
     -> List CollectionId
     -> List Collection
-    -> Images
+    -> ImageLookupTable
     -> Html Msg
 viewCollectionButtons minimumRating columns selectedCollections collections images =
     div [ class "browser-controls-collections" ] <|
@@ -320,7 +326,7 @@ viewCollectionSelect :
     Rating
     -> Columns
     -> List CollectionId
-    -> Images
+    -> ImageLookupTable
     -> Collection
     -> Html Msg
 viewCollectionSelect minimumRating columns selectedCollections images collection =
@@ -423,22 +429,12 @@ viewFilmRollBrowserRoll :
     -> Html Msg
 viewFilmRollBrowserRoll ((Columns columns_) as columns) filmRollHover filmRoll =
     let
-        name =
-            Maybe.withDefault (Path.toString filmRoll.directoryPath) <|
-                List.head <|
-                    List.reverse <|
-                        String.split "/" <|
-                            Path.toString filmRoll.directoryPath
-
-        shortTitle =
-            if String.length name > 30 then
-                interpolate "{0} ... {1}"
-                    [ String.trim (String.left 9 name)
-                    , String.trim (String.right 21 name)
-                    ]
-
-            else
-                name
+        formattedTitle =
+            interpolate "{0} | {1}"
+                [ String.fromInt <|
+                    (\(RollNumber n) -> n) filmRoll.rollNumber
+                , filmRoll.location
+                ]
 
         poster =
             case Maybe.map (Tuple.mapFirst ((==) filmRoll)) filmRollHover of
@@ -462,7 +458,7 @@ viewFilmRollBrowserRoll ((Columns columns_) as columns) filmRollHover filmRoll =
         ]
         [ viewMaybe poster <|
             viewFilmRollBrowserImage filmRoll
-        , h2 [] [ text shortTitle ]
+        , h2 [] [ text formattedTitle ]
         ]
 
 
