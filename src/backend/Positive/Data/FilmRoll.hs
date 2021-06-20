@@ -38,6 +38,10 @@ data FilmRollBase t f = FilmRollBase
     modified :: P t f UTCTime,
     developedOn :: P t f DevelopedOn,
     rollNumber :: P t f RollNumber,
+    filmType :: Text,
+    location :: Text,
+    camera :: Text,
+    development :: Text,
     imageSettings :: [ImageSettings]
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
@@ -75,6 +79,10 @@ emptyFilmRoll directoryPath =
       directoryPath = directoryPath,
       developedOn = Nothing,
       rollNumber = Nothing,
+      filmType = "",
+      location = "",
+      camera = "",
+      development = "",
       imageSettings = []
     }
 

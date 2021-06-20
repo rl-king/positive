@@ -150,6 +150,24 @@ updateRollNumber rollNumber filmRollId =
    in Session.statement (rollNumber, filmRollId) $
         Statement sql encoder Decode.noResult True
 
+updateMeta :: (Text, Text, Text, Text) -> FilmRollId -> Session ()
+updateMeta meta filmRollId =
+  let sql =
+        "update positive.film_roll\
+        \ set film_type = $2,\
+        \     camera = $3,\
+        \     development = $4,\
+        \     location = $5\
+        \ where id = $1"
+      encoder =
+        (Id.unpack . snd >$< param Encode.int4)
+          <> ((\(x, _, _, _) -> x) . fst >$< param Encode.text)
+          <> ((\(_, x, _, _) -> x) . fst >$< param Encode.text)
+          <> ((\(_, _, x, _) -> x) . fst >$< param Encode.text)
+          <> ((\(_, _, _, x) -> x) . fst >$< param Encode.text)
+   in Session.statement (meta, filmRollId) $
+        Statement sql encoder Decode.noResult True
+
 -- SELECT
 
 selectOutdatedPreviews :: Session [(Path.Directory, ImageSettings)]
@@ -300,6 +318,10 @@ decodeFilmRoll =
     <*> column Decode.timestamptz
     <*> fmap DevelopedOn (column Decode.date)
     <*> fmap RollNumber (column Decode.int2)
+    <*> column Decode.text
+    <*> column Decode.text
+    <*> column Decode.text
+    <*> column Decode.text
     <*> fmap pure decodeImageSettings
 
 decodeCollection :: Decode.Row Collection
@@ -412,14 +434,17 @@ extractRollFromDir ('/' : 'R' : 'o' : 'l' : 'l' : ' ' : a : b : c : _) =
 extractRollFromDir (_ : xs) = extractRollFromDir xs
 extractRollFromDir _ = Nothing
 
-addDescription :: IO ()
-addDescription = do
+addMeta :: IO ()
+addMeta = do
   result <- rundb $ do
     all <- selectFilmRolls
-    for all $ \filmRoll -> do
-      case extractRollFromDir $ Path.toFilePath filmRoll.directoryPath of
-        Nothing -> pure ()
-        Just roll -> pure (filmRoll.id, desc)
+    for all $ \filmRoll ->
+      case Text.splitOn " | " $ Path.unpack filmRoll.directoryPath of
+        _ : _ : film : camera : dev : location : _ ->
+          updateMeta (Text.drop 11 film, camera, dev, location) filmRoll.id
+        _ : _ : film : camera : dev : _ ->
+          updateMeta (Text.drop 11 film, camera, dev, "") filmRoll.id
+        _ -> pure ()
   print result
 
 extractDescFromDir :: String -> Maybe Int16
