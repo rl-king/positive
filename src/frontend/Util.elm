@@ -6,9 +6,7 @@ module Util exposing
     , Status(..)
     , appendNotifications
     , choice
-    , decodeDate
     , emptyNotifications
-    , encodeDate
     , groupBy
     , matchKey
     , matchKeyNoModifiers
@@ -17,7 +15,8 @@ module Util exposing
     , removeNotification
     , sortByDateAsc
     , sortByDateDesc
-    , sortByPathDesc
+    , sortByRollNumberAsc
+    , sortByRollNumberDesc
     , viewIf
     , viewMaybe
     , viewNotifications
@@ -28,6 +27,7 @@ module Util exposing
 import Data.Path as Path exposing (Path)
 import Date exposing (Date)
 import Dict
+import Generated.Data exposing (RollNumber(..))
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
@@ -216,25 +216,6 @@ withKey key decoder =
             )
 
 
-decodeDate : Decode.Decoder Date
-decodeDate =
-    let
-        toDate s =
-            case Date.fromIsoString s of
-                Ok date ->
-                    Decode.succeed date
-
-                Err err ->
-                    Decode.fail err
-    in
-    Decode.andThen toDate Decode.string
-
-
-encodeDate : Date -> Encode.Value
-encodeDate =
-    Encode.string << Date.toIsoString
-
-
 groupBy : (a -> comparable) -> List a -> List ( comparable, List a )
 groupBy f xs =
     let
@@ -263,7 +244,19 @@ sortByDateDesc f =
     List.reverse << sortByDateAsc f
 
 
-sortByPathDesc : (a -> Path b) -> List a -> List a
-sortByPathDesc f =
-    List.reverse
-        << List.sortWith (\a b -> Path.compare (f a) (f b))
+sortByRollNumberAsc :
+    List { a | rollNumber : RollNumber }
+    -> List { a | rollNumber : RollNumber }
+sortByRollNumberAsc =
+    let
+        compare_ (RollNumber a) (RollNumber b) =
+            compare a b
+    in
+    List.sortWith (\a b -> compare_ a.rollNumber b.rollNumber)
+
+
+sortByRollNumberDesc :
+    List { a | rollNumber : RollNumber }
+    -> List { a | rollNumber : RollNumber }
+sortByRollNumberDesc =
+    List.reverse << sortByRollNumberAsc

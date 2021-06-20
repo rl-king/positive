@@ -141,6 +141,15 @@ updateDevelopedOn developedOn filmRollId =
    in Session.statement (developedOn, filmRollId) $
         Statement sql encoder Decode.noResult True
 
+updateRollNumber :: RollNumber -> FilmRollId -> Session ()
+updateRollNumber rollNumber filmRollId =
+  let sql = "update positive.film_roll set roll = $1 where id = $2"
+      encoder =
+        ((\(RollNumber n) -> n) . fst >$< param Encode.int2)
+          <> (Id.unpack . snd >$< param Encode.int4)
+   in Session.statement (rollNumber, filmRollId) $
+        Statement sql encoder Decode.noResult True
+
 -- SELECT
 
 selectOutdatedPreviews :: Session [(Path.Directory, ImageSettings)]
@@ -290,6 +299,7 @@ decodeFilmRoll =
     <*> column Decode.timestamptz
     <*> column Decode.timestamptz
     <*> fmap DevelopedOn (column Decode.date)
+    <*> fmap RollNumber (column Decode.int2)
     <*> fmap pure decodeImageSettings
 
 decodeCollection :: Decode.Row Collection
@@ -385,3 +395,35 @@ extractDayFromDir (y1 : y2 : y3 : y4 : '-' : m1 : m2 : '-' : d1 : d2 : _) = do
   pure $ fromGregorian y m d
 extractDayFromDir (_ : xs) = extractDayFromDir xs
 extractDayFromDir _ = Nothing
+
+addRoll :: IO ()
+addRoll = do
+  result <- rundb $ do
+    all <- selectFilmRolls
+    for all $ \filmRoll -> do
+      case extractRollFromDir $ Path.toFilePath filmRoll.directoryPath of
+        Nothing -> pure ()
+        Just roll -> updateRollNumber (RollNumber roll) filmRoll.id
+  print result
+
+extractRollFromDir :: String -> Maybe Int16
+extractRollFromDir ('/' : 'R' : 'o' : 'l' : 'l' : ' ' : a : b : c : _) =
+  readMaybe [a, b, c] <|> readMaybe [a, b] <|> readMaybe [a]
+extractRollFromDir (_ : xs) = extractRollFromDir xs
+extractRollFromDir _ = Nothing
+
+addDescription :: IO ()
+addDescription = do
+  result <- rundb $ do
+    all <- selectFilmRolls
+    for all $ \filmRoll -> do
+      case extractRollFromDir $ Path.toFilePath filmRoll.directoryPath of
+        Nothing -> pure ()
+        Just roll -> pure (filmRoll.id, desc)
+  print result
+
+extractDescFromDir :: String -> Maybe Int16
+extractDescFromDir ('/' : 'R' : 'o' : 'l' : 'l' : ' ' : a : b : c : _) =
+  readMaybe [a, b, c] <|> readMaybe [a, b] <|> readMaybe [a]
+extractDescFromDir (_ : xs) = extractDescFromDir xs
+extractDescFromDir _ = Nothing

@@ -202,7 +202,7 @@ view model =
                         List.map (viewFilmRollBrowserYear model.columns model.filmRollHover) <|
                             List.reverse <|
                                 List.sortBy Tuple.first <|
-                                    List.map (Tuple.mapSecond (sortByPathDesc .directoryPath)) <|
+                                    List.map (Tuple.mapSecond sortByRollNumberDesc) <|
                                         groupBy (Date.year << .developedOn) model.filmRolls
 
                 ( n, [] ) ->

@@ -37,6 +37,7 @@ data FilmRollBase t f = FilmRollBase
     created :: P t f UTCTime,
     modified :: P t f UTCTime,
     developedOn :: P t f DevelopedOn,
+    rollNumber :: P t f RollNumber,
     imageSettings :: [ImageSettings]
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
@@ -55,10 +56,10 @@ instance Elm.HasElmType DevelopedOn where
   elmType = "Date.Date"
 
 instance Elm.HasElmDecoder Aeson.Value DevelopedOn where
-  elmDecoder = "Util.decodeDate"
+  elmDecoder = "Util.Date.decodeDate"
 
 instance Elm.HasElmEncoder Aeson.Value DevelopedOn where
-  elmEncoder = "Util.encodeDate"
+  elmEncoder = "Util.Date.encodeDate"
 
 deriving instance Show FilmRoll
 
@@ -73,6 +74,7 @@ emptyFilmRoll directoryPath =
       poster = Nothing,
       directoryPath = directoryPath,
       developedOn = Nothing,
+      rollNumber = Nothing,
       imageSettings = []
     }
 
@@ -82,3 +84,15 @@ newtype DevelopedOn = DevelopedOn
   deriving (Show, Generic)
   deriving anyclass (NFData, SOP.Generic, SOP.HasDatatypeInfo)
   deriving newtype (ToJSON, FromJSON)
+
+newtype RollNumber = RollNumber Int16
+  deriving (Show, Generic)
+  deriving anyclass (NFData, SOP.Generic, SOP.HasDatatypeInfo)
+  deriving
+    ( ToJSON,
+      FromJSON,
+      Elm.HasElmType,
+      Elm.HasElmEncoder Aeson.Value,
+      Elm.HasElmDecoder Aeson.Value
+    )
+    via Elm.ElmType "RollNumber" RollNumber

@@ -42,6 +42,7 @@ main = do
           <> Elm.jsonDefinitions @Expression
           <> Elm.jsonDefinitions @ExpressionResult
           <> Elm.jsonDefinitions @Collection
+          <> Elm.jsonDefinitions @RollNumber
       modules =
         -- FIXME: spaceleak in both elm-syntax functions
         Pretty.modules $
