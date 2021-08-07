@@ -47,7 +47,13 @@ fromDiskPreProcess ::
   String ->
   m (Either SomeException Monochrome)
 fromDiskPreProcess targetSize imageCrop path =
-  fmap (fromDoubleI . maybe identity resize targetSize . normalize . toDoubleI . crop imageCrop)
+  fmap
+    ( fromDoubleI
+        . maybe identity resize targetSize
+        . normalize
+        . toDoubleI
+        . crop imageCrop
+    )
     <$> fromDisk path
 
 -- EDIT
@@ -122,15 +128,23 @@ crop imageCrop image =
    in HIP.crop (const (y :. x, HIP.Sz2 cropHeight cropWidth)) image
 {-# INLINE crop #-}
 
--- | Due to the nature of analog scans we resize the image to average the min and max values a bit
--- Not ideal, works for now
+-- | Due to the nature of analog scans we resize the image to average the min
+-- and max values a bit, not ideal, works for now
 normalize :: MonochromeDouble -> MonochromeDouble
 normalize image =
   let !resized = HIP.shrink3x3 image
       !iMax = HIP.maxVal resized
       !iMin = HIP.minVal resized
    in HIP.map
-        (fmap (\e -> (e - iMin) * ((HIP.maxValue - HIP.minValue) HIP.// (iMax - iMin)) + HIP.minValue))
+        ( fmap
+            ( \e ->
+                (e - iMin)
+                  * ( (HIP.maxValue - HIP.minValue)
+                        HIP.// (iMax - iMin)
+                    )
+                    + HIP.minValue
+            )
+        )
         image
 {-# INLINE normalize #-}
 

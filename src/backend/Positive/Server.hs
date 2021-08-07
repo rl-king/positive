@@ -11,8 +11,6 @@ import Control.Carrier.Reader
 import qualified Control.Concurrent.Chan as Chan
 import qualified Control.Concurrent.MVar as MVar
 import Control.Effect.Labelled
-import Control.Effect.Lift
-import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
 import qualified Hasql.Pool as Hasql
 import Network.Wai.EventSource
@@ -42,7 +40,7 @@ start logger pool isDev port =
             )
             Warp.defaultSettings
    in do
-        imageMVar <- MVar.newMVar OrdPSQ.empty
+        imageMVar <- MVar.newMVar Nothing
         previewMVar <- MVar.newMVar ()
         eventChan <- Chan.newChan
         let env = Handler.Env imageMVar previewMVar isDev
@@ -76,18 +74,7 @@ start logger pool isDev port =
 
 -- HANDLERS
 
-handlers ::
-  ( HasLabelled "stdout" Log sig m,
-    HasLabelled "sse" Log sig m,
-    Has PostgreSQL sig m,
-    Has (Reader Handler.Env) sig m,
-    Has (Lift IO) sig m,
-    Has (Throw PostgreSQL.Error) sig m,
-    Has (Throw ServerError) sig m
-  ) =>
-  CLI.IsDev ->
-  Chan ServerEvent ->
-  Api (AsServerT m)
+handlers :: Handler.Handler sig m => CLI.IsDev -> Chan ServerEvent -> Api (AsServerT m)
 handlers isDev chan =
   Api
     { imageApi =

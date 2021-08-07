@@ -40,7 +40,6 @@ dependencies:
   - optparse-applicative
   - process
   - profunctors
-  - psqueues
   - record-hasfield
   - safe-exceptions
   - servant

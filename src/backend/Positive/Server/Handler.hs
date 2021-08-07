@@ -10,18 +10,14 @@
 module Positive.Server.Handler where
 
 import qualified Control.Concurrent.MVar as MVar
-import qualified Control.DeepSeq as DeepSeq
 import Control.Effect.Labelled hiding (Handler)
 import Control.Effect.Lift
 import Control.Effect.Reader
 import Control.Effect.Throw
-import Control.Exception (evaluate)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Massiv.Array as Massiv
 import qualified Data.Massiv.Array.Manifest.Vector as Massiv
-import qualified Data.OrdPSQ as OrdPSQ
 import qualified Data.Text as Text
-import qualified Data.Time.Clock as Time
 import qualified Graphics.Image as HIP
 import qualified Positive.CLI as CLI
 import Positive.Data.Collection (Collection)
@@ -63,7 +59,7 @@ type Handler sig m =
   )
 
 data Env = Env
-  { imageMVar :: !(MVar (OrdPSQ Text UTCTime (ImageCrop, Image.Monochrome))),
+  { imageMVar :: !(MVar (Maybe (ImageSettingsId, ImageCrop, Image.Monochrome))),
     previewMVar :: !(MVar ()),
     isDev :: !CLI.IsDev
   }
@@ -74,7 +70,7 @@ handleImage :: Handler sig m => Text -> ImageSettings -> m ByteString
 handleImage dir settings = do
   env <- ask @Env
   (image, putMVarBack) <-
-    getCachedImage settings.crop $
+    getCachedImage settings.id settings.crop $
       Text.pack (Text.unpack dir </> Path.toFilePath settings.filename)
   if env.isDev
     then do
@@ -175,7 +171,7 @@ handleGetSettingsHistogram settings = do
   directoryPath <-
     PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
   (image, putMVarBack) <-
-    getCachedImage settings.crop $
+    getCachedImage settings.id settings.crop $
       Text.pack (Path.append directoryPath settings.filename)
   sendIO putMVarBack
   logDebug @"stdout" "handler" $
@@ -202,7 +198,7 @@ handleGetCoordinateInfo (coordinates, settings) =
           PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
         (image, putMVarBack) <-
           first (Image.applySettings settings)
-            <$> getCachedImage settings.crop
+            <$> getCachedImage settings.id settings.crop
               (Text.pack (Path.append directoryPath settings.filename))
         sendIO putMVarBack
         pure $ fmap (toInfo image) coordinates
@@ -249,40 +245,33 @@ handleLeft m =
   m >>= either (\(_ :: err) -> logInfo @"stdout" "handler" "image read error" >> throwError err404) pure
 
 -- | Read image from disk, normalize before crop, keep result in MVar
-getCachedImage :: Handler sig m => ImageCrop -> Text -> m (Image.Monochrome, IO ())
-getCachedImage crop path = do
+getCachedImage ::
+  Handler sig m =>
+  ImageSettingsId ->
+  ImageCrop ->
+  Text ->
+  m (Image.Monochrome, IO ())
+getCachedImage imageSettingsId crop path = do
   env <- ask @Env
-  now <- sendIO Time.getCurrentTime
-  cache <- sendIO $ MVar.takeMVar env.imageMVar
-  logInfo @"stdout" "handler" $ "cached images: " <> tshow (OrdPSQ.size cache)
-  case checkCrop crop =<< OrdPSQ.lookup path cache of
-    Just (_, cached@(_, loadedImage)) -> do
-      logDebug @"stdout" "handler" "loaded image from cache"
-      pure
-        ( loadedImage,
-          MVar.putMVar env.imageMVar
-            =<< evaluate (DeepSeq.force (insertAndTrim path now cached cache))
-        )
+  maybeCache <- sendIO $ MVar.takeMVar env.imageMVar
+  case maybeCache of
+    Just cache@(cachedImageSettingsId, cachedCrop, cachedImage)
+      | cachedCrop == crop && cachedImageSettingsId == imageSettingsId -> do
+        logDebug @"stdout" "cache" "loaded image from cache"
+        pure (cachedImage, MVar.putMVar env.imageMVar (Just cache))
+      | otherwise -> do
+        logDebug @"stdout" "cache" "loading image from disk"
+        image <- handleLeft $ Util.readImageFromWithCache imageSettingsId crop path
+        logDebug @"stdout" "cache" "writing cached image to disk"
+        Util.writeToCache cachedImageSettingsId cachedCrop cachedImage
+        pure
+          ( image,
+            MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
+          )
     Nothing -> do
-      logDebug @"stdout" "handler" "loadin image from disk"
-      image <-
-        handleLeft . sendIO $
-          Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
+      logDebug @"stdout" "cache" "loading image from disk"
+      image <- handleLeft $ Util.readImageFromWithCache imageSettingsId crop path
       pure
         ( image,
-          MVar.putMVar env.imageMVar
-            =<< evaluate (DeepSeq.force (insertAndTrim path now (crop, image) cache))
+          MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
         )
-
-checkCrop ::
-  ImageCrop ->
-  (UTCTime, (ImageCrop, Image.Monochrome)) ->
-  Maybe (UTCTime, (ImageCrop, Image.Monochrome))
-checkCrop crop cached@(_, (cachedCrop, _))
-  | crop == cachedCrop = Just cached
-  | otherwise = Nothing
-
-insertAndTrim :: (Ord k, Ord p) => k -> p -> v -> OrdPSQ k p v -> OrdPSQ k p v
-insertAndTrim k v p psq =
-  let q = OrdPSQ.insert k v p psq
-   in if OrdPSQ.size q > 40 then OrdPSQ.deleteMin q else q

@@ -164,7 +164,15 @@ data ImageCrop = ImageCrop
     icLeft :: Double,
     icWidth :: Double
   }
-  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
+  deriving
+    ( Show,
+      Eq,
+      Generic,
+      SOP.Generic,
+      SOP.HasDatatypeInfo,
+      NFData,
+      Hashable
+    )
   deriving
     ( Aeson.ToJSON,
       Aeson.FromJSON,
