@@ -42,13 +42,13 @@ loop lock = do
   previews <- PostgreSQL.runSession Session.selectOutdatedPreviews
   case previews of
     [] -> do
-      logInfo @"stdout" "metadata" "found no outdated previews"
+      logTrace @"stdout" "metadata" "found no outdated previews"
       loop lock
     outdatedPreviews@((dir, imageSettings) : rest) -> do
-      logInfo @"stdout" "metadata" $
+      logTrace @"stdout" "metadata" $
         "found " <> tshow (length outdatedPreviews) <> " outdated previews"
       timedM "metadata" $ upsertMetadata dir imageSettings
-      logInfo @"sse" "preview" . tshow $ Id.unpack imageSettings.id
+      logTrace @"sse" "preview" . tshow $ Id.unpack imageSettings.id
       unless (null rest) $ sendIO (void (tryPutMVar lock key))
       loop lock
 
@@ -87,7 +87,7 @@ upsertMetadata (Path.toFilePath -> dir) imageSettings =
                   histogram =
                     Massiv.toVector . generateHistogram $ HIP.unImage image
                 }
-            logInfo @"stdout" "metadata" $
+            logTrace @"stdout" "metadata" $
               "generated preview for image id: " <> tshow (Id.unpack imageSettings.id)
 
 generateHistogram ::

@@ -31,7 +31,9 @@ ensureUniqueFilename filepath = do
          in mconcat [dropExtension filepath, preExt, takeExtension filepath]
 
 writeToCache ::
-  Has (Lift IO) sig m =>
+  ( Has (Lift IO) sig m,
+    HasLabelled "stdout" Log sig m
+  ) =>
   ImageSettingsId ->
   ImageCrop ->
   Image.Monochrome ->
@@ -39,7 +41,9 @@ writeToCache ::
 writeToCache imageSettingsId crop image = do
   cachePath <- toCacheFilePath imageSettingsId crop
   exists <- sendIO $ Directory.doesFileExist cachePath
-  unless exists . sendIO $ HIP.writeImage cachePath image
+  unless exists $ do
+    logTraceShow @"stdout" "writing image to cache" imageSettingsId
+    sendIO $ HIP.writeImage cachePath image
 
 readImageFromWithCache ::
   ( Has (Lift IO) sig m,
@@ -54,10 +58,10 @@ readImageFromWithCache imageSettingsId crop path = do
   exists <- sendIO $ Directory.doesFileExist cachePath
   if exists
     then do
-      logDebug @"stdout" "cache" "found cached image on disk"
+      logTrace @"stdout" "cache" "found cached image on disk"
       sendIO $ Image.fromDisk cachePath
     else do
-      logDebug @"stdout" "cache" "no cached image on disk, loading from source"
+      logTrace @"stdout" "cache" "no cached image on disk, loading from source"
       sendIO $
         Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
 

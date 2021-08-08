@@ -28,7 +28,7 @@ import Servant
 
 newtype Id (a :: Symbol)
   = Id Int32
-  deriving (Show, Eq, Generic, NFData, Hashable)
+  deriving (Eq, Generic, NFData, Hashable)
   deriving
     ( ToHttpApiData,
       FromHttpApiData,
@@ -36,6 +36,9 @@ newtype Id (a :: Symbol)
       Aeson.FromJSON
     )
     via Int32
+
+instance KnownSymbol a => Show (Id a) where
+  show (Id id) = symbolVal (Proxy @a) <> " " <> show id
 
 deriving via Int instance Elm.HasElmType (Identity (Id a))
 

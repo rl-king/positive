@@ -11,7 +11,6 @@ import Control.Carrier.Reader
 import qualified Control.Concurrent.Chan as Chan
 import qualified Control.Concurrent.MVar as MVar
 import Control.Effect.Labelled
-import qualified Data.Text as Text
 import qualified Hasql.Pool as Hasql
 import Network.Wai.EventSource
 import qualified Network.Wai.Handler.Warp as Warp
@@ -34,9 +33,8 @@ start logger pool isDev port =
   let settings =
         Warp.setPort port $
           Warp.setBeforeMainLoop
-            ( putLogStr logger Info "server" $
-                Text.concat
-                  ["listening on port: ", tshow port, ", is dev: ", tshow isDev]
+            ( putLogStr logger Trace ["server"] "port" (tshow port)
+                >> putLogStr logger Trace ["config"] "is dev" (tshow isDev)
             )
             Warp.defaultSettings
    in do

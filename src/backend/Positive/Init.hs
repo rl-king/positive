@@ -48,8 +48,8 @@ insertNewFilmRoll dir filenames = do
   imageSettingsIds <- PostgreSQL.runTransaction $ do
     filmRollId <- Session.insertFilmRoll dir
     traverse (Session.insertImageSettings filmRollId) filenames
-  logInfo @"stdout" "init" $ "inserted film roll for: " <> Path.unpack dir
-  logInfo @"stdout" "init" $
+  logTrace @"stdout" "init" $ "inserted film roll for: " <> Path.unpack dir
+  logTrace @"stdout" "init" $
     Text.unwords
       [ "inserted image settings for:",
         tshow (length imageSettingsIds),
@@ -68,7 +68,7 @@ generatePreviews ::
   [ImageSettingsId] ->
   m ()
 generatePreviews dir imageSettingsIds = do
-  logInfo @"stdout" "init" $
+  logTrace @"stdout" "init" $
     "generating " <> tshow (length imageSettingsIds) <> " previews"
   for_ imageSettingsIds $ \imageSettingsId -> do
     imageSettings <-

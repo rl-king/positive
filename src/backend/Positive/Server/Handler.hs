@@ -79,7 +79,7 @@ handleImage dir settings = do
       sendIO putMVarBack
       pure encoded
     else do
-      logInfo @"stdout" "handler" $
+      logTrace @"stdout" "handler" $
         "applying settings and encode: " <> Path.unpack settings.filename
       !encoded <- sendIO . Image.encode "_.png" $ Image.applySettings settings image
       sendIO putMVarBack
@@ -92,7 +92,7 @@ handleSaveFilmRoll filmRoll = do
   _ <-
     PostgreSQL.runTransaction $
       Session.updateImageSettingsList filmRoll.imageSettings
-  logDebug @"stdout" "handler" "saved filmroll"
+  logTraceShow @"stdout" "saved filmroll" filmRoll.id
   env <- ask @Env
   void . sendIO $
     MVar.tryPutMVar env.previewMVar ()
@@ -135,16 +135,16 @@ handleGenerateWallpaper settings = do
             (Path.toFilePath directoryPath)
           <> " | "
           <> Path.toFilePath settings.filename
-  logInfo @"stdout" "handler" $ "generating wallpaper version of: " <> Text.pack input
+  logTrace @"stdout" "handler" $ "generating wallpaper version of: " <> Text.pack input
   output <-
     sendIO $
       Util.ensureUniqueFilename . outputBase =<< sendIO Directory.getHomeDirectory
   image <-
-    handleLeft
+    throwLeft
       . sendIO
       $ Image.fromDiskPreProcess (Just 2560) settings.crop input
   sendIO . HIP.writeImage output $ Image.applySettings settings image
-  logInfo @"stdout" "handler" ("wrote wallpaper version of: " <> Text.pack input)
+  logTrace @"stdout" "handler" ("wrote wallpaper version of: " <> Text.pack input)
   pure NoContent
 
 -- OPEN EXTERNALEDITOR
@@ -154,9 +154,9 @@ handleOpenExternalEditor settings = do
   directoryPath <-
     PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
   let input = Path.append directoryPath settings.filename
-  logInfo @"stdout" "handler" $ "opening in external editor: " <> Text.pack input
+  logTrace @"stdout" "handler" $ "opening in external editor: " <> Text.pack input
   image <-
-    handleLeft
+    throwLeft
       . sendIO
       $ Image.fromDiskPreProcess Nothing settings.crop input
   sendIO
@@ -174,7 +174,7 @@ handleGetSettingsHistogram settings = do
     getCachedImage settings.id settings.crop $
       Text.pack (Path.append directoryPath settings.filename)
   sendIO putMVarBack
-  logDebug @"stdout" "handler" $
+  logTrace @"stdout" "handler" $
     "creating histogram for: " <> Path.unpack settings.filename
   pure . Massiv.toVector . Metadata.generateHistogram . HIP.unImage $
     Image.applySettings settings image
@@ -207,18 +207,18 @@ handleGetCoordinateInfo (coordinates, settings) =
 
 handleGetSettings :: Handler sig m => m [FilmRoll]
 handleGetSettings = do
-  logInfo @"stdout" "handler" "get filmrolls"
+  logTrace @"stdout" "handler" "get filmrolls"
   PostgreSQL.runSession Session.selectFilmRolls
 
 handleGetCollections :: Handler sig m => m [Collection]
 handleGetCollections = do
-  logInfo @"stdout" "handler" "get collections"
+  logTrace @"stdout" "handler" "get collections"
   PostgreSQL.runSession Session.selectCollections
 
 handleAddToCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
 handleAddToCollection collectionId imageSettingsId = do
-  logInfo @"stdout" "handler" "add to collection"
+  logTrace @"stdout" "handler" "add to collection"
   PostgreSQL.runSession $ do
     Session.insertImageToCollection collectionId imageSettingsId
     Session.selectCollections
@@ -226,23 +226,29 @@ handleAddToCollection collectionId imageSettingsId = do
 handleRemoveFromCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
 handleRemoveFromCollection collectionId imageSettingsId = do
-  logInfo @"stdout" "handler" "remove from collection"
+  logTrace @"stdout" "handler" "remove from collection"
   PostgreSQL.runSession $ do
     Session.deleteImageFromCollection collectionId imageSettingsId
     Session.selectCollections
 
 handleSetCollectionTarget :: Handler sig m => CollectionId -> m [Collection]
 handleSetCollectionTarget collectionId = do
-  logInfo @"stdout" "handler" "set collection target"
+  logTrace @"stdout" "handler" "set collection target"
   PostgreSQL.runTransaction $
     Session.updateCollectionTarget collectionId
   PostgreSQL.runSession Session.selectCollections
 
 -- HANDLER HELPERS
 
-handleLeft :: Handler sig m => m (Either err a) -> m a
-handleLeft m =
-  m >>= either (\(_ :: err) -> logInfo @"stdout" "handler" "image read error" >> throwError err404) pure
+throwLeft :: Handler sig m => m (Either err a) -> m a
+throwLeft m =
+  m
+    >>= either
+      ( \(_ :: err) -> do
+          logTrace @"stdout" "handler" "image read error"
+          throwError err404
+      )
+      pure
 
 -- | Read image from disk, normalize before crop, keep result in MVar
 getCachedImage ::
@@ -251,27 +257,27 @@ getCachedImage ::
   ImageCrop ->
   Text ->
   m (Image.Monochrome, IO ())
-getCachedImage imageSettingsId crop path = do
-  env <- ask @Env
-  maybeCache <- sendIO $ MVar.takeMVar env.imageMVar
-  case maybeCache of
-    Just cache@(cachedImageSettingsId, cachedCrop, cachedImage)
-      | cachedCrop == crop && cachedImageSettingsId == imageSettingsId -> do
-        logDebug @"stdout" "cache" "loaded image from cache"
-        pure (cachedImage, MVar.putMVar env.imageMVar (Just cache))
-      | otherwise -> do
-        logDebug @"stdout" "cache" "loading image from disk"
-        image <- handleLeft $ Util.readImageFromWithCache imageSettingsId crop path
-        logDebug @"stdout" "cache" "writing cached image to disk"
-        Util.writeToCache cachedImageSettingsId cachedCrop cachedImage
+getCachedImage imageSettingsId crop path =
+  withContext @"stdout" "image-cache" $ do
+    env <- ask @Env
+    maybeCache <- sendIO $ MVar.takeMVar env.imageMVar
+    case maybeCache of
+      Just cache@(cachedImageSettingsId, cachedCrop, cachedImage)
+        | cachedCrop == crop && cachedImageSettingsId == imageSettingsId -> do
+          logTraceShow @"stdout" "loaded from cache" imageSettingsId
+          pure (cachedImage, MVar.putMVar env.imageMVar (Just cache))
+        | otherwise -> do
+          logTraceShow @"stdout" "loading from disk" imageSettingsId
+          image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
+          Util.writeToCache cachedImageSettingsId cachedCrop cachedImage
+          pure
+            ( image,
+              MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
+            )
+      Nothing -> do
+        logTraceShow @"stdout" "loading from disk" imageSettingsId
+        image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
         pure
           ( image,
             MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
           )
-    Nothing -> do
-      logDebug @"stdout" "cache" "loading image from disk"
-      image <- handleLeft $ Util.readImageFromWithCache imageSettingsId crop path
-      pure
-        ( image,
-          MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
-        )

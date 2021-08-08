@@ -36,7 +36,8 @@ data PostgreSQL (m :: Type -> Type) k where
 newtype Error = Error Hasql.UsageError
   deriving (Show, Eq)
 
-runTransaction :: (Has PostgreSQL sig m, Has (Throw Error) sig m) => Transaction a -> m a
+runTransaction ::
+  (Has PostgreSQL sig m, Has (Throw Error) sig m) => Transaction a -> m a
 runTransaction =
   liftEither <=< send . Transaction
 
@@ -47,7 +48,10 @@ runSession =
 newtype PostgreSQLC m a = PostgreSQLC {unPostgreSQLC :: ReaderC Hasql.Pool m a}
   deriving newtype (Applicative, Functor, Monad, MonadIO)
 
-instance (Algebra sig m, Has (Lift IO) sig m) => Algebra (PostgreSQL :+: sig) (PostgreSQLC m) where
+instance
+  (Algebra sig m, Has (Lift IO) sig m) =>
+  Algebra (PostgreSQL :+: sig) (PostgreSQLC m)
+  where
   alg hdl sig ctx =
     case sig of
       R other ->
