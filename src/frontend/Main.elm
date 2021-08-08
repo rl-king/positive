@@ -5,7 +5,7 @@ import Browser.Events
 import Browser.Navigation as Navigation
 import Data.Id as Id exposing (FilmRollId)
 import Data.Path as Path
-import Generated.Data exposing (Collection, FilmRoll)
+import Generated.Data exposing (Collection, FilmRoll, RollNumber(..))
 import Generated.Request as Request
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -447,8 +447,10 @@ view model =
 
         Editor m ->
             { title =
-                interpolate "{0} | {1} | Editor"
-                    [ "todo", "todo" ]
+                interpolate "Roll {0} | {1} | Editor"
+                    [ (\(RollNumber n) -> String.fromInt n) m.filmRoll.rollNumber
+                    , Path.toString (Zipper.current m.images).filename
+                    ]
             , body =
                 [ Html.map EditorMsg <|
                     Page.Editor.view m model.notifications
