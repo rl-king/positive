@@ -77,6 +77,10 @@ data SettingsApi route = SettingsApi
       route :- "image" :> "settings" :> "externaleditor"
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent,
+    openInFinder ::
+      route :- "image" :> "settings" :> "finder"
+        :> Capture "imageSettingsId" ImageSettingsId
+        :> PostNoContent '[JSON] NoContent,
     getCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
         :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)

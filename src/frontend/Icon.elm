@@ -14,6 +14,7 @@ module Icon exposing
     , lambda
     , left
     , ok
+    , open
     , original
     , reset
     , resetTone
@@ -159,3 +160,8 @@ resetTone =
 undo : Html msg
 undo =
     icon "undo"
+
+
+open : Html msg
+open =
+    icon "open"

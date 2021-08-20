@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -44,7 +45,9 @@ import qualified Positive.SingleImage as SingleImage
 import Positive.Timed
 import Servant hiding (Handler, throwError)
 import qualified System.Directory as Directory
+import qualified System.Exit
 import System.FilePath.Posix (isPathSeparator, (</>))
+import qualified System.Process as Process
 
 -- HANDLER
 
@@ -67,23 +70,23 @@ data Env = Env
 -- IMAGE
 
 handleImage :: Handler sig m => Text -> ImageSettings -> m ByteString
-handleImage dir settings = do
-  env <- ask @Env
-  (image, putMVarBack) <-
-    getCachedImage settings.id settings.crop $
-      Text.pack (Text.unpack dir </> Path.toFilePath settings.filename)
-  if env.isDev
-    then do
-      processed <- timed "apply" $ Image.applySettings settings image
-      encoded <- timed "encode" =<< sendIO (Image.encode "_.png" processed)
-      sendIO putMVarBack
-      pure encoded
-    else do
-      logTrace @"stdout" "handler" $
-        "applying settings and encode: " <> Path.unpack settings.filename
-      !encoded <- sendIO . Image.encode "_.png" $ Image.applySettings settings image
-      sendIO putMVarBack
-      pure encoded
+handleImage dir settings =
+  withContext @"stdout" "image-handler" $ do
+    env <- ask @Env
+    (image, putMVarBack) <-
+      getCachedImage settings.id settings.crop $
+        Text.pack (Text.unpack dir </> Path.toFilePath settings.filename)
+    if env.isDev
+      then do
+        processed <- timed "apply" $ Image.applySettings settings image
+        encoded <- timed "encode" =<< sendIO (Image.encode "_.png" processed)
+        sendIO putMVarBack
+        pure encoded
+      else do
+        logTraceShow @"stdout" "applying settings and encode" settings.id
+        !encoded <- sendIO . Image.encode "_.png" $ Image.applySettings settings image
+        sendIO putMVarBack
+        pure encoded
 
 -- SAVE
 
@@ -135,7 +138,7 @@ handleGenerateWallpaper settings = do
             (Path.toFilePath directoryPath)
           <> " | "
           <> Path.toFilePath settings.filename
-  logTrace @"stdout" "handler" $ "generating wallpaper version of: " <> Text.pack input
+  logTraceShow @"stdout" "generating wallpaper version" settings.id
   output <-
     sendIO $
       Util.ensureUniqueFilename . outputBase =<< sendIO Directory.getHomeDirectory
@@ -144,17 +147,17 @@ handleGenerateWallpaper settings = do
       . sendIO
       $ Image.fromDiskPreProcess (Just 2560) settings.crop input
   sendIO . HIP.writeImage output $ Image.applySettings settings image
-  logTrace @"stdout" "handler" ("wrote wallpaper version of: " <> Text.pack input)
+  logTraceShow @"stdout" "wrote wallpaper version" settings.id
   pure NoContent
 
--- OPEN EXTERNALEDITOR
+-- OPEN
 
 handleOpenExternalEditor :: Handler sig m => ImageSettings -> m NoContent
 handleOpenExternalEditor settings = do
   directoryPath <-
     PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
   let input = Path.append directoryPath settings.filename
-  logTrace @"stdout" "handler" $ "opening in external editor: " <> Text.pack input
+  logTraceShow @"stdout" "opening in external editor" settings.id
   image <-
     throwLeft
       . sendIO
@@ -162,6 +165,25 @@ handleOpenExternalEditor settings = do
   sendIO
     . HIP.displayImageUsing HIP.defaultViewer False
     $ Image.applySettings settings image
+  pure NoContent
+
+handleOpenInFinder :: Handler sig m => ImageSettingsId -> m NoContent
+handleOpenInFinder imageSettingsId = do
+  directoryPath <-
+    fmap Path.toFilePath
+      . PostgreSQL.runSession
+      $ Session.selectDirectoryPath imageSettingsId
+  logTraceShow @"stdout" "opening in finder" imageSettingsId
+  result <- sendIO . Process.withCreateProcess (Process.proc "open" [directoryPath]) $
+    \_ _ _ handler ->
+      Process.waitForProcess handler >>= \case
+        System.Exit.ExitSuccess ->
+          pure $ Right "Successfully opened directory in finder"
+        result -> pure $ Left (tshow result)
+  either
+    (logError @"stdout" "open directory in finder")
+    (logTrace @"stdout" "open directory in finder")
+    result
   pure NoContent
 
 -- HISTOGRAM
@@ -174,8 +196,7 @@ handleGetSettingsHistogram settings = do
     getCachedImage settings.id settings.crop $
       Text.pack (Path.append directoryPath settings.filename)
   sendIO putMVarBack
-  logTrace @"stdout" "handler" $
-    "creating histogram for: " <> Path.unpack settings.filename
+  logTraceShow @"stdout" "creating histogram for" settings.id
   pure . Massiv.toVector . Metadata.generateHistogram . HIP.unImage $
     Image.applySettings settings image
 
@@ -218,7 +239,7 @@ handleGetCollections = do
 handleAddToCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
 handleAddToCollection collectionId imageSettingsId = do
-  logTrace @"stdout" "handler" "add to collection"
+  logTraceShow @"stdout" "add to collection" (collectionId, imageSettingsId)
   PostgreSQL.runSession $ do
     Session.insertImageToCollection collectionId imageSettingsId
     Session.selectCollections
@@ -226,28 +247,25 @@ handleAddToCollection collectionId imageSettingsId = do
 handleRemoveFromCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
 handleRemoveFromCollection collectionId imageSettingsId = do
-  logTrace @"stdout" "handler" "remove from collection"
+  logTraceShow @"stdout" "remove from collection" (collectionId, imageSettingsId)
   PostgreSQL.runSession $ do
     Session.deleteImageFromCollection collectionId imageSettingsId
     Session.selectCollections
 
 handleSetCollectionTarget :: Handler sig m => CollectionId -> m [Collection]
 handleSetCollectionTarget collectionId = do
-  logTrace @"stdout" "handler" "set collection target"
+  logTraceShow @"stdout" "set collection target" collectionId
   PostgreSQL.runTransaction $
     Session.updateCollectionTarget collectionId
   PostgreSQL.runSession Session.selectCollections
 
 -- HANDLER HELPERS
 
-throwLeft :: Handler sig m => m (Either err a) -> m a
+throwLeft :: Show err => Handler sig m => m (Either err a) -> m a
 throwLeft m =
   m
     >>= either
-      ( \(_ :: err) -> do
-          logTrace @"stdout" "handler" "image read error"
-          throwError err404
-      )
+      (\(e :: err) -> logErrorShow @"stdout" "error" e >> throwError err404)
       pure
 
 -- | Read image from disk, normalize before crop, keep result in MVar
@@ -267,7 +285,6 @@ getCachedImage imageSettingsId crop path =
           logTraceShow @"stdout" "loaded from cache" imageSettingsId
           pure (cachedImage, MVar.putMVar env.imageMVar (Just cache))
         | otherwise -> do
-          logTraceShow @"stdout" "loading from disk" imageSettingsId
           image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
           Util.writeToCache cachedImageSettingsId cachedCrop cachedImage
           pure

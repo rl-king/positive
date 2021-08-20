@@ -95,6 +95,7 @@ handlers isDev chan =
               getSettingsHistogram = Handler.handleGetSettingsHistogram,
               generateHighRes = Handler.handleGenerateHighRes,
               openExternalEditor = Handler.handleOpenExternalEditor,
+              openInFinder = Handler.handleOpenInFinder,
               getCoordinateInfo = Handler.handleGetCoordinateInfo,
               generateWallpaper = Handler.handleGenerateWallpaper
             }

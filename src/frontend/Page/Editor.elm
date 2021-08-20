@@ -259,6 +259,8 @@ type Msg
     | GotElementPosition Element
     | OpenExternalEditor
     | GotOpenExternalEditor (HttpResult ())
+    | OpenInFinder
+    | GotOpenInFinder (HttpResult ())
     | ToggleFullscreen
     | AddToCollection ImageSettingsId CollectionId
     | RemoveFromCollection ImageSettingsId CollectionId
@@ -665,6 +667,19 @@ update key msg model =
 
         GotOpenExternalEditor (Err _) ->
             pushNotification Warning RemoveNotification "Error opening external editor" model
+
+        OpenInFinder ->
+            ( model
+            , Cmd.map GotOpenInFinder <|
+                Request.postImageSettingsFinderByImageSettingsId <|
+                    (Zipper.current model.images).id
+            )
+
+        GotOpenInFinder (Ok _) ->
+            pushNotification Normal RemoveNotification "Opening finder" model
+
+        GotOpenInFinder (Err _) ->
+            pushNotification Warning RemoveNotification "Error opening finder" model
 
         ToggleFullscreen ->
             ( { model | fullscreen = not model.fullscreen }, Cmd.none )
@@ -1129,6 +1144,8 @@ viewSettingsLeft images undoState imageCropMode clipboard_ processingState =
                 [ Icon.wallpaper ]
             , button [ onClick OpenExternalEditor, title "open external" ]
                 [ Icon.externalEditor ]
+            , button [ onClick OpenInFinder, title "open in finder" ]
+                [ Icon.open ]
             ]
         , viewSettingsGroup
             [ button [ onClick NextImage ] [ Icon.right ]

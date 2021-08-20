@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="14px" height="15px" viewBox="0 0 14 15" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 56.3 (81716) - https://sketch.com -->
+    <title>open</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Artboard" transform="translate(-28.000000, -19.000000)" stroke="#FFFFFF" stroke-width="2">
+            <g id="open" transform="translate(28.000000, 21.000000)">
+                <path d="M14,11.5 L0,11.5" id="Rectangle"></path>
+                <polyline id="Line" stroke-linecap="square" transform="translate(7.000000, 2.500000) scale(1, -1) translate(-7.000000, -2.500000) " points="2 0 7 5 12 0"></polyline>
+            </g>
+        </g>
+    </g>
+</svg>
