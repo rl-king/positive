@@ -58,10 +58,10 @@ readImageFromWithCache imageSettingsId crop path = do
   exists <- sendIO $ Directory.doesFileExist cachePath
   if exists
     then do
-      logTrace @"stdout" "cache" "found cached image on disk"
+      logTraceShow @"stdout" "found cached image on disk" imageSettingsId
       sendIO $ Image.fromDisk cachePath
     else do
-      logTrace @"stdout" "cache" "no cached image on disk, loading from source"
+      logTraceShow @"stdout" "loading from source" imageSettingsId
       sendIO $
         Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
 

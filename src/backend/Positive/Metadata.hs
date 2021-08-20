@@ -40,17 +40,16 @@ loop ::
 loop lock = do
   key <- sendIO $ takeMVar lock
   previews <- PostgreSQL.runSession Session.selectOutdatedPreviews
-  case previews of
-    [] -> do
-      logTrace @"stdout" "metadata" "found no outdated previews"
-      loop lock
-    outdatedPreviews@((dir, imageSettings) : rest) -> do
-      logTrace @"stdout" "metadata" $
-        "found " <> tshow (length outdatedPreviews) <> " outdated previews"
-      timedM "metadata" $ upsertMetadata dir imageSettings
-      logTrace @"sse" "preview" . tshow $ Id.unpack imageSettings.id
-      unless (null rest) $ sendIO (void (tryPutMVar lock key))
-      loop lock
+  withContext @"stdout" "preview" $
+    case previews of
+      [] -> logTrace @"stdout" "outdated previews" "0"
+      outdatedPreviews@((dir, imageSettings) : rest) -> do
+        logTraceShow @"stdout" "outdated previews" $
+          length outdatedPreviews
+        timedM "creating preview" $ upsertMetadata dir imageSettings
+        logTrace @"sse" "preview" . tshow $ Id.unpack imageSettings.id
+        unless (null rest) $ sendIO (void (tryPutMVar lock key))
+  loop lock
 
 -- WRITE
 
@@ -75,7 +74,7 @@ upsertMetadata (Path.toFilePath -> dir) imageSettings =
           sendIO (Image.fromDiskPreProcess (Just 750) imageSettings.crop input)
         case resizedImage of
           Left _ ->
-            logError @"stdout" "metadata" "unable to load image"
+            logErrorShow @"stdout" "unable to load image" imageSettings.id
           Right image -> do
             sendIO . HIP.writeImage output $
               Image.applySettings imageSettings image
@@ -87,8 +86,7 @@ upsertMetadata (Path.toFilePath -> dir) imageSettings =
                   histogram =
                     Massiv.toVector . generateHistogram $ HIP.unImage image
                 }
-            logTrace @"stdout" "metadata" $
-              "generated preview for image id: " <> tshow (Id.unpack imageSettings.id)
+            logTraceShow @"stdout" "generated preview for" imageSettings.id
 
 generateHistogram ::
   ( HIP.Source r ix (HIP.Pixel HIP.Y e),

@@ -105,7 +105,7 @@ putLogStr logger logLevel context title msg =
             " ",
             if null context
               then ""
-              else toLogStr (Text.intercalate " | " context) <> " > ",
+              else toLogStr (Text.intercalate " | " context) <> " | ",
             toLogStr $ title <> " > ",
             toLogStr msg,
             "\n"

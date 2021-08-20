@@ -15,20 +15,18 @@ import Positive.Prelude
 
 timedM :: (HasLabelled "stdout" Log sig m, Has (Lift IO) sig m) => Text -> m a -> m a
 timedM name action = do
-  logTrace @"stdout" "profile" $ name <> " - started"
+  logTrace @"stdout" "profiling started" name
   start <- sendIO Time.getCurrentTime
   a <- liftWith $ \run ctx -> evaluate =<< run (action <$ ctx)
   done <- sendIO Time.getCurrentTime
-  logTrace @"stdout" "profile" $
-    name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
+  logTraceShow @"stdout" (name <> " took") $ Time.diffUTCTime done start
   pure a
 
 timed :: (HasLabelled "stdout" Log sig m, Has (Lift IO) sig m) => Text -> a -> m a
 timed name action = do
-  logTrace @"stdout" "profile" $ name <> " - started"
+  logTrace @"stdout" "profiling started" name
   start <- sendIO Time.getCurrentTime
   a <- sendIO $ evaluate action
   done <- sendIO Time.getCurrentTime
-  logTrace @"stdout" "profile" $
-    name <> " - processed in: " <> tshow (Time.diffUTCTime done start)
+  logTraceShow @"stdout" (name <> " took") $ Time.diffUTCTime done start
   pure a
