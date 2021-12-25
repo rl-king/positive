@@ -26,6 +26,7 @@ import System.FilePath.Posix ((</>))
 import qualified System.FilePath.Posix as Path
 import qualified System.Process as Process
 
+
 -- CODEGEN
 
 main :: IO ()
@@ -65,6 +66,7 @@ main = do
     writeFile (location </> filename) (show contents)
     Text.putStrLn $ "Wrote elm file: " <> Text.pack (location </> filename)
   runElmFormat
+
 
 runElmFormat :: IO ()
 runElmFormat =

@@ -8,15 +8,14 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- |
-module Positive.Effect.PostgreSQL
-  ( PostgreSQL (..),
-    runSession,
-    runTransaction,
-    runPostgreSQL,
-    Error (..),
-  )
-where
+--
+module Positive.Effect.PostgreSQL (
+  PostgreSQL (..),
+  runSession,
+  runTransaction,
+  runPostgreSQL,
+  Error (..),
+) where
 
 import Control.Algebra
 import Control.Carrier.Reader
@@ -29,24 +28,30 @@ import Hasql.Transaction.Sessions (IsolationLevel (..), Mode (..))
 import qualified Hasql.Transaction.Sessions as Transaction
 import Positive.Prelude
 
+
 data PostgreSQL (m :: Type -> Type) k where
   Session :: Session a -> PostgreSQL m (Either Error a)
   Transaction :: Transaction a -> PostgreSQL m (Either Error a)
 
+
 newtype Error = Error Hasql.UsageError
   deriving (Show, Eq)
+
 
 runTransaction ::
   (Has PostgreSQL sig m, Has (Throw Error) sig m) => Transaction a -> m a
 runTransaction =
   liftEither <=< send . Transaction
 
+
 runSession :: (Has PostgreSQL sig m, Has (Throw Error) sig m) => Session a -> m a
 runSession =
   liftEither <=< send . Session
 
+
 newtype PostgreSQLC m a = PostgreSQLC {unPostgreSQLC :: ReaderC Hasql.Pool m a}
   deriving newtype (Applicative, Functor, Monad, MonadIO)
+
 
 instance
   (Algebra sig m, Has (Lift IO) sig m) =>
@@ -66,6 +71,7 @@ instance
             ( Hasql.use pool $
                 Transaction.transaction Serializable Write transaction
             )
+
 
 runPostgreSQL :: Hasql.Pool -> PostgreSQLC m a -> m a
 runPostgreSQL pool =

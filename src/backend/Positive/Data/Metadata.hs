@@ -9,19 +9,23 @@ import Positive.Data.HKD
 import Positive.Data.Id
 import Positive.Prelude
 
+
 -- ALIAS
 
 type Metadata = MetadataBase FromDatabase Identity
 
+
 type UpsertMetadata = MetadataBase New Maybe
+
 
 -- METADATA
 
 data MetadataBase t f = MetadataBase
-  { id :: P t f MetadataId,
-    imageId :: ImageSettingsId,
-    preview_updated :: Maybe UTCTime,
-    histogram :: Vector Int
+  { id :: P t f MetadataId
+  , imageId :: ImageSettingsId
+  , preview_updated :: Maybe UTCTime
+  , histogram :: Vector Int
   }
+
 
 deriving instance Show Metadata

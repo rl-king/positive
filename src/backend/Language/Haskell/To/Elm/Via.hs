@@ -17,8 +17,10 @@ import qualified Language.Elm.Name as Name
 import Language.Haskell.To.Elm
 import Positive.Prelude
 
+
 newtype ElmType (name :: Symbol) a
   = ElmType a
+
 
 instance
   (Generic a, Aeson.GToJSON Aeson.Zero (Rep a)) =>
@@ -27,6 +29,7 @@ instance
   toJSON (ElmType a) =
     Aeson.genericToJSON Aeson.defaultOptions a
 
+
 instance
   (Generic a, Aeson.GFromJSON Aeson.Zero (Rep a)) =>
   Aeson.FromJSON (ElmType name a)
@@ -34,10 +37,11 @@ instance
   parseJSON =
     fmap ElmType . Aeson.genericParseJSON Aeson.defaultOptions
 
+
 instance
-  ( SOP.HasDatatypeInfo a,
-    SOP.All2 HasElmType (SOP.Code a),
-    KnownSymbol name
+  ( SOP.HasDatatypeInfo a
+  , SOP.All2 HasElmType (SOP.Code a)
+  , KnownSymbol name
   ) =>
   HasElmType (ElmType name a)
   where
@@ -49,12 +53,13 @@ instance
       . symbolVal
       $ Proxy @name
 
+
 instance
-  ( SOP.HasDatatypeInfo a,
-    HasElmType a,
-    SOP.All2 (HasElmDecoder Aeson.Value) (SOP.Code a),
-    HasElmType (ElmType name a),
-    KnownSymbol name
+  ( SOP.HasDatatypeInfo a
+  , HasElmType a
+  , SOP.All2 (HasElmDecoder Aeson.Value) (SOP.Code a)
+  , HasElmType (ElmType name a)
+  , KnownSymbol name
   ) =>
   HasElmDecoder Aeson.Value (ElmType name a)
   where
@@ -67,12 +72,13 @@ instance
       . symbolVal
       $ Proxy @name
 
+
 instance
-  ( SOP.HasDatatypeInfo a,
-    HasElmType a,
-    SOP.All2 (HasElmEncoder Aeson.Value) (SOP.Code a),
-    HasElmType (ElmType name a),
-    KnownSymbol name
+  ( SOP.HasDatatypeInfo a
+  , HasElmType a
+  , SOP.All2 (HasElmEncoder Aeson.Value) (SOP.Code a)
+  , HasElmType (ElmType name a)
+  , KnownSymbol name
   ) =>
   HasElmEncoder Aeson.Value (ElmType name a)
   where

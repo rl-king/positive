@@ -15,6 +15,7 @@ import qualified System.Directory as Directory
 import qualified System.FilePath.Glob as Glob
 import System.FilePath.Posix as Path
 
+
 -- FS
 
 ensureUniqueFilename :: MonadIO m => FilePath -> m FilePath
@@ -30,9 +31,10 @@ ensureUniqueFilename filepath = do
               _ -> "-1"
          in mconcat [dropExtension filepath, preExt, takeExtension filepath]
 
+
 writeToCache ::
-  ( Has (Lift IO) sig m,
-    HasLabelled "stdout" Log sig m
+  ( Has (Lift IO) sig m
+  , HasLabelled "stdout" Log sig m
   ) =>
   ImageSettingsId ->
   ImageCrop ->
@@ -45,9 +47,10 @@ writeToCache imageSettingsId crop image = do
     logTraceShow @"stdout" "writing image to cache" imageSettingsId
     sendIO $ HIP.writeImage cachePath image
 
+
 readImageFromWithCache ::
-  ( Has (Lift IO) sig m,
-    HasLabelled "stdout" Log sig m
+  ( Has (Lift IO) sig m
+  , HasLabelled "stdout" Log sig m
   ) =>
   ImageSettingsId ->
   ImageCrop ->
@@ -64,6 +67,7 @@ readImageFromWithCache imageSettingsId crop path = do
       logTraceShow @"stdout" "loading from source" imageSettingsId
       sendIO $
         Image.fromDiskPreProcess (Just 1440) crop (Text.unpack path)
+
 
 toCacheFilePath ::
   Has (Lift IO) sig m =>

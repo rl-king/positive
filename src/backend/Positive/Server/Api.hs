@@ -15,90 +15,96 @@ import Positive.Prelude hiding (ByteString)
 import Servant
 import Servant.API.Generic
 
+
 -- API
 
 data Api route = Api
-  { settingsApi :: route :- ToServantApi SettingsApi,
-    imageApi :: route :- ToServantApi ImageApi
+  { settingsApi :: route :- ToServantApi SettingsApi
+  , imageApi :: route :- ToServantApi ImageApi
   }
   deriving (Generic)
+
 
 data ImageApi route = ImageApi
   { image ::
       route :- "image"
         :> QueryParam' '[Required, Strict] "dir" Text
         :> QueryParam' '[Required, Strict] "image-settings" ImageSettings
-        :> Get '[Image] ByteString,
-    events :: route :- "events" :> Raw,
-    raw :: route :- Raw
+        :> Get '[Image] ByteString
+  , events :: route :- "events" :> Raw
+  , raw :: route :- Raw
   }
   deriving (Generic)
+
 
 data SettingsApi route = SettingsApi
   -- FIXME: rename paths
   { saveFilmRoll ::
       route :- "film-roll"
         :> ReqBody '[JSON] FilmRoll
-        :> Post '[JSON] FilmRoll,
-    checkExpressions ::
+        :> Post '[JSON] FilmRoll
+  , checkExpressions ::
       route :- "image" :> "settings" :> "expressions"
         :> ReqBody '[JSON] [Expression]
-        :> Post '[JSON] [ExpressionResult],
-    getSettings ::
+        :> Post '[JSON] [ExpressionResult]
+  , getSettings ::
       route :- "image"
         :> "settings"
-        :> Get '[JSON] [FilmRoll],
-    getCollections ::
+        :> Get '[JSON] [FilmRoll]
+  , getCollections ::
       route :- "collection"
-        :> Get '[JSON] [Collection],
-    addToCollection ::
-      route :- "collection"
-        :> Capture "collectionId" CollectionId
-        :> Capture "imageSettingsId" ImageSettingsId
-        :> Post '[JSON] [Collection],
-    removeFromCollection ::
+        :> Get '[JSON] [Collection]
+  , addToCollection ::
       route :- "collection"
         :> Capture "collectionId" CollectionId
         :> Capture "imageSettingsId" ImageSettingsId
-        :> Delete '[JSON] [Collection],
-    setCollectionTarget ::
+        :> Post '[JSON] [Collection]
+  , removeFromCollection ::
       route :- "collection"
         :> Capture "collectionId" CollectionId
-        :> Post '[JSON] [Collection],
-    getSettingsHistogram ::
+        :> Capture "imageSettingsId" ImageSettingsId
+        :> Delete '[JSON] [Collection]
+  , setCollectionTarget ::
+      route :- "collection"
+        :> Capture "collectionId" CollectionId
+        :> Post '[JSON] [Collection]
+  , getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> ReqBody '[JSON] ImageSettings
-        :> Post '[JSON] (Vector Int),
-    generateHighRes ::
+        :> Post '[JSON] (Vector Int)
+  , generateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent,
-    openExternalEditor ::
+        :> PostNoContent '[JSON] NoContent
+  , openExternalEditor ::
       route :- "image" :> "settings" :> "externaleditor"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent,
-    openInFinder ::
+        :> PostNoContent '[JSON] NoContent
+  , openInFinder ::
       route :- "image" :> "settings" :> "finder"
         :> Capture "imageSettingsId" ImageSettingsId
-        :> PostNoContent '[JSON] NoContent,
-    getCoordinateInfo ::
+        :> PostNoContent '[JSON] NoContent
+  , getCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
         :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)
-        :> Post '[JSON] [CoordinateInfo],
-    generateWallpaper ::
+        :> Post '[JSON] [CoordinateInfo]
+  , generateWallpaper ::
       route :- "image" :> "settings" :> "wallpaper"
         :> ReqBody '[JSON] ImageSettings
         :> PostNoContent '[JSON] NoContent
   }
   deriving (Generic)
 
+
 -- IMAGE
 
 data Image
 
+
 instance Accept Image where
   contentType _ =
     "image" // "png"
+
 
 instance MimeRender Image ByteString where
   mimeRender _ = identity

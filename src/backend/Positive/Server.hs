@@ -1,9 +1,8 @@
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
-module Positive.Server
-  ( start,
-  )
-where
+module Positive.Server (
+  start,
+) where
 
 import Control.Carrier.Error.Church as Error.Church
 import Control.Carrier.Error.Either as Error.Either
@@ -25,6 +24,7 @@ import qualified Positive.Server.Handler as Handler
 import qualified Positive.Static as Static
 import Servant hiding (throwError)
 import Servant.Server.Generic
+
 
 -- SERVER
 
@@ -70,6 +70,7 @@ start logger pool isDev port =
             )
             (handlers isDev eventChan)
 
+
 -- HANDLERS
 
 handlers :: Handler.Handler sig m => CLI.IsDev -> Chan ServerEvent -> Api (AsServerT m)
@@ -78,25 +79,25 @@ handlers isDev chan =
     { imageApi =
         genericServerT
           ImageApi
-            { image = Handler.handleImage,
-              events = pure $ eventSourceAppChan chan,
-              raw = Static.serve isDev
-            },
-      settingsApi =
+            { image = Handler.handleImage
+            , events = pure $ eventSourceAppChan chan
+            , raw = Static.serve isDev
+            }
+    , settingsApi =
         genericServerT
           SettingsApi
-            { saveFilmRoll = Handler.handleSaveFilmRoll,
-              checkExpressions = Handler.handleCheckExpressions,
-              getSettings = Handler.handleGetSettings,
-              getCollections = Handler.handleGetCollections,
-              addToCollection = Handler.handleAddToCollection,
-              removeFromCollection = Handler.handleRemoveFromCollection,
-              setCollectionTarget = Handler.handleSetCollectionTarget,
-              getSettingsHistogram = Handler.handleGetSettingsHistogram,
-              generateHighRes = Handler.handleGenerateHighRes,
-              openExternalEditor = Handler.handleOpenExternalEditor,
-              openInFinder = Handler.handleOpenInFinder,
-              getCoordinateInfo = Handler.handleGetCoordinateInfo,
-              generateWallpaper = Handler.handleGenerateWallpaper
+            { saveFilmRoll = Handler.handleSaveFilmRoll
+            , checkExpressions = Handler.handleCheckExpressions
+            , getSettings = Handler.handleGetSettings
+            , getCollections = Handler.handleGetCollections
+            , addToCollection = Handler.handleAddToCollection
+            , removeFromCollection = Handler.handleRemoveFromCollection
+            , setCollectionTarget = Handler.handleSetCollectionTarget
+            , getSettingsHistogram = Handler.handleGetSettingsHistogram
+            , generateHighRes = Handler.handleGenerateHighRes
+            , openExternalEditor = Handler.handleOpenExternalEditor
+            , openInFinder = Handler.handleOpenInFinder
+            , getCoordinateInfo = Handler.handleGetCoordinateInfo
+            , generateWallpaper = Handler.handleGenerateWallpaper
             }
     }

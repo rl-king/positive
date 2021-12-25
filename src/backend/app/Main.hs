@@ -9,6 +9,7 @@ import qualified Positive.SingleImage as SingleImage
 import System.Log.FastLogger (LogType' (..), defaultBufSize)
 import qualified System.Log.FastLogger as FastLogger
 
+
 -- MAIN
 
 main :: IO ()

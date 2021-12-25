@@ -21,6 +21,7 @@ import Positive.Prelude hiding (ByteString)
 import System.Directory
 import System.FilePath.Posix
 
+
 -- SINGLE IMAGE
 
 run :: TimedFastLogger -> Hasql.Pool -> FilePath -> IO ()
@@ -33,13 +34,14 @@ run logger pool filepath =
     & runLabelled @"stdout"
     & runLogStdout logger
 
+
 -- LOOKUP
 
 withLookup ::
-  ( HasLabelled "stdout" Log sig m,
-    Has PostgreSQL sig m,
-    Has (Lift IO) sig m,
-    Has (Throw PostgreSQL.Error) sig m
+  ( HasLabelled "stdout" Log sig m
+  , Has PostgreSQL sig m
+  , Has (Lift IO) sig m
+  , Has (Throw PostgreSQL.Error) sig m
   ) =>
   FilePath ->
   m ()
@@ -52,6 +54,7 @@ withLookup filepath = do
     PostgreSQL.runSession $
       Session.selectImageSettingsByPath dir filename
   generate dir imageSettings
+
 
 -- GENERATE
 

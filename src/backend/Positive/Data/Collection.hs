@@ -18,45 +18,56 @@ import Positive.Data.HKD
 import Positive.Data.Id
 import Positive.Prelude
 
+
 -- ALIAS
 
 type Collection = CollectionBase FromDatabase Identity
 
+
 type NewCollection = CollectionBase New Maybe
+
 
 -- FILMROLL
 
 data CollectionBase t f = CollectionBase
-  { id :: P t f CollectionId,
-    title :: Text,
-    created :: P t f UTCTime,
-    modified :: P t f UTCTime,
-    target :: Bool,
-    imageIds :: [ImageSettingsId]
+  { id :: P t f CollectionId
+  , title :: Text
+  , created :: P t f UTCTime
+  , modified :: P t f UTCTime
+  , target :: Bool
+  , imageIds :: [ImageSettingsId]
   }
   deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
 
+
 deriving via Elm.ElmType "Collection" Collection instance Aeson.ToJSON Collection
+
 
 deriving via Elm.ElmType "Collection" Collection instance Aeson.FromJSON Collection
 
+
 deriving via Elm.ElmType "Collection" Collection instance Elm.HasElmType Collection
+
 
 deriving via Elm.ElmType "Collection" Collection instance Elm.HasElmDecoder Aeson.Value Collection
 
+
 deriving via Elm.ElmType "Collection" Collection instance Elm.HasElmEncoder Aeson.Value Collection
+
 
 deriving instance Show Collection
 
+
 deriving instance NFData Collection
+
 
 emptyCollection :: Text -> NewCollection
 emptyCollection title =
   CollectionBase
-    { id = Nothing,
-      created = Nothing,
-      modified = Nothing,
-      target = False,
-      title = title,
-      imageIds = mempty
+    { id = Nothing
+    , created = Nothing
+    , modified = Nothing
+    , target = False
+    , title = title
+    , imageIds = mempty
     }

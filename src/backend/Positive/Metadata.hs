@@ -26,14 +26,15 @@ import Positive.Prelude hiding (ByteString)
 import Positive.Timed
 import System.FilePath.Posix
 
+
 -- LOOP
 
 loop ::
-  ( HasLabelled "stdout" Log sig m,
-    HasLabelled "sse" Log sig m,
-    Has PostgreSQL sig m,
-    Has (Lift IO) sig m,
-    Has (Throw PostgreSQL.Error) sig m
+  ( HasLabelled "stdout" Log sig m
+  , HasLabelled "sse" Log sig m
+  , Has PostgreSQL sig m
+  , Has (Lift IO) sig m
+  , Has (Throw PostgreSQL.Error) sig m
   ) =>
   MVar () ->
   m ()
@@ -51,13 +52,14 @@ loop lock = do
         unless (null rest) $ sendIO (void (tryPutMVar lock key))
   loop lock
 
+
 -- WRITE
 
 upsertMetadata ::
-  ( HasLabelled "stdout" Log sig m,
-    Has PostgreSQL sig m,
-    Has (Lift IO) sig m,
-    Has (Throw PostgreSQL.Error) sig m
+  ( HasLabelled "stdout" Log sig m
+  , Has PostgreSQL sig m
+  , Has (Lift IO) sig m
+  , Has (Throw PostgreSQL.Error) sig m
   ) =>
   Path.Directory ->
   ImageSettings ->
@@ -80,17 +82,18 @@ upsertMetadata (Path.toFilePath -> dir) imageSettings =
               Image.applySettings imageSettings image
             PostgreSQL.runSession . Session.upsertMetadata $
               MetadataBase
-                { id = Nothing,
-                  imageId = imageSettings.id,
-                  preview_updated = Nothing,
-                  histogram =
+                { id = Nothing
+                , imageId = imageSettings.id
+                , preview_updated = Nothing
+                , histogram =
                     Massiv.toVector . generateHistogram $ HIP.unImage image
                 }
             logTraceShow @"stdout" "generated preview for" imageSettings.id
 
+
 generateHistogram ::
-  ( HIP.Source r ix (HIP.Pixel HIP.Y e),
-    HIP.Elevator e
+  ( HIP.Source r ix (HIP.Pixel HIP.Y e)
+  , HIP.Elevator e
   ) =>
   HIP.Array r ix (HIP.Pixel HIP.Y e) ->
   HIP.Array Massiv.P HIP.Ix1 Int

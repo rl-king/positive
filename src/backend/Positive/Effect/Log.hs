@@ -28,22 +28,26 @@ import Network.Wai.EventSource
 import Positive.Prelude
 import System.Log.FastLogger (ToLogStr, toLogStr)
 
+
 data Log (m :: Type -> Type) a where
   Log :: LogLevel -> Text -> Text -> Log m ()
   Context :: Text -> m a -> Log m a
+
 
 data LogLevel
   = Trace
   | Error
   deriving (Bounded, Eq, Ord)
 
+
 instance ToLogStr LogLevel where
   toLogStr = \case
     Trace -> "[trace]"
     Error -> "[error]"
 
-logTrace,
-  logError ::
+
+logTrace
+  , logError ::
     forall label sig m.
     HasLabelled (label :: Symbol) Log sig m =>
     Text ->
@@ -52,8 +56,9 @@ logTrace,
 logTrace context = runUnderLabel @label . send . Log Trace context
 logError context = runUnderLabel @label . send . Log Error context
 
-logTraceShow,
-  logErrorShow ::
+
+logTraceShow
+  , logErrorShow ::
     forall label sig m msg.
     (Show msg, HasLabelled (label :: Symbol) Log sig m) =>
     Text ->
@@ -61,6 +66,7 @@ logTraceShow,
     m ()
 logTraceShow context = logTrace @label context . tshow
 logErrorShow context = logError @label context . tshow
+
 
 withContext ::
   forall label sig m a.
@@ -70,12 +76,14 @@ withContext ::
   m a
 withContext a m = sendLabelled @label $ Context a m
 
+
 -- STDOUT
 
 newtype LogStdoutC m a = LogStdoutC
   { unLogStdout :: ReaderC ([Text], TimedFastLogger) m a
   }
   deriving newtype (Applicative, Functor, Monad, MonadIO)
+
 
 instance
   (Algebra sig m, Has (Lift IO) sig m) =>
@@ -94,27 +102,30 @@ instance
         (context, logger) <- LogStdoutC ask
         (<$ ctx) <$> sendIO (putLogStr logger logLevel context title msg)
 
+
 putLogStr :: TimedFastLogger -> LogLevel -> [Text] -> Text -> Text -> IO ()
 putLogStr logger logLevel context title msg =
   logger
     ( \t ->
         mconcat
-          [ toLogStr t,
-            " ",
-            toLogStr logLevel,
-            " ",
-            if null context
+          [ toLogStr t
+          , " "
+          , toLogStr logLevel
+          , " "
+          , if null context
               then ""
-              else toLogStr (Text.intercalate " | " context) <> " | ",
-            toLogStr $ title <> " > ",
-            toLogStr msg,
-            "\n"
+              else toLogStr (Text.intercalate " | " context) <> " | "
+          , toLogStr $ title <> " > "
+          , toLogStr msg
+          , "\n"
           ]
     )
+
 
 runLogStdout :: TimedFastLogger -> LogStdoutC m a -> m a
 runLogStdout logger =
   runReader ([], logger) . unLogStdout
+
 
 -- SSE
 
@@ -122,6 +133,7 @@ newtype LogServerEventC m a = LogServerEventC
   { unLogServerEvent :: ReaderC ([Text], Chan ServerEvent) m a
   }
   deriving newtype (Applicative, Functor, Monad, MonadIO)
+
 
 instance
   (Algebra sig m, Has (Lift IO) sig m) =>
@@ -144,6 +156,7 @@ instance
             Nothing
             [Builder.byteString $ encodeUtf8 msg]
         pure (() <$ ctx)
+
 
 runLogServerEvent :: Chan ServerEvent -> LogServerEventC m a -> m a
 runLogServerEvent chan =

@@ -14,6 +14,7 @@ import Network.Wai.Application.Static
 import Positive.Prelude
 import Servant
 
+
 serve :: Bool -> Tagged (m :: Type -> Type) Application
 serve True =
   pure $ \req resp ->
@@ -41,6 +42,7 @@ serve False =
           _ ->
             staticApp (defaultFileServerSettings "/") req resp
 
+
 toFile :: Http.ResponseHeaders -> [Text] -> HashMap Text ByteString -> Wai.Response
 toFile headers path assets =
   maybe
@@ -48,9 +50,11 @@ toFile headers path assets =
     (Wai.responseLBS Http.status200 headers . fromStrict)
     $ HashMap.lookup (Text.intercalate "/" path) assets
 
+
 indexHtml :: ByteString
 indexHtml =
   $(embedFile "./index.html")
+
 
 static :: [(FilePath, ByteString)]
 static =
