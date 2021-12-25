@@ -26,6 +26,7 @@ import Positive.Data.Metadata as Metadata
 import qualified Positive.Data.Path as Path
 import Positive.Prelude
 
+
 -- INSERT
 
 insertImageSettings :: FilmRollId -> Path.Filename -> Transaction ImageSettingsId
@@ -40,17 +41,19 @@ insertImageSettings filmRollId filename =
    in Transaction.statement (emptyImageSettings filmRollId filename) $
         Statement sql encodeNewImageSettings decoder True
 
-insertFilmRoll :: Path.Directory -> Transaction FilmRollId
-insertFilmRoll directoryPath =
+
+insertFilmRoll :: RollNumber -> Path.Directory -> Transaction FilmRollId
+insertFilmRoll rollNumber directoryPath =
   let sql =
         "insert into positive.film_roll\
-        \ (poster, directory_path)\
-        \ values ($1, $2)\
+        \ (poster, directory_path, roll_number)\
+        \ values ($1, $2, $3)\
         \ returning id"
       decoder =
         Decode.singleRow $ Id.pack <$> column Decode.int4
-   in Transaction.statement (emptyFilmRoll directoryPath) $
+   in Transaction.statement (emptyFilmRoll rollNumber directoryPath) $
         Statement sql encodeNewFilmRoll decoder True
+
 
 insertImageToCollection :: CollectionId -> ImageSettingsId -> Session ()
 insertImageToCollection collectionId imageSettingsId =
@@ -65,6 +68,7 @@ insertImageToCollection collectionId imageSettingsId =
    in Session.statement (imageSettingsId, collectionId) $
         Statement sql encode Decode.noResult True
 
+
 -- DELETE
 
 deleteImageFromCollection :: CollectionId -> ImageSettingsId -> Session ()
@@ -78,6 +82,7 @@ deleteImageFromCollection collectionId imageSettingsId =
    in Session.statement (imageSettingsId, collectionId) $
         Statement sql encode Decode.noResult True
 
+
 -- UPDATE
 
 updateCollectionTarget :: CollectionId -> Transaction ()
@@ -90,9 +95,11 @@ updateCollectionTarget collectionId =
         Transaction.statement collectionId $
           Statement sql2 (Id.unpack >$< param Encode.int4) Decode.noResult True
 
+
 updateImageSettingsList :: [ImageSettings] -> Transaction ()
 updateImageSettingsList =
   traverse_ updateImageSettings
+
 
 updateImageSettings :: ImageSettings -> Transaction ()
 updateImageSettings imageSettings =
@@ -112,6 +119,7 @@ updateImageSettings imageSettings =
    in Transaction.statement imageSettings $
         Statement sql encodeImageSettings Decode.noResult True
 
+
 upsertMetadata :: UpsertMetadata -> Session ()
 upsertMetadata newMetadata =
   let sql =
@@ -123,14 +131,16 @@ upsertMetadata newMetadata =
    in Session.statement newMetadata $
         Statement sql encodeUpdateMetadata Decode.noResult True
 
-updatePoster :: Maybe ImageSettingsId -> FilmRollId -> Session ()
+
+updatePoster :: Maybe ImageSettingsId -> FilmRollId -> Transaction ()
 updatePoster imageSettingsId filmRollId =
   let sql = "update positive.film_roll set poster = $1 where id = $2"
       encoder =
         (fmap Id.unpack . fst >$< nullableParam Encode.int4)
           <> (Id.unpack . snd >$< param Encode.int4)
-   in Session.statement (imageSettingsId, filmRollId) $
+   in Transaction.statement (imageSettingsId, filmRollId) $
         Statement sql encoder Decode.noResult True
+
 
 updateDevelopedOn :: DevelopedOn -> FilmRollId -> Session ()
 updateDevelopedOn developedOn filmRollId =
@@ -141,6 +151,7 @@ updateDevelopedOn developedOn filmRollId =
    in Session.statement (developedOn, filmRollId) $
         Statement sql encoder Decode.noResult True
 
+
 updateRollNumber :: RollNumber -> FilmRollId -> Session ()
 updateRollNumber rollNumber filmRollId =
   let sql = "update positive.film_roll set roll = $1 where id = $2"
@@ -149,6 +160,7 @@ updateRollNumber rollNumber filmRollId =
           <> (Id.unpack . snd >$< param Encode.int4)
    in Session.statement (rollNumber, filmRollId) $
         Statement sql encoder Decode.noResult True
+
 
 updateMeta :: (Text, Text, Text, Text) -> FilmRollId -> Session ()
 updateMeta meta filmRollId =
@@ -168,6 +180,7 @@ updateMeta meta filmRollId =
    in Session.statement (meta, filmRollId) $
         Statement sql encoder Decode.noResult True
 
+
 -- SELECT
 
 selectOutdatedPreviews :: Session [(Path.Directory, ImageSettings)]
@@ -183,6 +196,7 @@ selectOutdatedPreviews =
           (,) <$> (Path.pack <$> column Decode.text) <*> decodeImageSettings
    in Session.statement () $
         Statement sql Encode.noParams decoder True
+
 
 selectImageSettingsByPath ::
   Path.Directory ->
@@ -204,6 +218,7 @@ selectImageSettingsByPath dir filename =
    in Session.statement (dir, filename) $
         Statement sql encoder decoder True
 
+
 selectDirectoryPath :: ImageSettingsId -> Session Path.Directory
 selectDirectoryPath imageSettingsId =
   let sql =
@@ -216,6 +231,7 @@ selectDirectoryPath imageSettingsId =
           (param $ Id.unpack >$< Encode.int4)
           (Decode.singleRow $ column (Path.pack <$> Decode.text))
           True
+
 
 selectFilmRolls :: Session [FilmRoll]
 selectFilmRolls =
@@ -231,8 +247,8 @@ selectFilmRolls =
               Just existingFilmRoll ->
                 Just $
                   existingFilmRoll
-                    { poster = newFilmRoll.poster <|> existingFilmRoll.poster,
-                      imageSettings =
+                    { poster = newFilmRoll.poster <|> existingFilmRoll.poster
+                    , imageSettings =
                         newFilmRoll.imageSettings <> existingFilmRoll.imageSettings
                     }
           )
@@ -244,6 +260,7 @@ selectFilmRolls =
           Encode.noParams
           (HashMap.elems <$> Decode.foldrRows merge mempty decodeFilmRoll)
           True
+
 
 selectImageSettings :: ImageSettingsId -> Session ImageSettings
 selectImageSettings imageSettingsId =
@@ -258,6 +275,7 @@ selectImageSettings imageSettingsId =
           (Decode.singleRow decodeImageSettings)
           True
 
+
 selectCollections :: Session [Collection]
 selectCollections =
   let sql =
@@ -269,44 +287,50 @@ selectCollections =
    in Session.statement () $
         Statement sql Encode.noParams (Decode.rowList decodeCollection) True
 
+
 -- EN-DECODING
 
 encodeNewFilmRoll :: Encode.Params NewFilmRoll
 encodeNewFilmRoll =
   mconcat
-    [ fmap Id.unpack . poster >$< nullableParam Encode.int4,
-      Path.unpack . directoryPath >$< param Encode.text
+    [ fmap Id.unpack . poster >$< nullableParam Encode.int4
+    , Path.unpack . directoryPath >$< param Encode.text
+    , (\(RollNumber n) -> n) . rollNumber >$< param Encode.int2
     ]
+
 
 encodeImageSettings :: Encode.Params ImageSettings
 encodeImageSettings =
   mconcat
-    [ Id.unpack . ImageSettings.id >$< param Encode.int4,
-      encodeNewImageSettings
+    [ Id.unpack . ImageSettings.id >$< param Encode.int4
+    , encodeNewImageSettings
     ]
+
 
 encodeNewImageSettings :: Encode.Params (ImageSettingsBase a b)
 encodeNewImageSettings =
   mconcat
-    [ Id.unpack . ImageSettings.filmRollId >$< param Encode.int4,
-      Path.unpack . filename >$< param Encode.text,
-      rating >$< param Encode.int2,
-      rotate >$< param Encode.float8,
-      Aeson.toJSON . crop >$< param Encode.jsonb,
-      gamma >$< param Encode.float8,
-      Aeson.toJSON . zones >$< param Encode.jsonb,
-      blackpoint >$< param Encode.float8,
-      whitepoint >$< param Encode.float8,
-      Aeson.toJSON . expressions >$< param Encode.jsonb
+    [ Id.unpack . ImageSettings.filmRollId >$< param Encode.int4
+    , Path.unpack . filename >$< param Encode.text
+    , rating >$< param Encode.int2
+    , rotate >$< param Encode.float8
+    , Aeson.toJSON . crop >$< param Encode.jsonb
+    , gamma >$< param Encode.float8
+    , Aeson.toJSON . zones >$< param Encode.jsonb
+    , blackpoint >$< param Encode.float8
+    , whitepoint >$< param Encode.float8
+    , Aeson.toJSON . expressions >$< param Encode.jsonb
     ]
+
 
 encodeUpdateMetadata :: Encode.Params UpsertMetadata
 encodeUpdateMetadata =
   mconcat
-    [ Id.unpack . Metadata.imageId >$< param Encode.int4,
-      fmap (toEnum . fromIntegral) . Metadata.histogram
+    [ Id.unpack . Metadata.imageId >$< param Encode.int4
+    , fmap (toEnum . fromIntegral) . Metadata.histogram
         >$< param (Encode.foldableArray (Encode.nonNullable Encode.int4))
     ]
+
 
 decodeFilmRoll :: Decode.Row FilmRoll
 decodeFilmRoll =
@@ -324,6 +348,7 @@ decodeFilmRoll =
     <*> column Decode.text
     <*> fmap pure decodeImageSettings
 
+
 decodeCollection :: Decode.Row Collection
 decodeCollection =
   CollectionBase
@@ -334,6 +359,7 @@ decodeCollection =
     <*> column Decode.bool
     <*> column
       (fmap Id.pack <$> Decode.listArray (Decode.nonNullable Decode.int4))
+
 
 decodeImageSettings :: Decode.Row ImageSettings
 decodeImageSettings =
@@ -358,6 +384,7 @@ decodeImageSettings =
               )
         )
 
+
 decodeMetadata :: Decode.Row Metadata
 decodeMetadata =
   MetadataBase
@@ -369,27 +396,33 @@ decodeMetadata =
           <$> Decode.vectorArray (Decode.nonNullable Decode.int4)
       )
 
+
 param :: Encode.Value a -> Encode.Params a
 param =
   Encode.param . Encode.nonNullable
+
 
 nullableParam :: Encode.Value a -> Encode.Params (Maybe a)
 nullableParam =
   Encode.param . Encode.nullable
 
+
 column :: Decode.Value a -> Decode.Row a
 column =
   Decode.column . Decode.nonNullable
 
+
 nullableColumn :: Decode.Value a -> Decode.Row (Maybe a)
 nullableColumn =
   Decode.column . Decode.nullable
+
 
 jsonb :: FromJSON a => Decode.Value a
 jsonb =
   Decode.refine
     (first Text.pack . Aeson.parseEither Aeson.parseJSON)
     Decode.jsonb
+
 
 -- HELPERS
 
@@ -398,6 +431,7 @@ rundb session = do
   Right conn <-
     Hasql.Connection.acquire "host=localhost port=5432 dbname=positive"
   Session.run session conn
+
 
 addDates :: IO ()
 addDates = do
@@ -409,6 +443,7 @@ addDates = do
         Just day -> updateDevelopedOn (DevelopedOn day) filmRoll.id
   print result
 
+
 extractDayFromDir :: String -> Maybe Day
 extractDayFromDir (y1 : y2 : y3 : y4 : '-' : m1 : m2 : '-' : d1 : d2 : _) = do
   y <- readMaybe [y1, y2, y3, y4]
@@ -418,6 +453,7 @@ extractDayFromDir (y1 : y2 : y3 : y4 : '-' : m1 : m2 : '-' : d1 : d2 : _) = do
 extractDayFromDir (_ : xs) = extractDayFromDir xs
 extractDayFromDir _ = Nothing
 
+
 addRoll :: IO ()
 addRoll = do
   result <- rundb $ do
@@ -425,14 +461,17 @@ addRoll = do
     for all $ \filmRoll -> do
       case extractRollFromDir $ Path.toFilePath filmRoll.directoryPath of
         Nothing -> pure ()
-        Just roll -> updateRollNumber (RollNumber roll) filmRoll.id
+        Just roll -> updateRollNumber roll filmRoll.id
   print result
 
-extractRollFromDir :: String -> Maybe Int16
+
+extractRollFromDir :: String -> Maybe RollNumber
 extractRollFromDir ('/' : 'R' : 'o' : 'l' : 'l' : ' ' : a : b : c : _) =
-  readMaybe [a, b, c] <|> readMaybe [a, b] <|> readMaybe [a]
+  fmap RollNumber $
+    readMaybe [a, b, c] <|> readMaybe [a, b] <|> readMaybe [a]
 extractRollFromDir (_ : xs) = extractRollFromDir xs
 extractRollFromDir _ = Nothing
+
 
 addMeta :: IO ()
 addMeta = do
@@ -446,6 +485,7 @@ addMeta = do
           updateMeta (Text.drop 11 film, camera, dev, "") filmRoll.id
         _ -> pure ()
   print result
+
 
 extractDescFromDir :: String -> Maybe Int16
 extractDescFromDir ('/' : 'R' : 'o' : 'l' : 'l' : ' ' : a : b : c : _) =

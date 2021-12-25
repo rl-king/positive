@@ -1,12 +1,11 @@
-module Positive.Prelude
-  ( module X,
+module Positive.Prelude (
+    module X,
     rightToMaybe,
     tshow,
     identity,
     unlessM,
     whenM,
-  )
-where
+) where
 
 import Control.Applicative as X ((<|>))
 import Control.Category as X ((>>>))
@@ -64,19 +63,19 @@ identity x = x
 
 tshow :: Show a => a -> Text
 tshow =
-  pack . show
+    pack . show
 
 -- FROM https://github.com/ndmitchell/extra
 
 -- | Like 'when', but where the test can be monadic.
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM b t =
-  ifM b t (pure ())
+    ifM b t (pure ())
 
 -- | Like 'unless', but where the test can be monadic.
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM b =
-  ifM b (pure ())
+    ifM b (pure ())
 
 -- | Like @if@, but where the test can be monadic.
 ifM :: Monad m => m Bool -> m a -> m a -> m a
@@ -84,6 +83,6 @@ ifM b t f = do c <- b; if c then t else f
 
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe e =
-  case e of
-    Left _ -> Nothing
-    Right r -> Just r
+    case e of
+        Left _ -> Nothing
+        Right r -> Just r

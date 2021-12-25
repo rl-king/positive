@@ -24,13 +24,13 @@ import qualified Positive.CLI as CLI
 import Positive.Data.Collection (Collection)
 import Positive.Data.FilmRoll (FilmRoll)
 import Positive.Data.Id
-import Positive.Data.ImageSettings
-  ( CoordinateInfo (..),
-    Expression (..),
-    ExpressionResult (..),
-    ImageCrop (..),
-    ImageSettings,
-  )
+import Positive.Data.ImageSettings (
+  CoordinateInfo (..),
+  Expression (..),
+  ExpressionResult (..),
+  ImageCrop (..),
+  ImageSettings,
+ )
 import qualified Positive.Data.Path as Path
 import qualified Positive.Database.Session as Session
 import Positive.Effect.Log
@@ -49,23 +49,26 @@ import qualified System.Exit
 import System.FilePath.Posix (isPathSeparator, (</>))
 import qualified System.Process as Process
 
+
 -- HANDLER
 
 type Handler sig m =
-  ( HasLabelled "stdout" Log sig m,
-    HasLabelled "sse" Log sig m,
-    Has PostgreSQL sig m,
-    Has (Reader Env) sig m,
-    Has (Lift IO) sig m,
-    Has (Throw PostgreSQL.Error) sig m,
-    Has (Throw ServerError) sig m
+  ( HasLabelled "stdout" Log sig m
+  , HasLabelled "sse" Log sig m
+  , Has PostgreSQL sig m
+  , Has (Reader Env) sig m
+  , Has (Lift IO) sig m
+  , Has (Throw PostgreSQL.Error) sig m
+  , Has (Throw ServerError) sig m
   )
 
+
 data Env = Env
-  { imageMVar :: !(MVar (Maybe (ImageSettingsId, ImageCrop, Image.Monochrome))),
-    previewMVar :: !(MVar ()),
-    isDev :: !CLI.IsDev
+  { imageMVar :: !(MVar (Maybe (ImageSettingsId, ImageCrop, Image.Monochrome)))
+  , previewMVar :: !(MVar ())
+  , isDev :: !CLI.IsDev
   }
+
 
 -- IMAGE
 
@@ -88,18 +91,21 @@ handleImage dir settings =
         sendIO putMVarBack
         pure encoded
 
+
 -- SAVE
 
 handleSaveFilmRoll :: Handler sig m => FilmRoll -> m FilmRoll
 handleSaveFilmRoll filmRoll = do
   _ <-
-    PostgreSQL.runTransaction $
+    PostgreSQL.runTransaction $ do
       Session.updateImageSettingsList filmRoll.imageSettings
+      Session.updatePoster filmRoll.poster filmRoll.id
   logTraceShow @"stdout" "saved filmroll" filmRoll.id
   env <- ask @Env
   void . sendIO $
     MVar.tryPutMVar env.previewMVar ()
   pure filmRoll
+
 
 -- CHECK EXPRESSIONS
 
@@ -115,6 +121,7 @@ handleCheckExpressions exprs =
           =<< first SyntaxError (Language.parse e.eExpr)
    in pure [either identity (eval e.eValue) (parseAndCheck e) | e <- exprs]
 
+
 -- GENERATE
 
 handleGenerateHighRes :: Handler sig m => ImageSettings -> m NoContent
@@ -123,6 +130,7 @@ handleGenerateHighRes settings = do
     PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
   SingleImage.generate directoryPath settings
   pure NoContent
+
 
 handleGenerateWallpaper :: Handler sig m => ImageSettings -> m NoContent
 handleGenerateWallpaper settings = do
@@ -150,6 +158,7 @@ handleGenerateWallpaper settings = do
   logTraceShow @"stdout" "wrote wallpaper version" settings.id
   pure NoContent
 
+
 -- OPEN
 
 handleOpenExternalEditor :: Handler sig m => ImageSettings -> m NoContent
@@ -166,6 +175,7 @@ handleOpenExternalEditor settings = do
     . HIP.displayImageUsing HIP.defaultViewer False
     $ Image.applySettings settings image
   pure NoContent
+
 
 handleOpenInFinder :: Handler sig m => ImageSettingsId -> m NoContent
 handleOpenInFinder imageSettingsId = do
@@ -186,6 +196,7 @@ handleOpenInFinder imageSettingsId = do
     result
   pure NoContent
 
+
 -- HISTOGRAM
 
 handleGetSettingsHistogram :: Handler sig m => ImageSettings -> m (Vector Int)
@@ -199,6 +210,7 @@ handleGetSettingsHistogram settings = do
   logTraceShow @"stdout" "creating histogram for" settings.id
   pure . Massiv.toVector . Metadata.generateHistogram . HIP.unImage $
     Image.applySettings settings image
+
 
 -- COORDINATE
 
@@ -224,6 +236,7 @@ handleGetCoordinateInfo (coordinates, settings) =
         sendIO putMVarBack
         pure $ fmap (toInfo image) coordinates
 
+
 -- LIST DIRECTORIES
 
 handleGetSettings :: Handler sig m => m [FilmRoll]
@@ -231,10 +244,12 @@ handleGetSettings = do
   logTrace @"stdout" "handler" "get filmrolls"
   PostgreSQL.runSession Session.selectFilmRolls
 
+
 handleGetCollections :: Handler sig m => m [Collection]
 handleGetCollections = do
   logTrace @"stdout" "handler" "get collections"
   PostgreSQL.runSession Session.selectCollections
+
 
 handleAddToCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
@@ -244,6 +259,7 @@ handleAddToCollection collectionId imageSettingsId = do
     Session.insertImageToCollection collectionId imageSettingsId
     Session.selectCollections
 
+
 handleRemoveFromCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
 handleRemoveFromCollection collectionId imageSettingsId = do
@@ -252,12 +268,14 @@ handleRemoveFromCollection collectionId imageSettingsId = do
     Session.deleteImageFromCollection collectionId imageSettingsId
     Session.selectCollections
 
+
 handleSetCollectionTarget :: Handler sig m => CollectionId -> m [Collection]
 handleSetCollectionTarget collectionId = do
   logTraceShow @"stdout" "set collection target" collectionId
   PostgreSQL.runTransaction $
     Session.updateCollectionTarget collectionId
   PostgreSQL.runSession Session.selectCollections
+
 
 -- HANDLER HELPERS
 
@@ -267,6 +285,7 @@ throwLeft m =
     >>= either
       (\(e :: err) -> logErrorShow @"stdout" "error" e >> throwError err404)
       pure
+
 
 -- | Read image from disk, normalize before crop, keep result in MVar
 getCachedImage ::
@@ -288,13 +307,13 @@ getCachedImage imageSettingsId crop path =
           image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
           Util.writeToCache cachedImageSettingsId cachedCrop cachedImage
           pure
-            ( image,
-              MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
+            ( image
+            , MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
             )
       Nothing -> do
         logTraceShow @"stdout" "loading from disk" imageSettingsId
         image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
         pure
-          ( image,
-            MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
+          ( image
+          , MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
           )

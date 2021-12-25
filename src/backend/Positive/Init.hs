@@ -20,6 +20,7 @@ import Positive.Prelude hiding (ByteString)
 import System.Directory
 import System.FilePath.Posix
 
+
 run :: TimedFastLogger -> Hasql.Pool -> IO ()
 run logger pool = do
   dir <- Path.fromFilePath <$> getCurrentDirectory
@@ -35,34 +36,40 @@ run logger pool = do
     & runLabelled @"stdout"
     & runLogStdout logger
 
+
 insertNewFilmRoll ::
-  ( HasLabelled "stdout" Log sig m,
-    Has PostgreSQL sig m,
-    Has (Lift IO) sig m,
-    Has (Throw PostgreSQL.Error) sig m
+  ( HasLabelled "stdout" Log sig m
+  , Has PostgreSQL sig m
+  , Has (Lift IO) sig m
+  , Has (Throw PostgreSQL.Error) sig m
   ) =>
   Path.Directory ->
   [Path.Filename] ->
   m [ImageSettingsId]
 insertNewFilmRoll dir filenames = do
+  let rollNumber =
+        fromMaybe (error "unable to extract rollnumber")
+          . Session.extractRollFromDir
+          $ Path.toFilePath dir
   imageSettingsIds <- PostgreSQL.runTransaction $ do
-    filmRollId <- Session.insertFilmRoll dir
+    filmRollId <- Session.insertFilmRoll rollNumber dir
     traverse (Session.insertImageSettings filmRollId) filenames
   logTrace @"stdout" "init" $ "inserted film roll for: " <> Path.unpack dir
   logTrace @"stdout" "init" $
     Text.unwords
-      [ "inserted image settings for:",
-        tshow (length imageSettingsIds),
-        "image(s)"
+      [ "inserted image settings for:"
+      , tshow (length imageSettingsIds)
+      , "image(s)"
       ]
-  sendIO $ createDirectoryIfMissing False "preview"
+  sendIO $ createDirectoryIfMissing False "previews"
   pure imageSettingsIds
 
+
 generatePreviews ::
-  ( HasLabelled "stdout" Log sig m,
-    Has PostgreSQL sig m,
-    Has (Lift IO) sig m,
-    Has (Throw PostgreSQL.Error) sig m
+  ( HasLabelled "stdout" Log sig m
+  , Has PostgreSQL sig m
+  , Has (Lift IO) sig m
+  , Has (Throw PostgreSQL.Error) sig m
   ) =>
   Path.Directory ->
   [ImageSettingsId] ->
