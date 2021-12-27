@@ -322,44 +322,32 @@ routeToPage filmRolls collections model =
         Route.Editor filmRollId imageSettingsId ->
             case ( toFilmRoll filmRollId, model.page ) of
                 ( Nothing, _ ) ->
-                    pushNotification Warning
-                        RemoveNotification
-                        "Error loading filmroll"
-                        model
+                    pushNotification Warning RemoveNotification "Error loading filmroll" model
 
                 ( Just ( filmRoll, images ), Editor m ) ->
                     if filmRoll.id == m.filmRoll.id then
-                        ( { model
-                            | page =
-                                Editor <|
-                                    Page.Editor.continue imageSettingsId m
-                          }
-                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                        )
+                        toEditor model <|
+                            Page.Editor.continue imageSettingsId m
 
                     else
-                        ( { model
-                            | page =
-                                Editor <|
-                                    Page.Editor.init filmRoll
-                                        collections
-                                        imageSettingsId
-                                        images
-                          }
-                        , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                        )
+                        toEditor model <|
+                            Page.Editor.init filmRoll collections imageSettingsId images
 
                 ( Just ( filmRoll, images ), _ ) ->
-                    ( { model
-                        | page =
-                            Editor <|
-                                Page.Editor.init filmRoll
-                                    collections
-                                    imageSettingsId
-                                    images
-                      }
-                    , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-                    )
+                    toEditor model <|
+                        Page.Editor.init filmRoll collections imageSettingsId images
+
+
+toEditor : Model -> Maybe Page.Editor.Model -> ( Model, Cmd Msg )
+toEditor model maybeEditor =
+    case maybeEditor of
+        Nothing ->
+            pushNotification Warning RemoveNotification "Error init/continuing editor" model
+
+        Just nextModel ->
+            ( { model | page = Editor nextModel }
+            , Cmd.map ScrollToMsg ScrollTo.scrollToTop
+            )
 
 
 extractUpdates : Model -> Model

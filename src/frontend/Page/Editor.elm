@@ -163,56 +163,56 @@ type alias EditorIndex =
     Index { editor : () }
 
 
-init : FilmRoll -> List Collection -> ImageSettingsId -> Images -> Model
+init : FilmRoll -> List Collection -> ImageSettingsId -> Images -> Maybe Model
 init filmRoll collections imageSettingsId images =
-    let
-        focussed =
-            focus imageSettingsId images
-    in
-    { filmRoll = filmRoll
-    , processingState = ProcessingState.preview
-    , images = focussed
-    , draftExpressions = fromArray (.expressions (Zipper.current focussed))
-    , checkExpressionsKey = Key 0
-    , imageCropMode = Nothing
-    , clipboard = Nothing
-    , undoState = []
-    , scale = 1
-    , minimumRating = 0
-    , previewColumns = 4
-    , notifications = emptyNotifications
-    , previewVersions = Dict.Fun.empty Id.toInt Id.fromInt
-    , imageElement =
-        { scene = { width = 0, height = 0 }
-        , viewport = { x = 0, y = 0, width = 0, height = 0 }
-        , element = { x = 0, y = 0, width = 0, height = 0 }
-        }
-    , coordinateInfo = Dict.empty
-    , fullscreen = False
-    , histogram = Nothing
-    , collections = collections
-    }
+    focus imageSettingsId images
+        |> Maybe.map
+            (\focussed ->
+                { filmRoll = filmRoll
+                , processingState = ProcessingState.preview
+                , images = focussed
+                , draftExpressions = fromArray (.expressions (Zipper.current focussed))
+                , checkExpressionsKey = Key 0
+                , imageCropMode = Nothing
+                , clipboard = Nothing
+                , undoState = []
+                , scale = 1
+                , minimumRating = 0
+                , previewColumns = 4
+                , notifications = emptyNotifications
+                , previewVersions = Dict.Fun.empty Id.toInt Id.fromInt
+                , imageElement =
+                    { scene = { width = 0, height = 0 }
+                    , viewport = { x = 0, y = 0, width = 0, height = 0 }
+                    , element = { x = 0, y = 0, width = 0, height = 0 }
+                    }
+                , coordinateInfo = Dict.empty
+                , fullscreen = False
+                , histogram = Nothing
+                , collections = collections
+                }
+            )
 
 
-continue : ImageSettingsId -> Model -> Model
+continue : ImageSettingsId -> Model -> Maybe Model
 continue imageSettingsId model =
-    let
-        focussed =
-            focus imageSettingsId model.images
-    in
-    { model
-        | processingState = ProcessingState.preview
-        , draftExpressions = fromArray (.expressions (Zipper.current focussed))
-        , images = focussed
-        , coordinateInfo = Dict.empty
-        , histogram = Nothing
-    }
+    focus imageSettingsId model.images
+        |> Maybe.map
+            (\focussed ->
+                { model
+                    | processingState = ProcessingState.preview
+                    , draftExpressions = fromArray (.expressions (Zipper.current focussed))
+                    , images = focussed
+                    , coordinateInfo = Dict.empty
+                    , histogram = Nothing
+                    , imageCropMode = Nothing
+                }
+            )
 
 
-focus : ImageSettingsId -> Images -> Images
+focus : ImageSettingsId -> Images -> Maybe Images
 focus imageSettingsId images =
-    Maybe.withDefault images <|
-        Zipper.findFirst ((==) imageSettingsId << .id) images
+    Zipper.findFirst (Id.eq imageSettingsId << .id) images
 
 
 
@@ -1050,6 +1050,28 @@ viewSettingsLeft images undoState imageCropMode clipboard_ processingState =
 
         clipboardTitle x clipboard =
             interpolate "{0} from {1}" [ x, Path.toString clipboard.filename ]
+
+        pasteAll s clipboard =
+            { s
+                | crop = clipboard.crop
+                , blackpoint = clipboard.blackpoint
+                , whitepoint = clipboard.whitepoint
+                , gamma = clipboard.gamma
+                , expressions = clipboard.expressions
+                , zones = clipboard.zones
+            }
+
+        pasteTone s clipboard =
+            { s
+                | blackpoint = clipboard.blackpoint
+                , whitepoint = clipboard.whitepoint
+                , gamma = clipboard.gamma
+                , expressions = clipboard.expressions
+                , zones = clipboard.zones
+            }
+
+        pasteCrop s clipboard =
+            { s | crop = clipboard.crop }
     in
     div [ class "image-settings-left" ]
         [ viewSettingsGroup
@@ -1069,50 +1091,38 @@ viewSettingsLeft images undoState imageCropMode clipboard_ processingState =
                     div [ class "image-settings-paste" ]
                         [ viewClipboardButton (clipboardTitle "tone+crop" clipboard)
                             Icon.applyBoth
-                            { clipboard | filename = settings.filename }
+                            (pasteAll settings clipboard)
                         , viewClipboardButton (clipboardTitle "tone" clipboard)
                             Icon.applyTone
-                            { clipboard
-                                | filename = settings.filename
-                                , rotate = settings.rotate
-                                , crop = settings.crop
-                            }
+                            (pasteTone settings clipboard)
                         , viewClipboardButton (clipboardTitle "crop" clipboard)
                             Icon.applyCrop
-                            { settings | crop = clipboard.crop }
+                            (pasteCrop settings clipboard)
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
-                                    Zipper.map (\i -> { clipboard | filename = i.filename }) images
+                                    Zipper.map (\s -> pasteAll s clipboard) images
                             , title (clipboardTitle "apply to all" clipboard)
                             ]
                             [ Icon.applyAll ]
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
-                                    Zipper.map
-                                        (\i ->
-                                            { clipboard
-                                                | filename = i.filename
-                                                , rotate = i.rotate
-                                                , crop = i.crop
-                                            }
-                                        )
-                                        images
+                                    Zipper.map (\s -> pasteTone s clipboard) images
                             , title (clipboardTitle "apply tone to all" clipboard)
                             ]
                             [ Icon.applyAllTone ]
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
-                                    Zipper.map (\i -> { i | crop = clipboard.crop }) images
+                                    Zipper.map (\s -> pasteCrop s clipboard) images
                             , title (clipboardTitle "apply crop to all" clipboard)
                             ]
                             [ Icon.applyAllCrop ]
                         , button
                             [ onClick <|
                                 ApplyCopyToAll <|
-                                    Zipper.map (\i -> { i | rotate = clipboard.rotate }) images
+                                    Zipper.map (\s -> { s | rotate = clipboard.rotate }) images
                             , title (clipboardTitle "apply rotate to all" clipboard)
                             ]
                             [ Icon.applyAllRotate ]
@@ -1599,7 +1609,7 @@ updateZipperById :
 updateZipperById imageSettingsId f =
     Zipper.map
         (\s ->
-            if s.id == imageSettingsId then
+            if Id.eq s.id imageSettingsId then
                 f s
 
             else

@@ -3,6 +3,7 @@ module Data.Id exposing
     , FilmRollId
     , Id
     , ImageSettingsId
+    , eq
     , fromInt
     , fromJson
     , fromString
@@ -39,6 +40,11 @@ type alias CollectionId =
 
 
 -- CONVERSIONS
+
+
+eq : Id a -> Id a -> Bool
+eq (Id a) (Id b) =
+    a == b
 
 
 fromInt : Int -> Id a
