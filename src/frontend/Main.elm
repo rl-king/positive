@@ -1,6 +1,7 @@
 port module Main exposing (main)
 
 import Browser
+import Browser.Dom
 import Browser.Events
 import Browser.Navigation as Navigation
 import Data.Id as Id exposing (FilmRollId)
@@ -17,6 +18,7 @@ import Page.Editor
 import Route exposing (Route)
 import ScrollTo
 import String.Interpolate exposing (interpolate)
+import Task
 import Url exposing (Url)
 import Util exposing (..)
 
@@ -133,7 +135,8 @@ init _ url key =
 
 
 type Msg
-    = LinkClicked Browser.UrlRequest
+    = NoOp
+    | LinkClicked Browser.UrlRequest
     | UrlChanged Url
     | ScrollToMsg ScrollTo.Msg
     | CancelScroll
@@ -150,6 +153,9 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NoOp ->
+            ( model, Cmd.none )
+
         LinkClicked (Browser.Internal url) ->
             ( model, Navigation.pushUrl model.key (Url.toString url) )
 
@@ -345,9 +351,7 @@ toEditor model maybeEditor =
             pushNotification Warning RemoveNotification "Error init/continuing editor" model
 
         Just nextModel ->
-            ( { model | page = Editor nextModel }
-            , Cmd.map ScrollToMsg ScrollTo.scrollToTop
-            )
+            ( { model | page = Editor nextModel }, Cmd.none )
 
 
 extractUpdates : Model -> Model
@@ -401,7 +405,13 @@ checkScrollPosition previousPage ( model, cmd ) =
                 ( model, cmd )
 
         ( Browser _, Editor _ ) ->
-            ( model, Cmd.batch [ cmd, Cmd.map ScrollToMsg ScrollTo.scrollToTop ] )
+            ( model
+            , Cmd.batch
+                [ cmd
+                , Task.attempt (always NoOp) <|
+                    Browser.Dom.setViewport 0 0
+                ]
+            )
 
         _ ->
             ( model, cmd )

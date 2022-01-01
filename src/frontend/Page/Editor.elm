@@ -178,7 +178,7 @@ init filmRoll collections imageSettingsId images =
                 , undoState = []
                 , scale = 1
                 , minimumRating = 0
-                , previewColumns = 4
+                , previewColumns = 6
                 , notifications = emptyNotifications
                 , previewVersions = Dict.Fun.empty Id.toInt Id.fromInt
                 , imageElement =
@@ -954,9 +954,9 @@ viewSettingsRight images collections maybeHistogram draftExpressions processingS
             List.map (Html.map OnImageSettingsChange)
                 [ Input.viewRange 0.1 ( 0, 10, 2.2 ) "Gamma" settings.gamma <|
                     \v -> { settings | gamma = v }
-                , Input.viewRange 0.01 ( -0.75, 0.75, 0 ) "Blackpoint" settings.blackpoint <|
+                , Input.viewRange 0.01 ( -0.25, 0.25, 0 ) "Blackpoint" settings.blackpoint <|
                     \v -> { settings | blackpoint = v }
-                , Input.viewRange 0.01 ( 0.25, 1.75, 1 ) "Whitepoint" settings.whitepoint <|
+                , Input.viewRange 0.01 ( 0.75, 1.25, 1 ) "Whitepoint" settings.whitepoint <|
                     \v -> { settings | whitepoint = v }
                 , Input.viewRange 0.001 ( -0.25, 0.25, 0 ) "Pop" zones.z7 <|
                     \v ->
