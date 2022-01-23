@@ -1,0 +1,365 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.6.
+--
+-- see: https://github.com/sol/hpack
+
+name:           positive
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/rl-king/positive#readme>
+homepage:       https://github.com/rl-king/positive#readme
+bug-reports:    https://github.com/rl-king/positive/issues
+author:         Ruben Lie King
+maintainer:     hello@rubenlieking.com
+copyright:      BSD-3
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    dist/index.html
+    dist/main.js
+    dist/style.css
+    dist/icons/apply-all-crop.svg
+    dist/icons/apply-all-rotate.svg
+    dist/icons/apply-all-tone.svg
+    dist/icons/apply-all.svg
+    dist/icons/apply-both.svg
+    dist/icons/apply-crop.svg
+    dist/icons/apply-tone.svg
+    dist/icons/cancel.svg
+    dist/icons/copy.svg
+    dist/icons/crop.svg
+    dist/icons/highres.svg
+    dist/icons/lambda.svg
+    dist/icons/left.svg
+    dist/icons/ok.svg
+    dist/icons/open.svg
+    dist/icons/original.svg
+    dist/icons/ps.svg
+    dist/icons/reset-tone.svg
+    dist/icons/reset.svg
+    dist/icons/right.svg
+    dist/icons/rotate.svg
+    dist/icons/save.svg
+    dist/icons/starred.svg
+    dist/icons/undo.svg
+    dist/icons/unstarred.svg
+    dist/icons/wallpaper.svg
+
+source-repository head
+  type: git
+  location: https://github.com/rl-king/positive
+
+library
+  exposed-modules:
+      Language.Haskell.To.Elm.Via
+      Positive.CLI
+      Positive.Data.Collection
+      Positive.Data.FilmRoll
+      Positive.Data.HKD
+      Positive.Data.Id
+      Positive.Data.ImageSettings
+      Positive.Data.Metadata
+      Positive.Data.Path
+      Positive.Database.Session
+      Positive.Effect.Log
+      Positive.Effect.PostgreSQL
+      Positive.Image
+      Positive.Image.Util
+      Positive.Init
+      Positive.Language
+      Positive.Metadata
+      Positive.Prelude
+      Positive.Server
+      Positive.Server.Api
+      Positive.Server.Handler
+      Positive.SingleImage
+      Positive.Static
+      Positive.Timed
+  other-modules:
+      Paths_positive
+  hs-source-dirs:
+      src/backend
+  default-extensions:
+      OverloadedStrings
+      NoImplicitPrelude
+  build-depends:
+      Glob
+    , aeson
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bound
+    , bytestring
+    , deepseq
+    , directory
+    , elm-syntax
+    , fast-logger
+    , file-embed
+    , filepath
+    , fused-effects ==1.1.1.1
+    , generics-sop
+    , hashable
+    , haskeline
+    , haskell-to-elm
+    , hasql
+    , hasql-pool
+    , hasql-transaction
+    , hip
+    , http-media
+    , http-types
+    , massiv
+    , massiv-io ==0.3.0.1
+    , megaparsec
+    , optparse-applicative
+    , process
+    , profunctors
+    , record-hasfield
+    , safe-exceptions
+    , servant
+    , servant-server
+    , servant-to-elm
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , wai
+    , wai-app-static
+    , wai-extra
+    , warp
+  default-language: Haskell2010
+
+executable codegen
+  main-is: Main.hs
+  other-modules:
+      Paths_positive
+  hs-source-dirs:
+      src/backend/codegen
+  default-extensions:
+      OverloadedStrings
+      NoImplicitPrelude
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fno-warn-name-shadowing
+  build-depends:
+      Glob
+    , aeson
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bound
+    , bytestring
+    , deepseq
+    , directory
+    , elm-syntax
+    , fast-logger
+    , file-embed
+    , filepath
+    , fused-effects ==1.1.1.1
+    , generics-sop
+    , hashable
+    , haskeline
+    , haskell-to-elm
+    , hasql
+    , hasql-pool
+    , hasql-transaction
+    , hip
+    , http-media
+    , http-types
+    , massiv
+    , massiv-io ==0.3.0.1
+    , megaparsec
+    , optparse-applicative
+    , positive
+    , process
+    , profunctors
+    , record-hasfield
+    , safe-exceptions
+    , servant
+    , servant-server
+    , servant-to-elm
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , wai
+    , wai-app-static
+    , wai-extra
+    , warp
+  default-language: Haskell2010
+
+executable pos
+  main-is: Main.hs
+  other-modules:
+      Paths_positive
+  hs-source-dirs:
+      src/backend/app
+  default-extensions:
+      OverloadedStrings
+      NoImplicitPrelude
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fno-warn-name-shadowing
+  build-depends:
+      Glob
+    , aeson
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bound
+    , bytestring
+    , deepseq
+    , directory
+    , elm-syntax
+    , fast-logger
+    , file-embed
+    , filepath
+    , fused-effects ==1.1.1.1
+    , generics-sop
+    , hashable
+    , haskeline
+    , haskell-to-elm
+    , hasql
+    , hasql-pool
+    , hasql-transaction
+    , hip
+    , http-media
+    , http-types
+    , massiv
+    , massiv-io ==0.3.0.1
+    , megaparsec
+    , optparse-applicative
+    , positive
+    , process
+    , profunctors
+    , record-hasfield
+    , safe-exceptions
+    , servant
+    , servant-server
+    , servant-to-elm
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , wai
+    , wai-app-static
+    , wai-extra
+    , warp
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Positive.LanguageSpec
+      Paths_positive
+  hs-source-dirs:
+      test
+  default-extensions:
+      OverloadedStrings
+      NoImplicitPrelude
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Glob
+    , aeson
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bound
+    , bytestring
+    , deepseq
+    , directory
+    , elm-syntax
+    , fast-logger
+    , file-embed
+    , filepath
+    , fused-effects ==1.1.1.1
+    , generics-sop
+    , hashable
+    , haskeline
+    , haskell-to-elm
+    , hasql
+    , hasql-pool
+    , hasql-transaction
+    , hip
+    , hspec
+    , hspec-expectations
+    , http-media
+    , http-types
+    , massiv
+    , massiv-io ==0.3.0.1
+    , megaparsec
+    , optparse-applicative
+    , positive
+    , process
+    , profunctors
+    , record-hasfield
+    , safe-exceptions
+    , servant
+    , servant-server
+    , servant-to-elm
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , wai
+    , wai-app-static
+    , wai-extra
+    , warp
+  default-language: Haskell2010
+
+benchmark pos-benchmark
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_positive
+  hs-source-dirs:
+      bench
+  default-extensions:
+      OverloadedStrings
+      NoImplicitPrelude
+  ghc-options: -rtsopts -threaded -with-rtsopts=-N -O2
+  build-depends:
+      Glob
+    , aeson
+    , base
+    , base64-bytestring
+    , bound
+    , bytestring
+    , criterion
+    , deepseq
+    , directory
+    , elm-syntax
+    , fast-logger
+    , file-embed
+    , filepath
+    , fused-effects ==1.1.1.1
+    , generics-sop
+    , hashable
+    , haskeline
+    , haskell-to-elm
+    , hasql
+    , hasql-pool
+    , hasql-transaction
+    , hip
+    , http-media
+    , http-types
+    , massiv
+    , massiv-io ==0.3.0.1
+    , megaparsec
+    , optparse-applicative
+    , positive
+    , process
+    , profunctors
+    , record-hasfield
+    , safe-exceptions
+    , servant
+    , servant-server
+    , servant-to-elm
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , vector
+    , wai
+    , wai-app-static
+    , wai-extra
+    , warp
+  default-language: Haskell2010

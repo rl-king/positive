@@ -1,7 +1,9 @@
 #!/bin/sh
 
-stack build --fast --ghc-options "-j4 +RTS -A128m -n2m -RTS -Wall" && \
-stack runghc -- -isrc src/codegen/CodeGen.hs && \
-elm make --debug src/frontend/Main.elm --output=dist/main.js && \
-cp -r src/frontend/icons dist && \
-cp src/frontend/style.css dist
+hpack &&
+cabal exec codegen &&
+elm make src/frontend/Main.elm  --output=dist/main.js --debug &&
+cp index.html dist &&
+cp src/frontend/style.css dist &&
+cp -r src/frontend/icons dist &&
+cabal build positive:exe:pos -O0 -j

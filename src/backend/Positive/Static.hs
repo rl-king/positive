@@ -53,9 +53,9 @@ toFile headers path assets =
 
 indexHtml :: ByteString
 indexHtml =
-  $(embedFile "./index.html")
+  $(embedFile "dist/index.html")
 
 
 static :: [(FilePath, ByteString)]
 static =
-  $(embedDir "./dist")
+  $(embedDir "dist")

@@ -11,8 +11,7 @@ import Browser.Events
 import Browser.Navigation
 import Data.Id as Id exposing (CollectionId, FilmRollId, ImageSettingsId)
 import Data.Path as Path
-import Date exposing (Date)
-import Dict
+import Date
 import Dict.Fun
 import Generated.Data
     exposing
@@ -216,7 +215,7 @@ view model =
                         List.map (viewFiltered n model.columns) <|
                             sortByDateDesc .developedOn model.filmRolls
 
-                ( n, selectedCollections ) ->
+                ( _, selectedCollections ) ->
                     viewCollections model.columns images <|
                         List.filter
                             (\{ id } -> List.member id selectedCollections)

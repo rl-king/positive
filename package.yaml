@@ -8,6 +8,11 @@ copyright: "BSD-3"
 
 extra-source-files:
   - README.md
+  - dist/index.html
+  - dist/main.js
+  - dist/style.css
+  - dist/icons/*.svg
+
 description: Please see the README on GitHub at <https://github.com/rl-king/positive#readme>
 
 dependencies:
@@ -36,7 +41,7 @@ dependencies:
   - http-types
   - massiv
   - megaparsec
-  - massiv-io
+  - massiv-io == 0.3.0.1
   - optparse-applicative
   - process
   - profunctors

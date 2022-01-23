@@ -24,7 +24,6 @@ module Util exposing
     , withCtrl
     )
 
-import Data.Path as Path exposing (Path)
 import Date exposing (Date)
 import Dict
 import Generated.Data exposing (RollNumber(..))
@@ -32,7 +31,6 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
 import Json.Decode as Decode
-import Json.Encode as Encode
 import Process
 import Task
 
@@ -185,7 +183,7 @@ matchKeyNoModifiers key msg =
 
 
 decodeKey : String -> Decode.Decoder { alt : Bool, ctrl : Bool, key : String }
-decodeKey key =
+decodeKey _ =
     Decode.map3
         (\a b c -> { key = a, ctrl = b, alt = c })
         (Decode.field "key" Decode.string)

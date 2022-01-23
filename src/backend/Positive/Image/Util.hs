@@ -26,6 +26,7 @@ ensureUniqueFilename filepath = do
       then filepath
       else
         let toNumbers = read @Int . reverse . takeWhile isDigit . reverse . dropExtension
+
             preExt = case sortOn Down $ toNumbers <$> filter (/= filepath) current of
               n : _ -> "-" <> show (n + 1)
               _ -> "-1"

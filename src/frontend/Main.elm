@@ -4,7 +4,7 @@ import Browser
 import Browser.Dom
 import Browser.Events
 import Browser.Navigation as Navigation
-import Data.Id as Id exposing (FilmRollId)
+import Data.Id exposing (FilmRollId)
 import Data.Path as Path
 import Generated.Data exposing (Collection, FilmRoll, RollNumber(..))
 import Generated.Request as Request

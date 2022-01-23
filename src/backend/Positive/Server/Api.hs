@@ -75,15 +75,15 @@ data SettingsApi route = SettingsApi
   , generateHighRes ::
       route :- "image" :> "settings" :> "highres"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent
+        :> PostNoContent
   , openExternalEditor ::
       route :- "image" :> "settings" :> "externaleditor"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent
+        :> PostNoContent
   , openInFinder ::
       route :- "image" :> "settings" :> "finder"
         :> Capture "imageSettingsId" ImageSettingsId
-        :> PostNoContent '[JSON] NoContent
+        :> PostNoContent
   , getCoordinateInfo ::
       route :- "image" :> "settings" :> "coordinate"
         :> ReqBody '[JSON] ([(Double, Double)], ImageSettings)
@@ -91,7 +91,7 @@ data SettingsApi route = SettingsApi
   , generateWallpaper ::
       route :- "image" :> "settings" :> "wallpaper"
         :> ReqBody '[JSON] ImageSettings
-        :> PostNoContent '[JSON] NoContent
+        :> PostNoContent
   }
   deriving (Generic)
 

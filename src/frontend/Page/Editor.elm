@@ -821,7 +821,7 @@ view model otherNotifications =
 
 
 viewNav : FilmRoll -> Images -> Html Msg
-viewNav filmRoll images =
+viewNav filmRoll _ =
     nav []
         [ a [ href "/" ] [ text "browser" ]
         , text <|
