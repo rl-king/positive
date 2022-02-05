@@ -162,6 +162,16 @@ updateRollNumber rollNumber filmRollId =
         Statement sql encoder Decode.noResult True
 
 
+updateDirectoryPath :: Path.Directory -> FilmRollId -> Session ()
+updateDirectoryPath directoryPath filmRollId =
+  let sql = "update positive.film_roll set directory_path = $1 where id = $2"
+      encoder =
+        (Path.unpack . fst >$< param Encode.text)
+          <> (Id.unpack . snd >$< param Encode.int4)
+   in Session.statement (directoryPath, filmRollId) $
+        Statement sql encoder Decode.noResult True
+
+
 updateMeta :: (Text, Text, Text, Text) -> FilmRollId -> Session ()
 updateMeta meta filmRollId =
   let sql =
@@ -462,6 +472,15 @@ addRoll = do
       case extractRollFromDir $ Path.toFilePath filmRoll.directoryPath of
         Nothing -> pure ()
         Just roll -> updateRollNumber roll filmRoll.id
+  print result
+
+
+rewriteDirPath :: IO ()
+rewriteDirPath = do
+  result <- rundb $ do
+    all <- selectFilmRolls
+    for all $ \filmRoll ->
+      updateDirectoryPath ("/Users/king/Pictures/Analog" <> filmRoll.directoryPath) filmRoll.id
   print result
 
 

@@ -64,18 +64,34 @@ generate ::
   ImageSettings ->
   m ()
 generate dir imageSettings = do
-  image <-
-    sendIO . Image.fromDiskPreProcess Nothing imageSettings.crop $
-      Path.append dir imageSettings.filename
-  sendIO $ createDirectoryIfMissing False (Path.toFilePath dir </> "highres")
-  outputWithCount <-
-    sendIO . Util.ensureUniqueFilename $
-      Path.toFilePath dir </> "highres" </> Path.toFilePath imageSettings.filename
-  logTrace @"stdout" "generate highres" $
-    "generating highres version: " <> Text.pack outputWithCount
-  either
-    (logTrace @"stdout" "generate highres" . tshow)
-    (sendIO . HIP.writeImage outputWithCount . Image.applySettings imageSettings)
-    image
-  logTrace @"stdout" "generate highres" $
-    "successfully generated highres version: " <> Text.pack outputWithCount
+  homeDir <- sendIO getHomeDirectory
+  let outputDir =
+        homeDir
+          </> "Pictures/PositiveOutput"
+          </> (last (splitDirectories (Path.toFilePath dir)))
+  sendIO $ createDirectoryIfMissing True outputDir
+  let outputNameWithHash =
+        updateBaseName (\n -> n <> "-" <> show (hash imageSettings)) $
+          outputDir </> Path.toFilePath imageSettings.filename
+  exists <- sendIO $ doesFileExist outputNameWithHash
+  if exists
+    then
+      logTrace @"stdout" "generate highres" $
+        "skipping generation of highres version (exists): " <> Text.pack outputNameWithHash
+    else do
+      logTrace @"stdout" "generate highres" $
+        "generating highres version: " <> Text.pack outputNameWithHash
+      image <-
+        sendIO . Image.fromDiskPreProcess Nothing imageSettings.crop $
+          Path.append dir imageSettings.filename
+      either
+        (logTrace @"stdout" "generate highres" . tshow)
+        (sendIO . HIP.writeImage outputNameWithHash . Image.applySettings imageSettings)
+        image
+      logTrace @"stdout" "generate highres" $
+        "successfully generated highres version: " <> Text.pack outputNameWithHash
+
+
+updateBaseName :: (FilePath -> FilePath) -> FilePath -> FilePath
+updateBaseName f x =
+  replaceBaseName x (f (takeBaseName x))

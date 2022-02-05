@@ -54,6 +54,7 @@ dependencies:
   - time
   - transformers
   - vector
+  - vector-instances
   - wai
   - wai-extra
   - wai-app-static

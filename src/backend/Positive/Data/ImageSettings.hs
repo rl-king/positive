@@ -17,6 +17,7 @@ module Positive.Data.ImageSettings where
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text as Text
+import Data.Vector.Instances ()
 import qualified Generics.SOP as SOP
 import qualified Language.Haskell.To.Elm as Elm
 import qualified Language.Haskell.To.Elm.Via as Elm
@@ -53,7 +54,14 @@ data ImageSettingsBase t f = ImageSettingsBase
   , filmRollId :: FilmRollId
   , histogram :: Vector Int
   }
-  deriving (Generic, SOP.Generic, SOP.HasDatatypeInfo)
+  deriving
+    ( Generic
+    , SOP.Generic
+    , SOP.HasDatatypeInfo
+    )
+
+
+deriving instance Hashable ImageSettings
 
 
 deriving via Elm.ElmType "ImageSettings" ImageSettings instance Aeson.ToJSON ImageSettings
@@ -117,7 +125,7 @@ data Zones = Zones
   , z8 :: Double
   , z9 :: Double
   }
-  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData, Hashable)
   deriving
     ( Aeson.ToJSON
     , Aeson.FromJSON
@@ -142,7 +150,7 @@ data Expression = Expression
   , eLabel :: Text
   , eExpr :: Text
   }
-  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData)
+  deriving (Show, Eq, Generic, SOP.Generic, SOP.HasDatatypeInfo, NFData, Hashable)
   deriving
     ( Aeson.ToJSON
     , Aeson.FromJSON

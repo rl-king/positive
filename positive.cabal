@@ -124,6 +124,7 @@ library
     , transformers
     , unordered-containers
     , vector
+    , vector-instances
     , wai
     , wai-app-static
     , wai-extra
@@ -181,6 +182,7 @@ executable pos
     , transformers
     , unordered-containers
     , vector
+    , vector-instances
     , wai
     , wai-app-static
     , wai-extra
@@ -238,6 +240,7 @@ executable pos-codegen
     , transformers
     , unordered-containers
     , vector
+    , vector-instances
     , wai
     , wai-app-static
     , wai-extra
@@ -299,6 +302,7 @@ test-suite spec
     , transformers
     , unordered-containers
     , vector
+    , vector-instances
     , wai
     , wai-app-static
     , wai-extra
@@ -358,6 +362,7 @@ benchmark pos-benchmark
     , transformers
     , unordered-containers
     , vector
+    , vector-instances
     , wai
     , wai-app-static
     , wai-extra

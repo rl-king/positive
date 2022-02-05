@@ -36,6 +36,7 @@ newtype Path (a :: Symbol)
     , FromHttpApiData
     , Aeson.ToJSON
     , Aeson.FromJSON
+    , Semigroup
     )
     via Text
 
