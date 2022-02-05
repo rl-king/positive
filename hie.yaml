@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "src/backend/app/Main.hs"
+      component: "exe:pos"
+
+    - path: "src/backend/codegen/Main.hs"
+      component: "exe:pos-codegen"
+
+    - path: "src/backend/src"
+      component: "lib:positive"

@@ -83,7 +83,7 @@ executables:
       - -Wincomplete-uni-patterns
       - -Wredundant-constraints
       - -fno-warn-name-shadowing
-  codegen:
+  pos-codegen:
     main: Main.hs
     source-dirs: src/backend/codegen
     dependencies:

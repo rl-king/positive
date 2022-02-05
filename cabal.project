@@ -11,9 +11,3 @@ source-repository-package
   type: git
   location: git@github.com:folq/haskell-to-elm.git
   tag: 8621bb349611787726a0a3f85990ed1a56e26dec
-
--- source-repository-package
---   type: git
---   location: git@github.com:lehins/hip.git
---   tag: 1386e83ad4c3e1bdb01f3d6bdec6fe40489dabd1
---   subdir:  hip
