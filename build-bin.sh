@@ -1,7 +1,6 @@
 #!/bin/sh
 
 hpack &&
-cabal exec pos-codegen &&
 elm make src/frontend/Main.elm  --output=dist/main.js --optimize &&
 cp index.html dist &&
 cp src/frontend/style.css dist &&

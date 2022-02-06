@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -F -pgmF=record-dot-preprocessor #-}
 
@@ -275,6 +276,17 @@ handleSetCollectionTarget collectionId = do
   PostgreSQL.runTransaction $
     Session.updateCollectionTarget collectionId
   PostgreSQL.runSession Session.selectCollections
+
+
+handleExportCollection :: Handler sig m => CollectionId -> m NoContent
+handleExportCollection collectionId = do
+  logTraceShow @"stdout" "export collection" collectionId
+  imageSettingsWithDirectories <- PostgreSQL.runSession $ do
+    collection <- Session.selectCollection collectionId
+    imageSettings <- traverse Session.selectImageSettings collection.imageIds
+    traverse (\x -> (,x) <$> Session.selectDirectoryPath x.id) imageSettings
+  traverse (uncurry SingleImage.generate) imageSettingsWithDirectories
+  pure NoContent
 
 
 -- HANDLER HELPERS

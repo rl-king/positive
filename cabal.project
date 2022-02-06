@@ -1,5 +1,9 @@
 packages: . ../Temp/hip/hip ../Temp/massiv-io/massiv-io
 
+jobs: $ncpus
+
+optimization: 0
+
 constraints: Color == 0.2.0, massiv == 0.5.4.0
 
 source-repository-package

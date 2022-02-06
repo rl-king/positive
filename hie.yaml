@@ -1,10 +1,16 @@
 cradle:
   cabal:
-    - path: "src/backend/app/Main.hs"
+    - path: "./src/backend/app/Main.hs"
       component: "exe:pos"
 
-    - path: "src/backend/codegen/Main.hs"
+    - path: "./src/backend/codegen/Main.hs"
       component: "exe:pos-codegen"
 
-    - path: "src/backend/src"
+    - path: "./bench/Main.hs"
+      component: "bench:pos-benchmark"
+
+    - path: "./test"
+      component: "test:spec"
+
+    - path: "./src/backend"
       component: "lib:positive"

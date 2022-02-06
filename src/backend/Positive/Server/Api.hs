@@ -68,6 +68,11 @@ data SettingsApi route = SettingsApi
       route :- "collection"
         :> Capture "collectionId" CollectionId
         :> Post '[JSON] [Collection]
+  , exportCollection ::
+      route :- "collection"
+        :> Capture "collectionId" CollectionId
+        :> "export"
+        :> PostNoContent
   , getSettingsHistogram ::
       route :- "image" :> "settings" :> "histogram"
         :> ReqBody '[JSON] ImageSettings

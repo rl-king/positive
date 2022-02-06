@@ -298,6 +298,23 @@ selectCollections =
         Statement sql Encode.noParams (Decode.rowList decodeCollection) True
 
 
+selectCollection :: CollectionId -> Session Collection
+selectCollection collectionId =
+  let sql =
+        "select collection.*, array_remove(array_agg(image_collection.image_id), null)\
+        \ from positive.collection\
+        \ left join positive.image_collection\
+        \ on image_collection.collection_id = collection.id\
+        \ where collection.id = $1 \
+        \ group by collection.id"
+   in Session.statement collectionId $
+        Statement
+          sql
+          (param $ Id.unpack >$< Encode.int4)
+          (Decode.singleRow decodeCollection)
+          True
+
+
 -- EN-DECODING
 
 encodeNewFilmRoll :: Encode.Params NewFilmRoll

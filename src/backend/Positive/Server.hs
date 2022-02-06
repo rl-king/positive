@@ -93,6 +93,7 @@ handlers isDev chan =
             , addToCollection = Handler.handleAddToCollection
             , removeFromCollection = Handler.handleRemoveFromCollection
             , setCollectionTarget = Handler.handleSetCollectionTarget
+            , exportCollection = Handler.handleExportCollection
             , getSettingsHistogram = Handler.handleGetSettingsHistogram
             , generateHighRes = Handler.handleGenerateHighRes
             , openExternalEditor = Handler.handleOpenExternalEditor

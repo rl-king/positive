@@ -84,9 +84,11 @@ type Msg
     | SetPoster (Maybe ( FilmRoll, ImageSettings ))
     | GotSaveImageSettings FilmRollId (HttpResult FilmRoll)
     | GotToggleCollection (HttpResult (List Collection))
+    | GotExportCollection (HttpResult ())
     | SetMinRating Rating
     | SetColumnCount Route.Columns
     | RemoveFromCollection CollectionId ImageSettingsId
+    | ExportCollection CollectionId
 
 
 update : Browser.Navigation.Key -> Msg -> Model -> ( Model, Cmd Msg )
@@ -121,6 +123,12 @@ update key msg model =
             ( { model | collections = collections }, Cmd.none )
 
         GotToggleCollection (Err _) ->
+            ( model, Cmd.none )
+
+        GotExportCollection (Ok _) ->
+            ( model, Cmd.none )
+
+        GotExportCollection (Err _) ->
             ( model, Cmd.none )
 
         SetPoster Nothing ->
@@ -161,6 +169,13 @@ update key msg model =
                 Request.deleteCollectionByCollectionIdByImageSettingsId
                     collectionId
                     imageSettingsId
+            )
+
+        ExportCollection collectionId ->
+            ( model
+            , Cmd.map GotExportCollection <|
+                Request.postCollectionByCollectionIdExport
+                    collectionId
             )
 
 
@@ -273,10 +288,17 @@ viewCollections columns images collections =
 viewCollection : Columns -> ImageLookupTable -> Collection -> Html Msg
 viewCollection columns images collection =
     div [ class "browser-collection-images" ] <|
-        (::) (h2 [] [ text collection.title ]) <|
-            List.map (viewCollectionImage columns collection.id) <|
+        List.concat
+            [ [ h2 [] [ text collection.title ]
+              , button
+                    [ onClick (ExportCollection collection.id)
+                    ]
+                    [ text "Export" ]
+              ]
+            , List.map (viewCollectionImage columns collection.id) <|
                 List.filterMap (\id -> Dict.Fun.get id images)
                     collection.imageIds
+            ]
 
 
 viewCollectionImage :
