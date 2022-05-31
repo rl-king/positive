@@ -61,6 +61,9 @@ data ImageSettingsBase t f = ImageSettingsBase
     )
 
 
+deriving instance Eq ImageSettings
+
+
 deriving instance Hashable ImageSettings
 
 

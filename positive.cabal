@@ -97,7 +97,7 @@ library
     , fast-logger
     , file-embed
     , filepath
-    , fused-effects ==1.1.1.1
+    , fused-effects ==1.1.1.2
     , generics-sop
     , hashable
     , haskeline
@@ -154,7 +154,7 @@ executable pos
     , fast-logger
     , file-embed
     , filepath
-    , fused-effects ==1.1.1.1
+    , fused-effects ==1.1.1.2
     , generics-sop
     , hashable
     , haskeline
@@ -212,7 +212,7 @@ executable pos-codegen
     , fast-logger
     , file-embed
     , filepath
-    , fused-effects ==1.1.1.1
+    , fused-effects ==1.1.1.2
     , generics-sop
     , hashable
     , haskeline
@@ -272,7 +272,7 @@ test-suite spec
     , fast-logger
     , file-embed
     , filepath
-    , fused-effects ==1.1.1.1
+    , fused-effects ==1.1.1.2
     , generics-sop
     , hashable
     , haskeline
@@ -334,7 +334,7 @@ benchmark pos-benchmark
     , fast-logger
     , file-embed
     , filepath
-    , fused-effects ==1.1.1.1
+    , fused-effects ==1.1.1.2
     , generics-sop
     , hashable
     , haskeline

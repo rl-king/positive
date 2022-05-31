@@ -70,26 +70,26 @@ generate dir imageSettings = do
           </> "Pictures/PositiveOutput"
           </> (last (splitDirectories (Path.toFilePath dir)))
   sendIO $ createDirectoryIfMissing True outputDir
-  let outputNameWithHash =
-        updateBaseName (\n -> n <> "-" <> show (hash imageSettings)) $
-          outputDir </> Path.toFilePath imageSettings.filename
-  exists <- sendIO $ doesFileExist outputNameWithHash
+  let outputNameWithoutHash =
+        -- updateBaseName (\n -> n <> "-" <> show (hash imageSettings)) $
+        outputDir </> Path.toFilePath imageSettings.filename
+  exists <- sendIO $ doesFileExist outputNameWithoutHash
   if exists
     then
       logTrace @"stdout" "generate highres" $
-        "skipping generation of highres version (exists): " <> Text.pack outputNameWithHash
+        "skipping generation of highres version (exists): " <> Text.pack outputNameWithoutHash
     else do
       logTrace @"stdout" "generate highres" $
-        "generating highres version: " <> Text.pack outputNameWithHash
+        "generating highres version: " <> Text.pack outputNameWithoutHash
       image <-
         sendIO . Image.fromDiskPreProcess Nothing imageSettings.crop $
           Path.append dir imageSettings.filename
       either
         (logTrace @"stdout" "generate highres" . tshow)
-        (sendIO . HIP.writeImage outputNameWithHash . Image.applySettings imageSettings)
+        (sendIO . HIP.writeImage outputNameWithoutHash . Image.applySettings imageSettings)
         image
       logTrace @"stdout" "generate highres" $
-        "successfully generated highres version: " <> Text.pack outputNameWithHash
+        "successfully generated highres version: " <> Text.pack outputNameWithoutHash
 
 
 updateBaseName :: (FilePath -> FilePath) -> FilePath -> FilePath

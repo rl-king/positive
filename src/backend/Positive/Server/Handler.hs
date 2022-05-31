@@ -145,12 +145,13 @@ handleGenerateWallpaper settings = do
           </> filter
             (\c -> not (isPathSeparator c || c == '.'))
             (Path.toFilePath directoryPath)
-          <> " | "
-          <> Path.toFilePath settings.filename
+            <> " | "
+            <> Path.toFilePath settings.filename
+  homeDir <- sendIO Directory.getHomeDirectory
+  sendIO . Directory.createDirectoryIfMissing True $
+    homeDir </> "Documents/wallpapers/positive"
   logTraceShow @"stdout" "generating wallpaper version" settings.id
-  output <-
-    sendIO $
-      Util.ensureUniqueFilename . outputBase =<< sendIO Directory.getHomeDirectory
+  output <- sendIO . Util.ensureUniqueFilename $ outputBase homeDir
   image <-
     throwLeft
       . sendIO
@@ -232,7 +233,9 @@ handleGetCoordinateInfo (coordinates, settings) =
           PostgreSQL.runSession $ Session.selectDirectoryPath settings.id
         (image, putMVarBack) <-
           first (Image.applySettings settings)
-            <$> getCachedImage settings.id settings.crop
+            <$> getCachedImage
+              settings.id
+              settings.crop
               (Text.pack (Path.append directoryPath settings.filename))
         sendIO putMVarBack
         pure $ fmap (toInfo image) coordinates
@@ -313,15 +316,15 @@ getCachedImage imageSettingsId crop path =
     case maybeCache of
       Just cache@(cachedImageSettingsId, cachedCrop, cachedImage)
         | cachedCrop == crop && cachedImageSettingsId == imageSettingsId -> do
-          logTraceShow @"stdout" "loaded from cache" imageSettingsId
-          pure (cachedImage, MVar.putMVar env.imageMVar (Just cache))
+            logTraceShow @"stdout" "loaded from cache" imageSettingsId
+            pure (cachedImage, MVar.putMVar env.imageMVar (Just cache))
         | otherwise -> do
-          image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
-          Util.writeToCache cachedImageSettingsId cachedCrop cachedImage
-          pure
-            ( image
-            , MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
-            )
+            image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
+            Util.writeToCache cachedImageSettingsId cachedCrop cachedImage
+            pure
+              ( image
+              , MVar.putMVar env.imageMVar (Just (imageSettingsId, crop, image))
+              )
       Nothing -> do
         logTraceShow @"stdout" "loading from disk" imageSettingsId
         image <- throwLeft $ Util.readImageFromWithCache imageSettingsId crop path
