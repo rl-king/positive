@@ -21,6 +21,7 @@ module Util exposing
     , viewMaybe
     , viewNotifications
     , withAlt
+    , withAltOr
     , withCtrl
     )
 
@@ -193,24 +194,29 @@ decodeKey _ =
 
 withCtrl : Decode.Decoder a -> Decode.Decoder a
 withCtrl =
-    withKey "ctrlKey"
+    withKey "ctrlKey" (Decode.fail "No ctrlKey pressed")
 
 
 withAlt : Decode.Decoder a -> Decode.Decoder a
 withAlt =
+    withKey "altKey" (Decode.fail "No altKey pressed")
+
+
+withAltOr : Decode.Decoder a -> Decode.Decoder a -> Decode.Decoder a
+withAltOr =
     withKey "altKey"
 
 
-withKey : String -> Decode.Decoder a -> Decode.Decoder a
-withKey key decoder =
+withKey : String -> Decode.Decoder a -> Decode.Decoder a -> Decode.Decoder a
+withKey key whenFalse whenTrue =
     Decode.field key Decode.bool
         |> Decode.andThen
             (\keyPressed ->
                 if keyPressed then
-                    decoder
+                    whenTrue
 
                 else
-                    Decode.fail ("No " ++ key ++ " pressed")
+                    whenFalse
             )
 
 

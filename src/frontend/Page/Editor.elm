@@ -1008,12 +1008,15 @@ viewSettingsRight images collections maybeHistogram draftExpressions processingS
 viewToggleCollection : ImageSettings -> Collection -> Html Msg
 viewToggleCollection { id } collection =
     let
-        ( isMember, msg ) =
-            if List.member id collection.imageIds then
-                ( True, RemoveFromCollection id collection.id )
+        isMember =
+            List.member id collection.imageIds
+
+        msg id_ =
+            if isMember then
+                RemoveFromCollection id_ collection.id
 
             else
-                ( False, AddToCollection id collection.id )
+                AddToCollection id_ collection.id
 
         content =
             if collection.target then
@@ -1026,12 +1029,9 @@ viewToggleCollection { id } collection =
         [ classList [ ( "-selected", isMember ) ]
         , title "'alt + click' to set as target, 'ctrl + a' to add"
         , on "click" <|
-            Decode.oneOf
-                [ withAlt <|
-                    Decode.succeed <|
-                        SetTargetCollection collection.id
-                , Decode.succeed msg
-                ]
+            withAltOr
+                (Decode.succeed (msg id))
+                (Decode.succeed (SetTargetCollection collection.id))
         ]
         [ text content ]
 

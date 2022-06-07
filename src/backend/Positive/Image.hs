@@ -11,7 +11,7 @@ import Graphics.Image (Ix2 ((:.)))
 import qualified Graphics.Image as HIP
 import Positive.Data.ImageSettings (
   ImageCrop,
-  ImageSettings,
+  ImageSettingsBase,
  )
 import qualified Positive.Language as Language
 import Positive.Prelude hiding (ByteString)
@@ -66,7 +66,7 @@ fromDiskPreProcess targetSize imageCrop path =
 
 -- EDIT
 
-applySettings :: ImageSettings -> Monochrome -> Monochrome
+applySettings :: ImageSettingsBase t f -> Monochrome -> Monochrome
 applySettings !is !image =
   let applyZones =
         foldr (\(z, v) acc -> acc . zone z v) identity $
@@ -155,7 +155,7 @@ normalize image =
                   * ( (HIP.maxValue - HIP.minValue)
                         HIP.// (iMax - iMin)
                     )
-                    + HIP.minValue
+                  + HIP.minValue
             )
         )
         image

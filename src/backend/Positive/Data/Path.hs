@@ -16,6 +16,7 @@ module Positive.Data.Path (
   pack,
   toFilePath,
   toByteString,
+  appendDir,
   fromFilePath,
   append,
 ) where
@@ -94,5 +95,10 @@ fromFilePath = Path . Text.pack
 
 
 append :: Path a -> Path b -> FilePath
-append dir filename =
-  toFilePath dir </> toFilePath filename
+append a b =
+  toFilePath a </> toFilePath b
+
+
+appendDir :: Directory -> Directory -> Directory
+appendDir a b =
+  fromFilePath $ toFilePath a </> toFilePath b

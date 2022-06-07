@@ -10,6 +10,7 @@ data Mode
   = Init
   | SingleImage FilePath
   | Server IsDev Port
+  | QuickPreview FilePath
   deriving (Show, Eq)
 
 
@@ -41,6 +42,13 @@ parser =
               <> metavar "FILENAME"
               <> help "process fullsize image to ./highres"
           )
+    , QuickPreview
+        <$> strOption
+          ( long "quick"
+              <> short 'q'
+              <> metavar "FILENAME"
+              <> help "process image to ./quick-preview with default settings"
+          )
     , Server <$> isDev <*> port
     ]
 
@@ -53,5 +61,9 @@ isDev =
 port :: Parser Int
 port =
   option auto $
-    long "listen" <> short 'l' <> showDefault <> value 8080 <> metavar "INT"
+    long "listen"
+      <> short 'l'
+      <> showDefault
+      <> value 8080
+      <> metavar "INT"
       <> help "Port at which the server is run"

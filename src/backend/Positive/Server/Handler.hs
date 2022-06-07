@@ -252,14 +252,14 @@ handleGetSettings = do
 handleGetCollections :: Handler sig m => m [Collection]
 handleGetCollections = do
   logTrace @"stdout" "handler" "get collections"
-  PostgreSQL.runSession Session.selectCollections
+  PostgreSQL.runTransaction Session.selectCollections
 
 
 handleAddToCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
 handleAddToCollection collectionId imageSettingsId = do
   logTraceShow @"stdout" "add to collection" (collectionId, imageSettingsId)
-  PostgreSQL.runSession $ do
+  PostgreSQL.runTransaction $ do
     Session.insertImageToCollection collectionId imageSettingsId
     Session.selectCollections
 
@@ -268,7 +268,7 @@ handleRemoveFromCollection ::
   Handler sig m => CollectionId -> ImageSettingsId -> m [Collection]
 handleRemoveFromCollection collectionId imageSettingsId = do
   logTraceShow @"stdout" "remove from collection" (collectionId, imageSettingsId)
-  PostgreSQL.runSession $ do
+  PostgreSQL.runTransaction $ do
     Session.deleteImageFromCollection collectionId imageSettingsId
     Session.selectCollections
 
@@ -276,9 +276,9 @@ handleRemoveFromCollection collectionId imageSettingsId = do
 handleSetCollectionTarget :: Handler sig m => CollectionId -> m [Collection]
 handleSetCollectionTarget collectionId = do
   logTraceShow @"stdout" "set collection target" collectionId
-  PostgreSQL.runTransaction $
+  PostgreSQL.runTransaction $ do
     Session.updateCollectionTarget collectionId
-  PostgreSQL.runSession Session.selectCollections
+    Session.selectCollections
 
 
 handleExportCollection :: Handler sig m => CollectionId -> m NoContent

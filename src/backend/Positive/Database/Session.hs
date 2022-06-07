@@ -55,7 +55,7 @@ insertFilmRoll rollNumber directoryPath =
         Statement sql encodeNewFilmRoll decoder True
 
 
-insertImageToCollection :: CollectionId -> ImageSettingsId -> Session ()
+insertImageToCollection :: CollectionId -> ImageSettingsId -> Transaction ()
 insertImageToCollection collectionId imageSettingsId =
   let sql =
         "insert into positive.image_collection\
@@ -65,13 +65,13 @@ insertImageToCollection collectionId imageSettingsId =
       encode =
         (Id.unpack . fst >$< param Encode.int4)
           <> (Id.unpack . snd >$< param Encode.int4)
-   in Session.statement (imageSettingsId, collectionId) $
+   in Transaction.statement (imageSettingsId, collectionId) $
         Statement sql encode Decode.noResult True
 
 
 -- DELETE
 
-deleteImageFromCollection :: CollectionId -> ImageSettingsId -> Session ()
+deleteImageFromCollection :: CollectionId -> ImageSettingsId -> Transaction ()
 deleteImageFromCollection collectionId imageSettingsId =
   let sql =
         "delete from positive.image_collection\
@@ -79,7 +79,7 @@ deleteImageFromCollection collectionId imageSettingsId =
       encode =
         (Id.unpack . fst >$< param Encode.int4)
           <> (Id.unpack . snd >$< param Encode.int4)
-   in Session.statement (imageSettingsId, collectionId) $
+   in Transaction.statement (imageSettingsId, collectionId) $
         Statement sql encode Decode.noResult True
 
 
@@ -286,7 +286,7 @@ selectImageSettings imageSettingsId =
           True
 
 
-selectCollections :: Session [Collection]
+selectCollections :: Transaction [Collection]
 selectCollections =
   let sql =
         "select collection.*, array_remove(array_agg(image_collection.image_id), null)\
@@ -294,7 +294,7 @@ selectCollections =
         \ left join positive.image_collection\
         \ on image_collection.collection_id = collection.id\
         \ group by collection.id"
-   in Session.statement () $
+   in Transaction.statement () $
         Statement sql Encode.noParams (Decode.rowList decodeCollection) True
 
 

@@ -217,6 +217,11 @@ emptyCrop =
   ImageCrop 0 0 100
 
 
+quickCrop :: ImageCrop
+quickCrop =
+  ImageCrop 3.5 3.5 93
+
+
 -- COORDINATE
 
 data CoordinateInfo = CoordinateInfo

@@ -71,6 +71,7 @@ library
       Positive.Language
       Positive.Metadata
       Positive.Prelude
+      Positive.QuickPreview
       Positive.Server
       Positive.Server.Api
       Positive.Server.Handler
