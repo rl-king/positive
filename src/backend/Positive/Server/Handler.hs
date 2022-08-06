@@ -22,6 +22,7 @@ import qualified Data.Massiv.Array.Manifest.Vector as Massiv
 import qualified Data.Text as Text
 import qualified Graphics.Image as HIP
 import qualified Positive.CLI as CLI
+import qualified Positive.CollectionExport as CollectionExport
 import Positive.Data.Collection (Collection)
 import Positive.Data.FilmRoll (FilmRoll)
 import Positive.Data.Id
@@ -284,11 +285,12 @@ handleSetCollectionTarget collectionId = do
 handleExportCollection :: Handler sig m => CollectionId -> m NoContent
 handleExportCollection collectionId = do
   logTraceShow @"stdout" "export collection" collectionId
-  imageSettingsWithDirectories <- PostgreSQL.runSession $ do
+  (collection, imageSettingsWithDirectories) <- PostgreSQL.runSession $ do
     collection <- Session.selectCollection collectionId
     imageSettings <- traverse Session.selectImageSettings collection.imageIds
-    traverse (\x -> (,x) <$> Session.selectDirectoryPath x.id) imageSettings
-  traverse (uncurry SingleImage.generate) imageSettingsWithDirectories
+    imageSettingsWithDirectories <- traverse (\x -> (,x) <$> Session.selectDirectoryPath x.id) imageSettings
+    pure (collection, imageSettingsWithDirectories)
+  traverse_ (uncurry (CollectionExport.generate collection)) imageSettingsWithDirectories
   pure NoContent
 
 

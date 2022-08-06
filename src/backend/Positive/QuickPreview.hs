@@ -64,7 +64,7 @@ generate dir filename = do
   logTrace @"stdout" "generate quick-preview" $
     "generating quick-preview version: " <> Text.pack outputPath
   resizedImage <-
-    sendIO (Image.fromDiskPreProcess (Just 750) ImageSettings.quickCrop inputPath)
+    sendIO (Image.fromDiskPreProcess Nothing ImageSettings.quickCrop inputPath)
   either
     (logTrace @"stdout" "generate quick-preview" . tshow)
     ( sendIO

@@ -68,7 +68,7 @@ generate dir imageSettings = do
   let outputDir =
         homeDir
           </> "Pictures/PositiveOutput"
-          </> (last (splitDirectories (Path.toFilePath dir)))
+          </> last (splitDirectories (Path.toFilePath dir))
   sendIO $ createDirectoryIfMissing True outputDir
   let outputNameWithoutHash =
         -- updateBaseName (\n -> n <> "-" <> show (hash imageSettings)) $

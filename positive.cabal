@@ -55,6 +55,7 @@ library
   exposed-modules:
       Language.Haskell.To.Elm.Via
       Positive.CLI
+      Positive.CollectionExport
       Positive.Data.Collection
       Positive.Data.FilmRoll
       Positive.Data.HKD
