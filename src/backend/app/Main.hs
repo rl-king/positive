@@ -19,7 +19,7 @@ main = do
   FastLogger.withTimedFastLogger timeCache (LogStdout defaultBufSize) $
     \logger -> do
       mode <- CLI.parseArgs
-      pool <- Hasql.Pool.acquire (3, 10, "host=localhost port=5432 dbname=positive")
+      pool <- Hasql.Pool.acquire 3 (Just 10) "host=localhost port=5432 dbname=positive"
       case mode of
         CLI.Init -> Init.run logger pool
         CLI.SingleImage filepath -> SingleImage.run logger pool filepath
